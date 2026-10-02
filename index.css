@@ -127,6 +127,8 @@ body {
     max-width: 600px;
     padding: 2rem;
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    max-height: 90vh;
+    overflow-y: auto;
 }
 
 .form-grid {
@@ -425,4 +427,37 @@ body {
     border-top: 1px solid rgba(255,255,255,0.1);
     padding-top: 1rem;
     margin-bottom: 1rem;
+}
+
+/* ============================
+   RESPONSIVE (MÓVIL)
+   ============================ */
+@media (max-width: 768px) {
+    .pos-layout {
+        flex-direction: column;
+        overflow-y: auto;
+    }
+    
+    .pos-cart-section {
+        width: 100%;
+        min-height: 400px;
+    }
+    
+    .pos-products-section {
+        overflow-y: visible;
+    }
+
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .app-layout {
+        height: auto;
+        min-height: 100vh;
+    }
+
+    .top-nav {
+        flex-direction: column;
+        gap: 1rem;
+    }
 }
