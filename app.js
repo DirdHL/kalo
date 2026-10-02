@@ -27,11 +27,56 @@ try {
         // Inputs del Formulario
         const productCodeInput = document.getElementById('productCode');
         const productNameInput = document.getElementById('productName');
+        const categoriaInput = document.getElementById('categoria');
+        const previewImg = document.getElementById('previewImg');
         const precioCompraInput = document.getElementById('precioCompra');
         const precioVentaInput = document.getElementById('precioVenta');
         const gananciaInput = document.getElementById('ganancia');
         const stockInput = document.getElementById('stock');
         const alertaStockInput = document.getElementById('alertaStock');
+
+        // Nodos Modal Imagen
+        const imagePickerModal = document.getElementById('imagePickerModal');
+        const openImagePickerBtn = document.getElementById('openImagePickerBtn');
+        const closeImagePickerBtn = document.getElementById('closeImagePickerBtn');
+        const imageGrid = document.getElementById('imageGrid');
+        
+        let selectedImageName = ''; // Guardará el nombre del archivo
+
+        // Aquí van los nombres de las fotos que pondrás en la carpeta public/img/
+        const availableImages = [
+            'agua.jpg', 'cocacola.jpg', 'galletas.jpg', 'papas.jpg', 
+            'cerveza.jpg', 'leche.jpg', 'jabon.jpg', 'chocolate.jpg'
+        ];
+
+        // --- MANEJO DEL MODAL DE IMÁGENES ---
+        openImagePickerBtn.addEventListener('click', () => {
+            imagePickerModal.classList.remove('hidden');
+            renderImageGrid();
+        });
+
+        closeImagePickerBtn.addEventListener('click', () => {
+            imagePickerModal.classList.add('hidden');
+        });
+
+        function renderImageGrid() {
+            imageGrid.innerHTML = '';
+            availableImages.forEach(imgName => {
+                const div = document.createElement('div');
+                div.className = 'image-option';
+                // Si la imagen no existe aún, se verá roto, pero cuando el usuario ponga el archivo se arreglará
+                div.innerHTML = `
+                    <img src="/img/${imgName}" alt="${imgName}" onerror="this.src='https://via.placeholder.com/100?text=Falta+Foto'">
+                    <p>${imgName}</p>
+                `;
+                div.addEventListener('click', () => {
+                    selectedImageName = imgName;
+                    previewImg.src = `/img/${imgName}`;
+                    imagePickerModal.classList.add('hidden');
+                });
+                imageGrid.appendChild(div);
+            });
+        }
 
         // --- MANEJO DEL MODAL ---
         openModalBtn.addEventListener('click', () => {
@@ -47,12 +92,15 @@ try {
         function limpiarFormulario() {
             productCodeInput.value = '';
             productNameInput.value = '';
+            categoriaInput.value = 'Bebidas';
             precioCompraInput.value = '';
             precioVentaInput.value = '';
             gananciaInput.value = '';
             stockInput.value = '';
             alertaStockInput.value = '';
             productStatusMsg.textContent = '';
+            selectedImageName = '';
+            previewImg.src = 'https://via.placeholder.com/50?text=Img';
         }
 
         // --- CÁLCULO DE GANANCIA EN TIEMPO REAL ---
@@ -120,7 +168,7 @@ try {
                 productList.innerHTML = ''; 
                 
                 if (data.length === 0) {
-                    productList.innerHTML = '<tr><td colspan="6" style="text-align:center; color:gray">No hay productos registrados.</td></tr>';
+                    productList.innerHTML = '<tr><td colspan="8" style="text-align:center; color:gray">No hay productos registrados.</td></tr>';
                     return;
                 }
 
@@ -140,10 +188,14 @@ try {
                     const pCompra = prod.precio_compra ? `$${prod.precio_compra.toFixed(2)}` : '—';
                     const pVenta = prod.precio_venta ? `$${prod.precio_venta.toFixed(2)}` : '—';
                     const pStock = prod.stock !== null ? prod.stock : '—';
+                    const cat = prod.categoria ? prod.categoria : '—';
+                    const imgSrc = prod.imagen ? `/img/${prod.imagen}` : 'https://via.placeholder.com/40?text=No+Img';
 
                     tr.innerHTML = `
+                        <td><img src="${imgSrc}" style="width: 40px; height: 40px; border-radius: 8px; object-fit: cover;" onerror="this.src='https://via.placeholder.com/40?text=?'"></td>
                         <td><code>${codigo}</code></td>
                         <td>${prod.nombre}</td>
+                        <td>${cat}</td>
                         <td>${pCompra}</td>
                         <td><strong style="color: #a7f3d0">${pVenta}</strong></td>
                         <td>${pStock}${stockWarning}</td>
@@ -185,6 +237,7 @@ try {
             const pVenta = parseFloat(precioVentaInput.value) || null;
             const stock = parseInt(stockInput.value) || null;
             const alerta = parseInt(alertaStockInput.value) || null;
+            const cat = categoriaInput.value;
             
             if (!productName || !productCode) {
                 productStatusMsg.textContent = 'El código y el nombre son obligatorios.';
@@ -197,6 +250,8 @@ try {
                 const payload = { 
                     codigo: productCode, 
                     nombre: productName,
+                    categoria: cat,
+                    imagen: selectedImageName || null,
                     precio_compra: pCompra,
                     precio_venta: pVenta,
                     stock: stock,

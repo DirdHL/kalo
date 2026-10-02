@@ -45,8 +45,10 @@
                 <table class="data-table">
                     <thead>
                         <tr>
+                            <th>Img</th>
                             <th>Código</th>
                             <th>Nombre</th>
+                            <th>Categoría</th>
                             <th>Compra</th>
                             <th>Venta</th>
                             <th>Stock</th>
@@ -74,6 +76,28 @@
             <div class="input-group">
                 <label>Nombre del Producto</label>
                 <input type="text" id="productName" placeholder="Ej. Galletas de Chocolate" class="styled-input">
+            </div>
+
+            <div class="form-grid">
+                <div class="input-group">
+                    <label>Categoría</label>
+                    <select id="categoria" class="styled-input">
+                        <option value="Bebidas">🥤 Bebidas</option>
+                        <option value="Snacks">🍿 Snacks</option>
+                        <option value="Lácteos">🥛 Lácteos</option>
+                        <option value="Limpieza">🧼 Limpieza</option>
+                        <option value="Dulces">🍬 Dulces</option>
+                        <option value="Abarrotes">🥫 Abarrotes</option>
+                        <option value="Otros">📦 Otros</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label>Imagen del Producto</label>
+                    <div style="display: flex; gap: 1rem; align-items: center;">
+                        <img id="previewImg" src="/img/placeholder.png" alt="Sin foto" style="width: 50px; height: 50px; border-radius: 8px; object-fit: cover; background: rgba(255,255,255,0.1);">
+                        <button id="openImagePickerBtn" class="secondary-btn" style="padding: 0.5rem; flex: 1; font-size: 0.9rem;">Escoger Img</button>
+                    </div>
+                </div>
             </div>
 
             <div class="form-grid">
@@ -107,6 +131,22 @@
             <div class="modal-actions">
                 <button id="closeModalBtn" class="secondary-btn">Cancelar</button>
                 <button id="addProductBtn" class="primary-btn">Guardar Producto</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Seleccionador de Imágenes -->
+    <div class="modal-overlay hidden" id="imagePickerModal" style="z-index: 200;">
+        <div class="modal" style="max-width: 700px;">
+            <h2 style="margin-bottom: 1.5rem;">Escoger Imagen 📸</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 1rem; font-size: 0.9rem;">Haz clic en la fotografía que corresponda al producto.</p>
+            
+            <div class="image-grid" id="imageGrid">
+                <!-- Se llenará con JS con las fotos reales de tu carpeta -->
+            </div>
+            
+            <div class="modal-actions">
+                <button id="closeImagePickerBtn" class="secondary-btn">Cancelar</button>
             </div>
         </div>
     </div>
