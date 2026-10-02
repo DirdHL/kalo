@@ -66,14 +66,15 @@ try {
             availableImages.forEach(imgName => {
                 const div = document.createElement('div');
                 div.className = 'image-option';
-                // Si la imagen no existe aún, se verá roto, pero cuando el usuario ponga el archivo se arreglará
+                
+                // Usamos import.meta.env.BASE_URL para que funcione tanto en localhost como en GitHub Pages (/kalo/)
                 div.innerHTML = `
-                    <img src="/img/${imgName}" alt="${imgName}" onerror="this.src='https://via.placeholder.com/100?text=Falta+Foto'">
+                    <img src="${import.meta.env.BASE_URL}img/${imgName}" alt="${imgName}" onerror="this.src='https://via.placeholder.com/100?text=Falta+Foto'">
                     <p>${imgName}</p>
                 `;
                 div.addEventListener('click', () => {
                     selectedImageName = imgName;
-                    previewImg.src = `/img/${imgName}`;
+                    previewImg.src = `${import.meta.env.BASE_URL}img/${imgName}`;
                     imagePickerModal.classList.add('hidden');
                 });
                 imageGrid.appendChild(div);
@@ -191,7 +192,7 @@ try {
                     const pVenta = prod.precio_venta ? `$${prod.precio_venta.toFixed(2)}` : '—';
                     const pStock = prod.stock !== null ? prod.stock : '—';
                     const cat = prod.categoria ? prod.categoria : '—';
-                    const imgSrc = prod.imagen ? `/img/${prod.imagen}` : 'https://via.placeholder.com/40?text=No+Img';
+                    const imgSrc = prod.imagen ? `${import.meta.env.BASE_URL}img/${prod.imagen}` : 'https://via.placeholder.com/40?text=No+Img';
 
                     tr.innerHTML = `
                         <td><img src="${imgSrc}" style="width: 40px; height: 40px; border-radius: 8px; object-fit: cover;" onerror="this.src='https://via.placeholder.com/40?text=?'"></td>
