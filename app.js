@@ -102,9 +102,38 @@ try {
                     li.style.borderRadius = '8px';
                     li.style.display = 'flex';
                     li.style.alignItems = 'center';
-                    li.innerHTML = `<span>🏷️ ${prod.nombre}</span>`;
+                    li.style.justifyContent = 'space-between';
+                    
+                    li.innerHTML = `
+                        <span>🏷️ ${prod.nombre}</span>
+                        <button class="delete-btn" data-id="${prod.id || prod.nombre}" style="background: transparent; border: none; cursor: pointer; font-size: 1.2rem; color: #fca5a5; transition: transform 0.2s; padding: 0 0.5rem;">🗑️</button>
+                    `;
                     productList.appendChild(li);
                 });
+
+                // Escuchar clics en los botones de eliminar
+                document.querySelectorAll('.delete-btn').forEach(btn => {
+                    btn.addEventListener('click', async (e) => {
+                        const id = e.currentTarget.getAttribute('data-id');
+                        if(confirm('¿Seguro que deseas eliminar este producto?')) {
+                            try {
+                                e.currentTarget.style.opacity = '0.5';
+                                
+                                // Intentamos borrar por ID, o por nombre si no hay ID
+                                const column = prod => prod.id ? 'id' : 'nombre'; // Hack rápido
+                                const { error } = await supabase.from('productos').delete().eq(Number(id) ? 'id' : 'nombre', id);
+                                
+                                if (error) throw error;
+                                await loadProducts(); // Recargar la lista
+                            } catch (error) {
+                                console.error('Error al eliminar:', error);
+                                alert('No se pudo eliminar: ' + error.message);
+                                await loadProducts();
+                            }
+                        }
+                    });
+                });
+
             } catch (error) {
                 console.error('Error al cargar:', error);
                 productList.innerHTML = `<li style="padding: 0.5rem; color: #fca5a5; text-align: center;">Error al cargar: ${error.message}</li>`;
