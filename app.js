@@ -23,19 +23,26 @@ try {
         const productList = document.getElementById('productList');
         const productStatusMsg = document.getElementById('productStatusMsg');
         const addProductBtn = document.getElementById('addProductBtn');
+        const productCodeInput = document.getElementById('productCode');
         const productNameInput = document.getElementById('productName');
         const logoutBtn = document.getElementById('logoutBtn');
 
+        // Escuchar "Enter" en el código de barras (así funcionan las lectoras)
+        productCodeInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                productNameInput.focus(); // Pasar al nombre al escanear
+            }
+        });
+
         // ESCUCHAR CAMBIOS DE SESIÓN MÁGICAMENTE
-        // Esto detecta si el usuario está logueado o si cerró sesión
         supabase.auth.onAuthStateChange((event, session) => {
             if (session) {
-                // Si hay un usuario logueado, ocultamos login y mostramos inventario
                 loginCard.classList.add('hidden');
                 dashboardCard.classList.remove('hidden');
-                loadProducts(); // Cargar la lista solo cuando entra
+                loadProducts(); 
+                productCodeInput.focus(); // Enfocar para escanear rápido
             } else {
-                // Si no hay nadie, mostramos login y ocultamos inventario
                 dashboardCard.classList.add('hidden');
                 loginCard.classList.remove('hidden');
             }
@@ -55,14 +62,12 @@ try {
                 loginBtn.textContent = 'Iniciando...';
                 loginStatusMsg.textContent = '';
                 
-                // Pedirle a Supabase que verifique las credenciales
                 const { error } = await supabase.auth.signInWithPassword({
                     email,
                     password
                 });
 
                 if (error) throw error;
-                // Si es exitoso, el evento 'onAuthStateChange' se disparará solo.
                 
             } catch (error) {
                 console.error(error);
@@ -83,7 +88,8 @@ try {
         // 3. CARGAR PRODUCTOS
         async function loadProducts() {
             try {
-                const { data, error } = await supabase.from('productos').select('*');
+                // Ordenar por más reciente primero
+                const { data, error } = await supabase.from('productos').select('*').order('id', { ascending: false });
                 if (error) throw error;
 
                 productList.innerHTML = ''; 
@@ -104,12 +110,13 @@ try {
                     li.style.alignItems = 'center';
                     li.style.justifyContent = 'space-between';
                     
-                    // Asegurarnos de saber qué columna usar para borrar (id es lo ideal, si no hay, por nombre)
                     const delCol = prod.id !== undefined ? 'id' : 'nombre';
                     const delVal = prod.id !== undefined ? prod.id : prod.nombre;
 
+                    const codigoText = prod.codigo ? `[${prod.codigo}] ` : '';
+
                     li.innerHTML = `
-                        <span>🏷️ ${prod.nombre}</span>
+                        <span>🧾 ${codigoText}🏷️ ${prod.nombre}</span>
                         <button class="delete-btn" data-col="${delCol}" data-val="${delVal}" style="background: transparent; border: none; cursor: pointer; font-size: 1.2rem; color: #fca5a5; transition: transform 0.2s; padding: 0 0.5rem;">🗑️</button>
                     `;
                     productList.appendChild(li);
@@ -124,11 +131,9 @@ try {
                         if(confirm('¿Seguro que deseas eliminar este producto?')) {
                             try {
                                 e.currentTarget.style.opacity = '0.5';
-                                
                                 const { error } = await supabase.from('productos').delete().eq(col, val);
-                                
                                 if (error) throw error;
-                                await loadProducts(); // Recargar la lista
+                                await loadProducts();
                             } catch (error) {
                                 console.error('Error al eliminar:', error);
                                 alert('No se pudo eliminar: ' + error.message);
@@ -146,22 +151,29 @@ try {
 
         // 4. AGREGAR PRODUCTO
         addProductBtn.addEventListener('click', async () => {
+            const productCode = productCodeInput.value.trim();
             const productName = productNameInput.value.trim();
-            if (!productName) {
-                productStatusMsg.textContent = 'El nombre es obligatorio.';
+            
+            if (!productName || !productCode) {
+                productStatusMsg.textContent = 'El código y el nombre son obligatorios.';
                 return;
             }
 
             try {
                 addProductBtn.textContent = 'Guardando...';
-                const { error } = await supabase.from('productos').insert([{ nombre: productName }]);
+                // Insertamos código y nombre a la vez
+                const { error } = await supabase.from('productos').insert([{ codigo: productCode, nombre: productName }]);
                 if (error) throw error;
 
                 productStatusMsg.style.color = '#86efac';
-                productStatusMsg.textContent = '¡Guardado!';
+                productStatusMsg.textContent = '¡Guardado con éxito!';
+                productCodeInput.value = '';
                 productNameInput.value = '';
                 
                 await loadProducts();
+                
+                // Volver a enfocar el código para que escaneen el siguiente producto rápido
+                productCodeInput.focus();
                 
                 setTimeout(() => productStatusMsg.textContent = '', 3000);
             } catch (error) {
