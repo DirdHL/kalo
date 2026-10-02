@@ -46,13 +46,12 @@ try {
         // Aquí pones exactamente los nombres de las fotos que vayas metiendo a la carpeta
         const availableImages = [
             'AGUA_SAN_CARLOS_500ML.svg',
-            'Agua_Loa_1L_chupon.svg',
+            'Agua_Loa_1l_chupon.svg',
             'Agua_Loa_3L.svg',
             'Agua_Loa_625ml.svg',
             'Agua_cielo_2.5_litros_Sin_Gas.svg',
             'Agua_cielo_625ml_Sin_Gas.svg',
-            'Agua_cielo_chupon_1lt_Sin_Gas.svg',
-            'Agua_san_luis_limon_625ml.svg'
+            'Agua_cielo_chupon_1lt_Sin_Gas.svg'
         ];
 
         // --- MANEJO DEL MODAL DE IMÁGENES ---
