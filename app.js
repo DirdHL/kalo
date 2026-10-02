@@ -397,8 +397,8 @@ try {
             const alerta = parseInt(alertaStockInput.value) || null;
             const cat = categoriaInput.value;
 
-            if (!productName || !productCode) {
-                productStatusMsg.textContent = 'El código y el nombre son obligatorios.';
+            if (!productName) {
+                productStatusMsg.textContent = 'El nombre del producto es obligatorio.';
                 return;
             }
 
@@ -406,7 +406,7 @@ try {
                 addProductBtn.textContent = 'Guardando...';
 
                 const payload = {
-                    codigo: productCode,
+                    codigo: productCode || null,
                     nombre: productName,
                     categoria: cat,
                     imagen: selectedImageName || null,
