@@ -42,6 +42,7 @@ try {
         const imageGrid = document.getElementById('imageGrid');
 
         let selectedImageName = ''; // Guardará el nombre del archivo
+        let editingProductId = null; // ID del producto al editar
 
         // Aquí pones exactamente los nombres de las fotos que vayas metiendo a la carpeta
         const availableImages = [
@@ -96,6 +97,9 @@ try {
         });
 
         function limpiarFormulario() {
+            editingProductId = null;
+            document.querySelector('#productModal h2').textContent = 'Registrar Producto';
+            addProductBtn.textContent = 'Guardar Producto';
             productCodeInput.value = '';
             productNameInput.value = '';
             categoriaInput.value = 'Bebidas';
@@ -107,6 +111,30 @@ try {
             productStatusMsg.textContent = '';
             selectedImageName = '';
             previewImg.src = 'https://via.placeholder.com/50?text=Img';
+        }
+
+        function abrirModalEdicion(prod) {
+            editingProductId = prod.id;
+            document.querySelector('#productModal h2').textContent = 'Editar Producto ✏️';
+            addProductBtn.textContent = 'Actualizar Producto';
+            
+            productCodeInput.value = prod.codigo || '';
+            productNameInput.value = prod.nombre || '';
+            categoriaInput.value = prod.categoria || 'Bebidas';
+            precioCompraInput.value = prod.precio_compra || '';
+            precioVentaInput.value = prod.precio_venta || '';
+            stockInput.value = prod.stock !== null ? prod.stock : '';
+            alertaStockInput.value = prod.alerta_stock !== null ? prod.alerta_stock : '';
+            
+            selectedImageName = prod.imagen || '';
+            if (selectedImageName) {
+                previewImg.src = `${import.meta.env.BASE_URL}img/${selectedImageName}`;
+            } else {
+                previewImg.src = 'https://via.placeholder.com/50?text=Img';
+            }
+            
+            calcularGanancia();
+            productModal.classList.remove('hidden');
         }
 
         // --- CÁLCULO DE GANANCIA EN TIEMPO REAL ---
@@ -205,11 +233,18 @@ try {
                         <td>${pCompra}</td>
                         <td><strong style="color: #a7f3d0">${pVenta}</strong></td>
                         <td>${pStock}${stockWarning}</td>
-                        <td>
-                            <button class="delete-btn" data-col="${delCol}" data-val="${delVal}" style="background: transparent; border: none; cursor: pointer; font-size: 1.2rem; color: #fca5a5; transition: transform 0.2s;">🗑️</button>
+                        <td style="display: flex; gap: 0.5rem; justify-content: center;">
+                            <button class="edit-btn" style="background: transparent; border: none; cursor: pointer; font-size: 1.2rem; color: #60a5fa; transition: transform 0.2s;" title="Editar">✏️</button>
+                            <button class="delete-btn" data-col="${delCol}" data-val="${delVal}" style="background: transparent; border: none; cursor: pointer; font-size: 1.2rem; color: #fca5a5; transition: transform 0.2s;" title="Eliminar">🗑️</button>
                         </td>
                     `;
                     productList.appendChild(tr);
+                });
+
+                document.querySelectorAll('.edit-btn').forEach((btn, index) => {
+                    btn.addEventListener('click', () => {
+                        abrirModalEdicion(data[index]);
+                    });
                 });
 
                 document.querySelectorAll('.delete-btn').forEach(btn => {
@@ -264,11 +299,17 @@ try {
                     alerta_stock: alerta
                 };
 
-                const { error } = await supabase.from('productos').insert([payload]);
-                if (error) throw error;
+                let res;
+                if (editingProductId) {
+                    res = await supabase.from('productos').update(payload).eq('id', editingProductId);
+                } else {
+                    res = await supabase.from('productos').insert([payload]);
+                }
+
+                if (res.error) throw res.error;
 
                 productStatusMsg.style.color = '#86efac';
-                productStatusMsg.textContent = '¡Producto guardado exitosamente!';
+                productStatusMsg.textContent = editingProductId ? '¡Producto actualizado exitosamente!' : '¡Producto guardado exitosamente!';
 
                 await loadProducts();
 
@@ -282,7 +323,7 @@ try {
                 productStatusMsg.style.color = '#fca5a5';
                 productStatusMsg.textContent = 'Error: ' + error.message;
             } finally {
-                addProductBtn.textContent = 'Guardar Producto';
+                addProductBtn.textContent = editingProductId ? 'Actualizar Producto' : 'Guardar Producto';
             }
         });
     });
