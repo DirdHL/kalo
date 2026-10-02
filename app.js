@@ -70,7 +70,7 @@ try {
             availableImages.forEach(imgName => {
                 const div = document.createElement('div');
                 div.className = 'image-option';
-                
+
                 // Usamos import.meta.env.BASE_URL para que funcione tanto en localhost como en GitHub Pages (/kalo/)
                 div.innerHTML = `
                     <img src="${import.meta.env.BASE_URL}img/${imgName}" alt="${imgName}" onerror="this.src='https://via.placeholder.com/100?text=Falta+Foto'">
@@ -117,7 +117,7 @@ try {
             editingProductId = prod.id;
             document.querySelector('#productModal h2').textContent = 'Editar Producto ✏️';
             addProductBtn.textContent = 'Actualizar Producto';
-            
+
             productCodeInput.value = prod.codigo || '';
             productNameInput.value = prod.nombre || '';
             categoriaInput.value = prod.categoria || 'Bebidas';
@@ -125,14 +125,14 @@ try {
             precioVentaInput.value = prod.precio_venta || '';
             stockInput.value = prod.stock !== null ? prod.stock : '';
             alertaStockInput.value = prod.alerta_stock !== null ? prod.alerta_stock : '';
-            
+
             selectedImageName = prod.imagen || '';
             if (selectedImageName) {
                 previewImg.src = `${import.meta.env.BASE_URL}img/${selectedImageName}`;
             } else {
                 previewImg.src = 'https://via.placeholder.com/50?text=Img';
             }
-            
+
             calcularGanancia();
             productModal.classList.remove('hidden');
         }
