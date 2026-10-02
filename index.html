@@ -12,8 +12,24 @@
     <div class="background-animation"></div>
     <main class="container">
         
+        <!-- Pantalla de Login -->
+        <div class="glass-card" id="loginCard">
+            <h1>Bienvenido.</h1>
+            <p>Inicia sesión para acceder al inventario</p>
+            
+            <div class="input-group">
+                <input type="email" id="emailInput" placeholder="Correo electrónico" class="styled-input">
+            </div>
+            <div class="input-group">
+                <input type="password" id="passwordInput" placeholder="Contraseña" class="styled-input">
+            </div>
+            
+            <button id="loginBtn" class="primary-btn">Entrar</button>
+            <p id="loginStatusMsg" style="margin-top: 1rem; margin-bottom: 0; font-size: 0.9rem; color: #fca5a5;"></p>
+        </div>
+
         <!-- Panel Principal: Registrar Producto -->
-        <div class="glass-card" id="dashboardCard">
+        <div class="glass-card hidden" id="dashboardCard">
             <h1>Nuevo Producto 📦</h1>
             <p>Ingresa los detalles para registrar un producto</p>
             
@@ -31,11 +47,14 @@
                     <li style="padding: 0.5rem; text-align: center; color: rgba(255,255,255,0.5);">Cargando productos...</li>
                 </ul>
             </div>
+
+            <div style="margin-top: 2rem; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 1.5rem;">
+                <button id="logoutBtn" class="secondary-btn" style="padding: 0.5rem 1.5rem; font-size: 0.9rem;">Cerrar sesión</button>
+            </div>
         </div>
 
     </main>
-    <!-- Supabase CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js"></script>
+    <!-- Script de la aplicación como módulo -->
+    <script type="module" src="/app.js"></script>
 </body>
 </html>

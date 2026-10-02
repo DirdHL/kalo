@@ -1,23 +1,86 @@
-// Envolvemos todo en un bloque para capturar errores críticos (como bloqueos del navegador o de Antigravity)
+import { createClient } from '@supabase/supabase-js';
+
+// Envolvemos todo en un bloque para capturar errores críticos
 try {
-    // ¡Tus credenciales fijas!
-    const SUPABASE_URL = 'https://zdomrtadukszbsavopuo.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpkb21ydGFkdWtzemJzYXZvcHVvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA4NjUxNzUsImV4cCI6MjEwNjQ0MTE3NX0.qIK-MYiAJlxBwstPbtXhVRyHALlFFJ0yQQKST-a3iL0';
+    // ¡Tus credenciales seguras leídas desde el archivo .env!
+    const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+    const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
     document.addEventListener('DOMContentLoaded', () => {
+        const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // Nodos del DOM (Pantallas)
+        const loginCard = document.getElementById('loginCard');
+        const dashboardCard = document.getElementById('dashboardCard');
+        
+        // Nodos del Login
+        const emailInput = document.getElementById('emailInput');
+        const passwordInput = document.getElementById('passwordInput');
+        const loginBtn = document.getElementById('loginBtn');
+        const loginStatusMsg = document.getElementById('loginStatusMsg');
+        
+        // Nodos del Inventario
         const productList = document.getElementById('productList');
         const productStatusMsg = document.getElementById('productStatusMsg');
         const addProductBtn = document.getElementById('addProductBtn');
         const productNameInput = document.getElementById('productName');
+        const logoutBtn = document.getElementById('logoutBtn');
 
-        // Verificar si la librería cargó correctamente de internet
-        if (typeof window.supabase === 'undefined') {
-            productList.innerHTML = '<li style="color: #fca5a5; padding: 1rem; text-align: center;">❌ Error: No se pudo cargar Supabase. Es posible que tu vista previa esté bloqueando scripts de internet. Intenta abrir el archivo directamente en Chrome.</li>';
-            return;
-        }
+        // ESCUCHAR CAMBIOS DE SESIÓN MÁGICAMENTE
+        // Esto detecta si el usuario está logueado o si cerró sesión
+        supabase.auth.onAuthStateChange((event, session) => {
+            if (session) {
+                // Si hay un usuario logueado, ocultamos login y mostramos inventario
+                loginCard.classList.add('hidden');
+                dashboardCard.classList.remove('hidden');
+                loadProducts(); // Cargar la lista solo cuando entra
+            } else {
+                // Si no hay nadie, mostramos login y ocultamos inventario
+                dashboardCard.classList.add('hidden');
+                loginCard.classList.remove('hidden');
+            }
+        });
 
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        // 1. INICIAR SESIÓN
+        loginBtn.addEventListener('click', async () => {
+            const email = emailInput.value.trim();
+            const password = passwordInput.value.trim();
+            
+            if (!email || !password) {
+                loginStatusMsg.textContent = 'Ingresa correo y contraseña.';
+                return;
+            }
 
+            try {
+                loginBtn.textContent = 'Iniciando...';
+                loginStatusMsg.textContent = '';
+                
+                // Pedirle a Supabase que verifique las credenciales
+                const { error } = await supabase.auth.signInWithPassword({
+                    email,
+                    password
+                });
+
+                if (error) throw error;
+                // Si es exitoso, el evento 'onAuthStateChange' se disparará solo.
+                
+            } catch (error) {
+                console.error(error);
+                loginStatusMsg.textContent = 'Error: Credenciales inválidas o usuario no existe.';
+            } finally {
+                loginBtn.textContent = 'Entrar';
+            }
+        });
+
+        // 2. CERRAR SESIÓN
+        logoutBtn.addEventListener('click', async () => {
+            await supabase.auth.signOut();
+            emailInput.value = '';
+            passwordInput.value = '';
+            productList.innerHTML = '';
+        });
+
+        // 3. CARGAR PRODUCTOS
         async function loadProducts() {
             try {
                 const { data, error } = await supabase.from('productos').select('*');
@@ -48,8 +111,7 @@ try {
             }
         }
 
-        loadProducts();
-
+        // 4. AGREGAR PRODUCTO
         addProductBtn.addEventListener('click', async () => {
             const productName = productNameInput.value.trim();
             if (!productName) {
@@ -59,7 +121,7 @@ try {
 
             try {
                 addProductBtn.textContent = 'Guardando...';
-                const { data, error } = await supabase.from('productos').insert([{ nombre: productName }]);
+                const { error } = await supabase.from('productos').insert([{ nombre: productName }]);
                 if (error) throw error;
 
                 productStatusMsg.style.color = '#86efac';
@@ -80,9 +142,4 @@ try {
 
 } catch (error) {
     console.error("Error crítico en la inicialización:", error);
-    // Mostrar error si la vista previa falla silenciosamente
-    setTimeout(() => {
-        const list = document.getElementById('productList');
-        if(list) list.innerHTML = `<li style="color: red;">Error crítico en el código: ${error.message}</li>`;
-    }, 1000);
 }
