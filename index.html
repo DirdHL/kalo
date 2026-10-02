@@ -62,18 +62,19 @@
             </div>
 
             <!-- Panel Principal: Inventario -->
-            <div class="glass-card hidden" id="dashboardCard" style="flex: 1; display: flex; flex-direction: column;">
-                <div class="dashboard-header" style="margin-bottom: 1.5rem;">
+            <div class="glass-card hidden" id="dashboardCard" style="flex: 1; display: flex; flex-direction: column; overflow: visible;">
+                <div class="dashboard-header" style="margin-bottom: 1.5rem; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 1rem; align-items: center;">
                     <div>
                         <h1 style="margin-bottom: 0.2rem">Inventario 📦</h1>
                         <p style="color: var(--text-secondary); font-size: 0.9rem;">Gestiona tus productos y stock</p>
                     </div>
-                    <div>
+                    <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+                        <input type="text" id="invSearch" class="pos-search" style="width: 280px; padding: 0.8rem;" placeholder="🔍 Buscar producto...">
                         <button id="openModalBtn" class="primary-btn" style="width: auto; padding: 0.8rem 1.5rem;">➕ Nuevo Producto</button>
                     </div>
                 </div>
 
-                <div class="table-container" style="flex: 1;">
+                <div class="table-container" style="flex: 1; overflow: visible;">
                     <table class="data-table">
                         <thead>
                             <tr>
@@ -91,6 +92,15 @@
                             <!-- Productos generados por JS -->
                         </tbody>
                     </table>
+                </div>
+                
+                <!-- Paginación -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.1);">
+                    <div style="color: var(--text-secondary); font-size: 0.9rem;" id="paginationInfo">Mostrando 0 productos</div>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button id="prevPageBtn" class="secondary-btn" style="width: auto; padding: 0.5rem 1rem;">Anterior</button>
+                        <button id="nextPageBtn" class="secondary-btn" style="width: auto; padding: 0.5rem 1rem;">Siguiente</button>
+                    </div>
                 </div>
             </div>
         </div>

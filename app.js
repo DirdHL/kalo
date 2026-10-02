@@ -33,6 +33,16 @@ try {
         let globalProducts = [];
         let cart = [];
 
+        // Paginación y Búsqueda Inventario
+        const invSearch = document.getElementById('invSearch');
+        const prevPageBtn = document.getElementById('prevPageBtn');
+        const nextPageBtn = document.getElementById('nextPageBtn');
+        const paginationInfo = document.getElementById('paginationInfo');
+        
+        let invCurrentPage = 1;
+        const invItemsPerPage = 10;
+        let invFilteredProducts = [];
+
         // Nodos del Modal
         const productModal = document.getElementById('productModal');
         const openModalBtn = document.getElementById('openModalBtn');
@@ -231,81 +241,139 @@ try {
                 const { data, error } = await supabase.from('productos').select('*').order('id', { ascending: false });
                 if (error) throw error;
 
-                productList.innerHTML = '';
-
                 if (data.length === 0) {
-                    productList.innerHTML = '<tr><td colspan="8" style="text-align:center; color:gray">No hay productos registrados.</td></tr>';
                     globalProducts = [];
+                    invFilteredProducts = [];
+                    renderInventoryTable();
                     renderPosGrid(globalProducts);
                     return;
                 }
 
                 globalProducts = data;
+                invFilteredProducts = data;
+                invCurrentPage = 1;
+                renderInventoryTable();
                 renderPosGrid(globalProducts);
-
-                data.forEach(prod => {
-                    const tr = document.createElement('tr');
-
-                    // Alerta de inventario bajo
-                    let stockWarning = '';
-                    if (prod.stock !== null && prod.alerta_stock !== null && prod.stock <= prod.alerta_stock) {
-                        tr.classList.add('warning-row');
-                        stockWarning = ' <span title="¡Inventario Bajo!" style="color: #f59e0b;">⚠️</span>';
-                    }
-
-                    const delCol = prod.id !== undefined ? 'id' : 'nombre';
-                    const delVal = prod.id !== undefined ? prod.id : prod.nombre;
-                    const codigo = prod.codigo ? prod.codigo : '—';
-                    const pCompra = prod.precio_compra ? `$${prod.precio_compra.toFixed(2)}` : '—';
-                    const pVenta = prod.precio_venta ? `$${prod.precio_venta.toFixed(2)}` : '—';
-                    const pStock = prod.stock !== null ? prod.stock : '—';
-                    const cat = prod.categoria ? prod.categoria : '—';
-                    const imgSrc = prod.imagen ? `${import.meta.env.BASE_URL}img/${prod.imagen}` : 'https://via.placeholder.com/40?text=No+Img';
-
-                    tr.innerHTML = `
-                        <td><img src="${imgSrc}" style="width: 40px; height: 40px; border-radius: 8px; object-fit: cover;" onerror="this.src='https://via.placeholder.com/40?text=?'"></td>
-                        <td><code>${codigo}</code></td>
-                        <td>${prod.nombre}</td>
-                        <td>${cat}</td>
-                        <td>${pCompra}</td>
-                        <td><strong style="color: #a7f3d0">${pVenta}</strong></td>
-                        <td>${pStock}${stockWarning}</td>
-                        <td style="display: flex; gap: 0.5rem; justify-content: center;">
-                            <button class="edit-btn" style="background: transparent; border: none; cursor: pointer; font-size: 1.2rem; color: #60a5fa; transition: transform 0.2s;" title="Editar">✏️</button>
-                            <button class="delete-btn" data-col="${delCol}" data-val="${delVal}" style="background: transparent; border: none; cursor: pointer; font-size: 1.2rem; color: #fca5a5; transition: transform 0.2s;" title="Eliminar">🗑️</button>
-                        </td>
-                    `;
-                    productList.appendChild(tr);
-                });
-
-                document.querySelectorAll('.edit-btn').forEach((btn, index) => {
-                    btn.addEventListener('click', () => {
-                        abrirModalEdicion(data[index]);
-                    });
-                });
-
-                document.querySelectorAll('.delete-btn').forEach(btn => {
-                    btn.addEventListener('click', async (e) => {
-                        const col = e.currentTarget.getAttribute('data-col');
-                        const val = e.currentTarget.getAttribute('data-val');
-                        if (confirm('¿Seguro que deseas eliminar este producto?')) {
-                            try {
-                                e.currentTarget.style.opacity = '0.5';
-                                const { error } = await supabase.from('productos').delete().eq(col, val);
-                                if (error) throw error;
-                                await loadProducts();
-                            } catch (error) {
-                                alert('Error: ' + error.message);
-                                await loadProducts();
-                            }
-                        }
-                    });
-                });
 
             } catch (error) {
                 productList.innerHTML = `<tr><td colspan="8" style="color:#fca5a5; text-align:center">Error al cargar: ${error.message}</td></tr>`;
             }
         }
+
+        // --- RENDERIZAR TABLA DE INVENTARIO CON PAGINACIÓN ---
+        function renderInventoryTable() {
+            productList.innerHTML = '';
+            
+            if (invFilteredProducts.length === 0) {
+                productList.innerHTML = '<tr><td colspan="8" style="text-align:center; color:gray">No hay productos registrados.</td></tr>';
+                paginationInfo.textContent = 'Mostrando 0 productos';
+                prevPageBtn.disabled = true;
+                nextPageBtn.disabled = true;
+                return;
+            }
+
+            const totalPages = Math.ceil(invFilteredProducts.length / invItemsPerPage);
+            if (invCurrentPage > totalPages) invCurrentPage = totalPages;
+            if (invCurrentPage < 1) invCurrentPage = 1;
+
+            const startIndex = (invCurrentPage - 1) * invItemsPerPage;
+            const endIndex = startIndex + invItemsPerPage;
+            const currentData = invFilteredProducts.slice(startIndex, endIndex);
+
+            currentData.forEach((prod, index) => {
+                const tr = document.createElement('tr');
+
+                // Alerta de inventario bajo
+                let stockWarning = '';
+                if (prod.stock !== null && prod.alerta_stock !== null && prod.stock <= prod.alerta_stock) {
+                    tr.classList.add('warning-row');
+                    stockWarning = ' <span title="¡Inventario Bajo!" style="color: #f59e0b;">⚠️</span>';
+                }
+
+                const delCol = prod.id !== undefined ? 'id' : 'nombre';
+                const delVal = prod.id !== undefined ? prod.id : prod.nombre;
+                const codigo = prod.codigo ? prod.codigo : '—';
+                const pCompra = prod.precio_compra ? `S/ ${prod.precio_compra.toFixed(2)}` : '—';
+                const pVenta = prod.precio_venta ? `S/ ${prod.precio_venta.toFixed(2)}` : '—';
+                const pStock = prod.stock !== null ? prod.stock : '—';
+                const cat = prod.categoria ? prod.categoria : '—';
+                const imgSrc = prod.imagen ? `${import.meta.env.BASE_URL}img/${prod.imagen}` : 'https://via.placeholder.com/40?text=No+Img';
+
+                tr.innerHTML = `
+                    <td><img src="${imgSrc}" style="width: 40px; height: 40px; border-radius: 8px; object-fit: cover;" onerror="this.src='https://via.placeholder.com/40?text=?'"></td>
+                    <td><code>${codigo}</code></td>
+                    <td>${prod.nombre}</td>
+                    <td>${cat}</td>
+                    <td>${pCompra}</td>
+                    <td><strong style="color: #a7f3d0">${pVenta}</strong></td>
+                    <td>${pStock}${stockWarning}</td>
+                    <td style="display: flex; gap: 0.5rem; justify-content: center;">
+                        <button class="edit-btn" style="background: transparent; border: none; cursor: pointer; font-size: 1.2rem; color: #60a5fa; transition: transform 0.2s;" title="Editar">✏️</button>
+                        <button class="delete-btn" data-col="${delCol}" data-val="${delVal}" style="background: transparent; border: none; cursor: pointer; font-size: 1.2rem; color: #fca5a5; transition: transform 0.2s;" title="Eliminar">🗑️</button>
+                    </td>
+                `;
+                productList.appendChild(tr);
+            });
+
+            // Listeners para editar
+            document.querySelectorAll('.edit-btn').forEach((btn, index) => {
+                btn.addEventListener('click', () => {
+                    abrirModalEdicion(currentData[index]);
+                });
+            });
+
+            // Listeners para eliminar
+            document.querySelectorAll('.delete-btn').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const col = e.currentTarget.getAttribute('data-col');
+                    const val = e.currentTarget.getAttribute('data-val');
+                    if (confirm('¿Seguro que deseas eliminar este producto?')) {
+                        try {
+                            e.currentTarget.style.opacity = '0.5';
+                            const { error } = await supabase.from('productos').delete().eq(col, val);
+                            if (error) throw error;
+                            await loadProducts();
+                        } catch (error) {
+                            alert('Error: ' + error.message);
+                            await loadProducts();
+                        }
+                    }
+                });
+            });
+
+            // Actualizar paginación visual
+            paginationInfo.textContent = `Mostrando ${startIndex + 1} - ${Math.min(endIndex, invFilteredProducts.length)} de ${invFilteredProducts.length} productos`;
+            prevPageBtn.disabled = invCurrentPage === 1;
+            nextPageBtn.disabled = invCurrentPage === totalPages;
+            prevPageBtn.style.opacity = prevPageBtn.disabled ? '0.5' : '1';
+            nextPageBtn.style.opacity = nextPageBtn.disabled ? '0.5' : '1';
+        }
+
+        invSearch.addEventListener('input', (e) => {
+            const term = e.target.value.toLowerCase();
+            invFilteredProducts = globalProducts.filter(p => 
+                p.nombre.toLowerCase().includes(term) || 
+                (p.codigo && p.codigo.toLowerCase().includes(term)) ||
+                (p.categoria && p.categoria.toLowerCase().includes(term))
+            );
+            invCurrentPage = 1;
+            renderInventoryTable();
+        });
+
+        prevPageBtn.addEventListener('click', () => {
+            if (invCurrentPage > 1) {
+                invCurrentPage--;
+                renderInventoryTable();
+            }
+        });
+
+        nextPageBtn.addEventListener('click', () => {
+            const totalPages = Math.ceil(invFilteredProducts.length / invItemsPerPage);
+            if (invCurrentPage < totalPages) {
+                invCurrentPage++;
+                renderInventoryTable();
+            }
+        });
 
         // --- LÓGICA DEL PUNTO DE VENTA (POS) ---
         function renderPosGrid(productsToRender) {
