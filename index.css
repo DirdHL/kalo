@@ -21,8 +21,10 @@ body {
     min-height: 100vh;
     display: flex;
     justify-content: center;
-    align-items: center;
-    overflow: hidden;
+    align-items: flex-start; /* Evita que se corte por arriba */
+    overflow-x: hidden;
+    overflow-y: auto; /* Permite bajar y subir */
+    padding: 2rem 1rem;
 }
 
 .background-animation {
@@ -44,8 +46,7 @@ body {
     position: relative;
     z-index: 1;
     width: 100%;
-    max-width: 1000px;
-    padding: 2rem;
+    max-width: 1400px;
 }
 
 .glass-card {
@@ -251,7 +252,7 @@ body {
     display: flex;
     flex-direction: column;
     gap: 1rem;
-    height: 95vh;
+    height: calc(100vh - 4rem);
 }
 
 .top-nav {
