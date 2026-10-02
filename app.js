@@ -43,10 +43,9 @@ try {
         
         let selectedImageName = ''; // Guardará el nombre del archivo
 
-        // Aquí van los nombres de las fotos que pondrás en la carpeta public/img/
+        // Aquí pones exactamente los nombres de las fotos que vayas metiendo a la carpeta
         const availableImages = [
-            'agua.jpg', 'cocacola.jpg', 'galletas.jpg', 'papas.jpg', 
-            'cerveza.jpg', 'leche.jpg', 'jabon.jpg', 'chocolate.jpg'
+            'Agua_cielo_2.5_litros.svg'
         ];
 
         // --- MANEJO DEL MODAL DE IMÁGENES ---
