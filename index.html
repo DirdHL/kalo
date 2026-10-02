@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Kalo - Inventario">
+    <title>Kalo | Inventario</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="index.css">
+</head>
+<body>
+    <div class="background-animation"></div>
+    <main class="container">
+        
+        <!-- Panel Principal: Registrar Producto -->
+        <div class="glass-card" id="dashboardCard">
+            <h1>Nuevo Producto 📦</h1>
+            <p>Ingresa los detalles para registrar un producto</p>
+            
+            <div class="input-group">
+                <input type="text" id="productName" placeholder="Nombre del producto" class="styled-input">
+            </div>
+            
+            <button id="addProductBtn" class="primary-btn">Guardar Producto</button>
+            <p id="productStatusMsg" style="margin-top: 1rem; margin-bottom: 0; font-size: 0.9rem; color: #fca5a5;"></p>
+
+            <!-- Lista de Productos -->
+            <div style="margin-top: 2.5rem; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 1.5rem; text-align: left;">
+                <h3 style="margin-bottom: 1rem; color: #fff; font-size: 1.2rem;">Lista de Productos</h3>
+                <ul id="productList" style="list-style: none; padding: 0; color: var(--text-secondary); max-height: 200px; overflow-y: auto;">
+                    <li style="padding: 0.5rem; text-align: center; color: rgba(255,255,255,0.5);">Cargando productos...</li>
+                </ul>
+            </div>
+        </div>
+
+    </main>
+    <!-- Supabase CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="app.js"></script>
+</body>
+</html>
