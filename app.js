@@ -9,13 +9,29 @@ try {
 
         // Nodos Principales
         const loginCard = document.getElementById('loginCard');
-        const dashboardCard = document.getElementById('dashboardCard');
+        const appView = document.getElementById('appView');
         const emailInput = document.getElementById('emailInput');
         const passwordInput = document.getElementById('passwordInput');
         const loginBtn = document.getElementById('loginBtn');
         const loginStatusMsg = document.getElementById('loginStatusMsg');
         const logoutBtn = document.getElementById('logoutBtn');
         const productList = document.getElementById('productList');
+
+        // Navegación
+        const navPosBtn = document.getElementById('navPosBtn');
+        const navInvBtn = document.getElementById('navInvBtn');
+        const posView = document.getElementById('posView');
+        const inventoryView = document.getElementById('dashboardCard');
+
+        // POS Elements
+        const posGrid = document.getElementById('posGrid');
+        const posSearch = document.getElementById('posSearch');
+        const cartItemsContainer = document.getElementById('cartItems');
+        const cartTotalValue = document.getElementById('cartTotalValue');
+        const cobrarBtn = document.getElementById('cobrarBtn');
+
+        let globalProducts = [];
+        let cart = [];
 
         // Nodos del Modal
         const productModal = document.getElementById('productModal');
@@ -142,7 +158,7 @@ try {
             const compra = parseFloat(precioCompraInput.value) || 0;
             const venta = parseFloat(precioVentaInput.value) || 0;
             const ganancia = venta - compra;
-            gananciaInput.value = ganancia > 0 ? `+ $${ganancia.toFixed(2)}` : `$${ganancia.toFixed(2)}`;
+            gananciaInput.value = ganancia > 0 ? `+ S/ ${ganancia.toFixed(2)}` : `S/ ${ganancia.toFixed(2)}`;
             if (ganancia <= 0 && venta > 0) gananciaInput.style.color = '#fca5a5';
             else gananciaInput.style.color = '#a7f3d0';
         }
@@ -157,15 +173,31 @@ try {
             }
         });
 
+        // --- NAVEGACIÓN ---
+        navPosBtn.addEventListener('click', () => {
+            navPosBtn.classList.add('active');
+            navInvBtn.classList.remove('active');
+            posView.classList.remove('hidden');
+            inventoryView.classList.add('hidden');
+        });
+
+        navInvBtn.addEventListener('click', () => {
+            navInvBtn.classList.add('active');
+            navPosBtn.classList.remove('active');
+            inventoryView.classList.remove('hidden');
+            posView.classList.add('hidden');
+        });
+
         // --- AUTENTICACIÓN ---
         supabase.auth.onAuthStateChange((event, session) => {
             if (session) {
                 loginCard.classList.add('hidden');
-                dashboardCard.classList.remove('hidden');
+                appView.classList.remove('hidden');
                 loadProducts();
             } else {
-                dashboardCard.classList.add('hidden');
+                appView.classList.add('hidden');
                 loginCard.classList.remove('hidden');
+                productList.innerHTML = '';
             }
         });
 
@@ -203,8 +235,13 @@ try {
 
                 if (data.length === 0) {
                     productList.innerHTML = '<tr><td colspan="8" style="text-align:center; color:gray">No hay productos registrados.</td></tr>';
+                    globalProducts = [];
+                    renderPosGrid(globalProducts);
                     return;
                 }
+
+                globalProducts = data;
+                renderPosGrid(globalProducts);
 
                 data.forEach(prod => {
                     const tr = document.createElement('tr');
@@ -266,9 +303,89 @@ try {
                 });
 
             } catch (error) {
-                productList.innerHTML = `<tr><td colspan="6" style="color:#fca5a5; text-align:center">Error al cargar: ${error.message}</td></tr>`;
+                productList.innerHTML = `<tr><td colspan="8" style="color:#fca5a5; text-align:center">Error al cargar: ${error.message}</td></tr>`;
             }
         }
+
+        // --- LÓGICA DEL PUNTO DE VENTA (POS) ---
+        function renderPosGrid(productsToRender) {
+            posGrid.innerHTML = '';
+            productsToRender.forEach(prod => {
+                const div = document.createElement('div');
+                div.className = 'product-card';
+                const imgSrc = prod.imagen ? `${import.meta.env.BASE_URL}img/${prod.imagen}` : 'https://via.placeholder.com/80?text=No+Img';
+                const precio = prod.precio_venta ? `S/ ${prod.precio_venta.toFixed(2)}` : 'S/ 0.00';
+                
+                div.innerHTML = `
+                    <img src="${imgSrc}" onerror="this.src='https://via.placeholder.com/80?text=?'">
+                    <h3>${prod.nombre}</h3>
+                    <p>${precio}</p>
+                `;
+                
+                div.addEventListener('click', () => addToCart(prod));
+                posGrid.appendChild(div);
+            });
+        }
+
+        posSearch.addEventListener('input', (e) => {
+            const term = e.target.value.toLowerCase();
+            const filtered = globalProducts.filter(p => 
+                p.nombre.toLowerCase().includes(term) || 
+                (p.codigo && p.codigo.toLowerCase().includes(term))
+            );
+            renderPosGrid(filtered);
+        });
+
+        function addToCart(prod) {
+            const existing = cart.find(item => item.id === prod.id);
+            if (existing) {
+                existing.qty++;
+            } else {
+                cart.push({ ...prod, qty: 1 });
+            }
+            renderCart();
+        }
+
+        function renderCart() {
+            cartItemsContainer.innerHTML = '';
+            let total = 0;
+            cart.forEach((item, index) => {
+                const itemTotal = (item.precio_venta || 0) * item.qty;
+                total += itemTotal;
+                
+                const div = document.createElement('div');
+                div.className = 'cart-item';
+                div.innerHTML = `
+                    <div class="cart-item-info">
+                        <p class="cart-item-title">${item.nombre}</p>
+                        <p class="cart-item-price">S/ ${(item.precio_venta || 0).toFixed(2)} x ${item.qty}</p>
+                    </div>
+                    <div class="cart-item-qty">
+                        <button class="qty-btn" onclick="updateQty(${index}, -1)">-</button>
+                        <span>${item.qty}</span>
+                        <button class="qty-btn" onclick="updateQty(${index}, 1)">+</button>
+                    </div>
+                `;
+                cartItemsContainer.appendChild(div);
+            });
+            cartTotalValue.textContent = `S/ ${total.toFixed(2)}`;
+        }
+
+        window.updateQty = (index, delta) => {
+            cart[index].qty += delta;
+            if (cart[index].qty <= 0) {
+                cart.splice(index, 1);
+            }
+            renderCart();
+        };
+
+        cobrarBtn.addEventListener('click', () => {
+            if (cart.length === 0) return alert('El ticket está vacío.');
+            // Aquí en el futuro se descontaría el stock de Supabase
+            alert('¡Venta realizada con éxito!');
+            cart = [];
+            renderCart();
+        });
 
         // --- AGREGAR PRODUCTO ---
         addProductBtn.addEventListener('click', async () => {

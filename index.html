@@ -28,37 +28,70 @@
             <p id="loginStatusMsg" style="margin-top: 1rem; text-align: center; color: #fca5a5;"></p>
         </div>
 
-        <!-- Panel Principal: Inventario -->
-        <div class="glass-card hidden" id="dashboardCard" style="max-width: 1000px; width: 100%;">
-            <div class="dashboard-header">
-                <div>
-                    <h1 style="margin-bottom: 0.2rem">Inventario 📦</h1>
-                    <p style="color: var(--text-secondary); font-size: 0.9rem;">Gestiona tus productos y stock</p>
-                </div>
+        <!-- App View (Punto de Venta e Inventario) -->
+        <div id="appView" class="hidden app-layout">
+            <!-- Barra de Navegación -->
+            <div class="glass-card top-nav">
+                <h1 style="font-size: 1.5rem; margin: 0; background: linear-gradient(90deg, #60a5fa, #a78bfa); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Kalo</h1>
                 <div style="display: flex; gap: 1rem;">
-                    <button id="openModalBtn" class="primary-btn" style="width: auto; padding: 0.8rem 1.5rem;">➕ Nuevo Producto</button>
-                    <button id="logoutBtn" class="secondary-btn" style="width: auto; padding: 0.8rem 1.5rem;">Salir</button>
+                    <button id="navPosBtn" class="nav-btn active">🛒 Punto de Venta</button>
+                    <button id="navInvBtn" class="nav-btn">📦 Inventario</button>
+                </div>
+                <button id="logoutBtn" class="secondary-btn" style="width: auto; padding: 0.5rem 1.5rem;">Salir</button>
+            </div>
+
+            <!-- Vista Punto de Venta -->
+            <div id="posView" class="pos-layout">
+                <div class="pos-products-section">
+                    <input type="text" id="posSearch" class="pos-search" placeholder="🔍 Buscar producto por nombre o código...">
+                    <div class="pos-grid" id="posGrid">
+                        <!-- Generado por JS -->
+                    </div>
+                </div>
+                <div class="pos-cart-section">
+                    <h2 style="margin-bottom: 1rem; font-size: 1.2rem; text-align: center;">Ticket de Venta</h2>
+                    <div class="cart-items" id="cartItems">
+                        <!-- Generado por JS -->
+                    </div>
+                    <div class="cart-total">
+                        <span>Total:</span>
+                        <span id="cartTotalValue">S/ 0.00</span>
+                    </div>
+                    <button id="cobrarBtn" class="primary-btn" style="font-size: 1.2rem; padding: 1rem;">Cobrar</button>
                 </div>
             </div>
 
-            <div class="table-container">
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>Img</th>
-                            <th>Código</th>
-                            <th>Nombre</th>
-                            <th>Categoría</th>
-                            <th>Compra</th>
-                            <th>Venta</th>
-                            <th>Stock</th>
-                            <th>Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody id="productList">
-                        <!-- Productos generados por JS -->
-                    </tbody>
-                </table>
+            <!-- Panel Principal: Inventario -->
+            <div class="glass-card hidden" id="dashboardCard" style="flex: 1; display: flex; flex-direction: column;">
+                <div class="dashboard-header" style="margin-bottom: 1.5rem;">
+                    <div>
+                        <h1 style="margin-bottom: 0.2rem">Inventario 📦</h1>
+                        <p style="color: var(--text-secondary); font-size: 0.9rem;">Gestiona tus productos y stock</p>
+                    </div>
+                    <div>
+                        <button id="openModalBtn" class="primary-btn" style="width: auto; padding: 0.8rem 1.5rem;">➕ Nuevo Producto</button>
+                    </div>
+                </div>
+
+                <div class="table-container" style="flex: 1;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Img</th>
+                                <th>Código</th>
+                                <th>Nombre</th>
+                                <th>Categoría</th>
+                                <th>Compra</th>
+                                <th>Venta</th>
+                                <th>Stock</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="productList">
+                            <!-- Productos generados por JS -->
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </main>
