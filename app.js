@@ -40,12 +40,15 @@ try {
         const openImagePickerBtn = document.getElementById('openImagePickerBtn');
         const closeImagePickerBtn = document.getElementById('closeImagePickerBtn');
         const imageGrid = document.getElementById('imageGrid');
-        
+
         let selectedImageName = ''; // Guardará el nombre del archivo
 
         // Aquí pones exactamente los nombres de las fotos que vayas metiendo a la carpeta
         const availableImages = [
-            'Agua_cielo_2.5_litros.svg'
+            'Agua_cielo_2.5_litros_Sin_Gas.svg',
+            'Agua_cielo_625ml_Sin_Gas.svg',
+            'Agua_cielo_chupon_1lt_Sin_Gas.svg',
+            'Agua_Loa_1l_chupon.svg'
         ];
 
         // --- MANEJO DEL MODAL DE IMÁGENES ---
@@ -127,7 +130,7 @@ try {
             if (session) {
                 loginCard.classList.add('hidden');
                 dashboardCard.classList.remove('hidden');
-                loadProducts(); 
+                loadProducts();
             } else {
                 dashboardCard.classList.add('hidden');
                 loginCard.classList.remove('hidden');
@@ -138,7 +141,7 @@ try {
             const email = emailInput.value.trim();
             const password = passwordInput.value.trim();
             if (!email || !password) return (loginStatusMsg.textContent = 'Ingresa correo y contraseña.');
-            
+
             try {
                 loginBtn.textContent = 'Iniciando...';
                 loginStatusMsg.textContent = '';
@@ -164,8 +167,8 @@ try {
                 const { data, error } = await supabase.from('productos').select('*').order('id', { ascending: false });
                 if (error) throw error;
 
-                productList.innerHTML = ''; 
-                
+                productList.innerHTML = '';
+
                 if (data.length === 0) {
                     productList.innerHTML = '<tr><td colspan="8" style="text-align:center; color:gray">No hay productos registrados.</td></tr>';
                     return;
@@ -173,7 +176,7 @@ try {
 
                 data.forEach(prod => {
                     const tr = document.createElement('tr');
-                    
+
                     // Alerta de inventario bajo
                     let stockWarning = '';
                     if (prod.stock !== null && prod.alerta_stock !== null && prod.stock <= prod.alerta_stock) {
@@ -209,7 +212,7 @@ try {
                     btn.addEventListener('click', async (e) => {
                         const col = e.currentTarget.getAttribute('data-col');
                         const val = e.currentTarget.getAttribute('data-val');
-                        if(confirm('¿Seguro que deseas eliminar este producto?')) {
+                        if (confirm('¿Seguro que deseas eliminar este producto?')) {
                             try {
                                 e.currentTarget.style.opacity = '0.5';
                                 const { error } = await supabase.from('productos').delete().eq(col, val);
@@ -237,7 +240,7 @@ try {
             const stock = parseInt(stockInput.value) || null;
             const alerta = parseInt(alertaStockInput.value) || null;
             const cat = categoriaInput.value;
-            
+
             if (!productName || !productCode) {
                 productStatusMsg.textContent = 'El código y el nombre son obligatorios.';
                 return;
@@ -245,9 +248,9 @@ try {
 
             try {
                 addProductBtn.textContent = 'Guardando...';
-                
-                const payload = { 
-                    codigo: productCode, 
+
+                const payload = {
+                    codigo: productCode,
                     nombre: productName,
                     categoria: cat,
                     imagen: selectedImageName || null,
@@ -262,9 +265,9 @@ try {
 
                 productStatusMsg.style.color = '#86efac';
                 productStatusMsg.textContent = '¡Producto guardado exitosamente!';
-                
+
                 await loadProducts();
-                
+
                 // Cerrar modal automáticamente después de un segundo
                 setTimeout(() => {
                     productModal.classList.add('hidden');
