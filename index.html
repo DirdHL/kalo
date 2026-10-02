@@ -1,70 +1,117 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Kalo - Inventario">
-    <title>Kalo | Inventario</title>
+    <meta name="description" content="Kalo - Punto de Venta">
+    <title>Kalo | Punto de Venta</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="index.css">
 </head>
-
 <body>
     <div class="background-animation"></div>
     <main class="container">
-
+        
         <!-- Pantalla de Login -->
         <div class="glass-card" id="loginCard">
-            <h1>Bienvenido.</h1>
-            <p>Inicia sesión para acceder al inventario</p>
-
+            <h1 style="margin-bottom: 0.5rem">Bienvenido.</h1>
+            <p style="margin-bottom: 2rem; color: var(--text-secondary)">Inicia sesión para acceder al sistema</p>
+            
             <div class="input-group">
                 <input type="email" id="emailInput" placeholder="Correo electrónico" class="styled-input">
             </div>
             <div class="input-group">
                 <input type="password" id="passwordInput" placeholder="Contraseña" class="styled-input">
             </div>
-
+            
             <button id="loginBtn" class="primary-btn">Entrar</button>
-            <p id="loginStatusMsg" style="margin-top: 1rem; margin-bottom: 0; font-size: 0.9rem; color: #fca5a5;"></p>
+            <p id="loginStatusMsg" style="margin-top: 1rem; text-align: center; color: #fca5a5;"></p>
         </div>
 
-        <!-- Panel Principal: Registrar Producto -->
-        <div class="glass-card hidden" id="dashboardCard">
-            <h1>Nuevo Producto 📦</h1>
-            <p>Ingresa los detalles para registrar un producto</p>
-
-            <div class="input-group">
-                <input type="text" id="productCode" placeholder="Código de barras (Escanea aquí)" class="styled-input" autofocus>
-            </div>
-            <div class="input-group">
-                <input type="text" id="productName" placeholder="Nombre del producto" class="styled-input">
-            </div>
-
-            <button id="addProductBtn" class="primary-btn">Guardar Producto</button>
-            <p id="productStatusMsg" style="margin-top: 1rem; margin-bottom: 0; font-size: 0.9rem; color: #fca5a5;"></p>
-
-            <!-- Lista de Productos -->
-            <div
-                style="margin-top: 2.5rem; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 1.5rem; text-align: left;">
-                <h3 style="margin-bottom: 1rem; color: #fff; font-size: 1.2rem;">Lista de Productos</h3>
-                <ul id="productList"
-                    style="list-style: none; padding: 0; color: var(--text-secondary); max-height: 200px; overflow-y: auto;">
-                    <li style="padding: 0.5rem; text-align: center; color: rgba(255,255,255,0.5);">Cargando productos...
-                    </li>
-                </ul>
+        <!-- Panel Principal: Inventario -->
+        <div class="glass-card hidden" id="dashboardCard" style="max-width: 1000px; width: 100%;">
+            <div class="dashboard-header">
+                <div>
+                    <h1 style="margin-bottom: 0.2rem">Inventario 📦</h1>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem;">Gestiona tus productos y stock</p>
+                </div>
+                <div style="display: flex; gap: 1rem;">
+                    <button id="openModalBtn" class="primary-btn" style="width: auto; padding: 0.8rem 1.5rem;">➕ Nuevo Producto</button>
+                    <button id="logoutBtn" class="secondary-btn" style="width: auto; padding: 0.8rem 1.5rem;">Salir</button>
+                </div>
             </div>
 
-            <div style="margin-top: 2rem; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 1.5rem;">
-                <button id="logoutBtn" class="secondary-btn" style="padding: 0.5rem 1.5rem; font-size: 0.9rem;">Cerrar
-                    sesión</button>
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Código</th>
+                            <th>Nombre</th>
+                            <th>Compra</th>
+                            <th>Venta</th>
+                            <th>Stock</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="productList">
+                        <!-- Productos generados por JS -->
+                    </tbody>
+                </table>
             </div>
         </div>
-
     </main>
+
+    <!-- Modal para Nuevo Producto -->
+    <div class="modal-overlay hidden" id="productModal">
+        <div class="modal">
+            <h2 style="margin-bottom: 1.5rem;">Registrar Producto</h2>
+            
+            <div class="input-group">
+                <label>Código de Barras</label>
+                <input type="text" id="productCode" placeholder="Escanea o escribe el código" class="styled-input">
+            </div>
+            
+            <div class="input-group">
+                <label>Nombre del Producto</label>
+                <input type="text" id="productName" placeholder="Ej. Galletas de Chocolate" class="styled-input">
+            </div>
+
+            <div class="form-grid">
+                <div class="input-group">
+                    <label>Precio de Compra ($)</label>
+                    <input type="number" id="precioCompra" placeholder="0.00" step="0.01" class="styled-input">
+                </div>
+                <div class="input-group">
+                    <label>Precio de Venta ($)</label>
+                    <input type="number" id="precioVenta" placeholder="0.00" step="0.01" class="styled-input">
+                </div>
+                <div class="input-group" style="grid-column: span 2;">
+                    <label>Ganancia Calculada ($)</label>
+                    <input type="text" id="ganancia" placeholder="0.00" class="styled-input" readonly>
+                </div>
+            </div>
+
+            <div class="form-grid">
+                <div class="input-group">
+                    <label>Stock Actual (Cantidad)</label>
+                    <input type="number" id="stock" placeholder="0" class="styled-input">
+                </div>
+                <div class="input-group">
+                    <label>Alerta de Inventario Bajo</label>
+                    <input type="number" id="alertaStock" placeholder="Ej. 2" class="styled-input">
+                </div>
+            </div>
+
+            <p id="productStatusMsg" style="text-align: center; color: #fca5a5; margin-bottom: 1rem;"></p>
+
+            <div class="modal-actions">
+                <button id="closeModalBtn" class="secondary-btn">Cancelar</button>
+                <button id="addProductBtn" class="primary-btn">Guardar Producto</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Script de la aplicación como módulo -->
     <script type="module" src="/app.js"></script>
 </body>
-
 </html>

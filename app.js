@@ -1,83 +1,109 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Envolvemos todo en un bloque para capturar errores críticos
 try {
-    // ¡Tus credenciales seguras leídas desde el archivo .env!
     const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
     const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
     document.addEventListener('DOMContentLoaded', () => {
         const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // Nodos del DOM (Pantallas)
+        // Nodos Principales
         const loginCard = document.getElementById('loginCard');
         const dashboardCard = document.getElementById('dashboardCard');
-        
-        // Nodos del Login
         const emailInput = document.getElementById('emailInput');
         const passwordInput = document.getElementById('passwordInput');
         const loginBtn = document.getElementById('loginBtn');
         const loginStatusMsg = document.getElementById('loginStatusMsg');
-        
-        // Nodos del Inventario
+        const logoutBtn = document.getElementById('logoutBtn');
         const productList = document.getElementById('productList');
+
+        // Nodos del Modal
+        const productModal = document.getElementById('productModal');
+        const openModalBtn = document.getElementById('openModalBtn');
+        const closeModalBtn = document.getElementById('closeModalBtn');
         const productStatusMsg = document.getElementById('productStatusMsg');
         const addProductBtn = document.getElementById('addProductBtn');
+
+        // Inputs del Formulario
         const productCodeInput = document.getElementById('productCode');
         const productNameInput = document.getElementById('productName');
-        const logoutBtn = document.getElementById('logoutBtn');
+        const precioCompraInput = document.getElementById('precioCompra');
+        const precioVentaInput = document.getElementById('precioVenta');
+        const gananciaInput = document.getElementById('ganancia');
+        const stockInput = document.getElementById('stock');
+        const alertaStockInput = document.getElementById('alertaStock');
 
-        // Escuchar "Enter" en el código de barras (así funcionan las lectoras)
+        // --- MANEJO DEL MODAL ---
+        openModalBtn.addEventListener('click', () => {
+            productModal.classList.remove('hidden');
+            productCodeInput.focus();
+        });
+
+        closeModalBtn.addEventListener('click', () => {
+            productModal.classList.add('hidden');
+            limpiarFormulario();
+        });
+
+        function limpiarFormulario() {
+            productCodeInput.value = '';
+            productNameInput.value = '';
+            precioCompraInput.value = '';
+            precioVentaInput.value = '';
+            gananciaInput.value = '';
+            stockInput.value = '';
+            alertaStockInput.value = '';
+            productStatusMsg.textContent = '';
+        }
+
+        // --- CÁLCULO DE GANANCIA EN TIEMPO REAL ---
+        function calcularGanancia() {
+            const compra = parseFloat(precioCompraInput.value) || 0;
+            const venta = parseFloat(precioVentaInput.value) || 0;
+            const ganancia = venta - compra;
+            gananciaInput.value = ganancia > 0 ? `+ $${ganancia.toFixed(2)}` : `$${ganancia.toFixed(2)}`;
+            if (ganancia <= 0 && venta > 0) gananciaInput.style.color = '#fca5a5';
+            else gananciaInput.style.color = '#a7f3d0';
+        }
+        precioCompraInput.addEventListener('input', calcularGanancia);
+        precioVentaInput.addEventListener('input', calcularGanancia);
+
+        // Escuchar "Enter" en el código para saltar al nombre
         productCodeInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 e.preventDefault();
-                productNameInput.focus(); // Pasar al nombre al escanear
+                productNameInput.focus();
             }
         });
 
-        // ESCUCHAR CAMBIOS DE SESIÓN MÁGICAMENTE
+        // --- AUTENTICACIÓN ---
         supabase.auth.onAuthStateChange((event, session) => {
             if (session) {
                 loginCard.classList.add('hidden');
                 dashboardCard.classList.remove('hidden');
                 loadProducts(); 
-                productCodeInput.focus(); // Enfocar para escanear rápido
             } else {
                 dashboardCard.classList.add('hidden');
                 loginCard.classList.remove('hidden');
             }
         });
 
-        // 1. INICIAR SESIÓN
         loginBtn.addEventListener('click', async () => {
             const email = emailInput.value.trim();
             const password = passwordInput.value.trim();
+            if (!email || !password) return (loginStatusMsg.textContent = 'Ingresa correo y contraseña.');
             
-            if (!email || !password) {
-                loginStatusMsg.textContent = 'Ingresa correo y contraseña.';
-                return;
-            }
-
             try {
                 loginBtn.textContent = 'Iniciando...';
                 loginStatusMsg.textContent = '';
-                
-                const { error } = await supabase.auth.signInWithPassword({
-                    email,
-                    password
-                });
-
+                const { error } = await supabase.auth.signInWithPassword({ email, password });
                 if (error) throw error;
-                
             } catch (error) {
-                console.error(error);
-                loginStatusMsg.textContent = 'Error: Credenciales inválidas o usuario no existe.';
+                loginStatusMsg.textContent = 'Error: Credenciales inválidas.';
             } finally {
                 loginBtn.textContent = 'Entrar';
             }
         });
 
-        // 2. CERRAR SESIÓN
         logoutBtn.addEventListener('click', async () => {
             await supabase.auth.signOut();
             emailInput.value = '';
@@ -85,49 +111,53 @@ try {
             productList.innerHTML = '';
         });
 
-        // 3. CARGAR PRODUCTOS
+        // --- CARGAR PRODUCTOS ---
         async function loadProducts() {
             try {
-                // Ordenar por más reciente primero
                 const { data, error } = await supabase.from('productos').select('*').order('id', { ascending: false });
                 if (error) throw error;
 
                 productList.innerHTML = ''; 
                 
                 if (data.length === 0) {
-                    productList.innerHTML = '<li style="padding: 0.5rem; text-align: center; color: rgba(255,255,255,0.5);">No hay productos registrados aún.</li>';
+                    productList.innerHTML = '<tr><td colspan="6" style="text-align:center; color:gray">No hay productos registrados.</td></tr>';
                     return;
                 }
 
                 data.forEach(prod => {
-                    const li = document.createElement('li');
-                    li.style.marginBottom = '0.5rem';
-                    li.style.padding = '0.75rem';
-                    li.style.background = 'rgba(255,255,255,0.05)';
-                    li.style.border = '1px solid rgba(255,255,255,0.1)';
-                    li.style.borderRadius = '8px';
-                    li.style.display = 'flex';
-                    li.style.alignItems = 'center';
-                    li.style.justifyContent = 'space-between';
+                    const tr = document.createElement('tr');
                     
+                    // Alerta de inventario bajo
+                    let stockWarning = '';
+                    if (prod.stock !== null && prod.alerta_stock !== null && prod.stock <= prod.alerta_stock) {
+                        tr.classList.add('warning-row');
+                        stockWarning = ' <span title="¡Inventario Bajo!" style="color: #f59e0b;">⚠️</span>';
+                    }
+
                     const delCol = prod.id !== undefined ? 'id' : 'nombre';
                     const delVal = prod.id !== undefined ? prod.id : prod.nombre;
+                    const codigo = prod.codigo ? prod.codigo : '—';
+                    const pCompra = prod.precio_compra ? `$${prod.precio_compra.toFixed(2)}` : '—';
+                    const pVenta = prod.precio_venta ? `$${prod.precio_venta.toFixed(2)}` : '—';
+                    const pStock = prod.stock !== null ? prod.stock : '—';
 
-                    const codigoText = prod.codigo ? `[${prod.codigo}] ` : '';
-
-                    li.innerHTML = `
-                        <span>🧾 ${codigoText}🏷️ ${prod.nombre}</span>
-                        <button class="delete-btn" data-col="${delCol}" data-val="${delVal}" style="background: transparent; border: none; cursor: pointer; font-size: 1.2rem; color: #fca5a5; transition: transform 0.2s; padding: 0 0.5rem;">🗑️</button>
+                    tr.innerHTML = `
+                        <td><code>${codigo}</code></td>
+                        <td>${prod.nombre}</td>
+                        <td>${pCompra}</td>
+                        <td><strong style="color: #a7f3d0">${pVenta}</strong></td>
+                        <td>${pStock}${stockWarning}</td>
+                        <td>
+                            <button class="delete-btn" data-col="${delCol}" data-val="${delVal}" style="background: transparent; border: none; cursor: pointer; font-size: 1.2rem; color: #fca5a5; transition: transform 0.2s;">🗑️</button>
+                        </td>
                     `;
-                    productList.appendChild(li);
+                    productList.appendChild(tr);
                 });
 
-                // Escuchar clics en los botones de eliminar
                 document.querySelectorAll('.delete-btn').forEach(btn => {
                     btn.addEventListener('click', async (e) => {
                         const col = e.currentTarget.getAttribute('data-col');
                         const val = e.currentTarget.getAttribute('data-val');
-                        
                         if(confirm('¿Seguro que deseas eliminar este producto?')) {
                             try {
                                 e.currentTarget.style.opacity = '0.5';
@@ -135,8 +165,7 @@ try {
                                 if (error) throw error;
                                 await loadProducts();
                             } catch (error) {
-                                console.error('Error al eliminar:', error);
-                                alert('No se pudo eliminar: ' + error.message);
+                                alert('Error: ' + error.message);
                                 await loadProducts();
                             }
                         }
@@ -144,15 +173,18 @@ try {
                 });
 
             } catch (error) {
-                console.error('Error al cargar:', error);
-                productList.innerHTML = `<li style="padding: 0.5rem; color: #fca5a5; text-align: center;">Error al cargar: ${error.message}</li>`;
+                productList.innerHTML = `<tr><td colspan="6" style="color:#fca5a5; text-align:center">Error al cargar: ${error.message}</td></tr>`;
             }
         }
 
-        // 4. AGREGAR PRODUCTO
+        // --- AGREGAR PRODUCTO ---
         addProductBtn.addEventListener('click', async () => {
             const productCode = productCodeInput.value.trim();
             const productName = productNameInput.value.trim();
+            const pCompra = parseFloat(precioCompraInput.value) || null;
+            const pVenta = parseFloat(precioVentaInput.value) || null;
+            const stock = parseInt(stockInput.value) || null;
+            const alerta = parseInt(alertaStockInput.value) || null;
             
             if (!productName || !productCode) {
                 productStatusMsg.textContent = 'El código y el nombre son obligatorios.';
@@ -161,21 +193,30 @@ try {
 
             try {
                 addProductBtn.textContent = 'Guardando...';
-                // Insertamos código y nombre a la vez
-                const { error } = await supabase.from('productos').insert([{ codigo: productCode, nombre: productName }]);
+                
+                const payload = { 
+                    codigo: productCode, 
+                    nombre: productName,
+                    precio_compra: pCompra,
+                    precio_venta: pVenta,
+                    stock: stock,
+                    alerta_stock: alerta
+                };
+
+                const { error } = await supabase.from('productos').insert([payload]);
                 if (error) throw error;
 
                 productStatusMsg.style.color = '#86efac';
-                productStatusMsg.textContent = '¡Guardado con éxito!';
-                productCodeInput.value = '';
-                productNameInput.value = '';
+                productStatusMsg.textContent = '¡Producto guardado exitosamente!';
                 
                 await loadProducts();
                 
-                // Volver a enfocar el código para que escaneen el siguiente producto rápido
-                productCodeInput.focus();
-                
-                setTimeout(() => productStatusMsg.textContent = '', 3000);
+                // Cerrar modal automáticamente después de un segundo
+                setTimeout(() => {
+                    productModal.classList.add('hidden');
+                    limpiarFormulario();
+                }, 1000);
+
             } catch (error) {
                 productStatusMsg.style.color = '#fca5a5';
                 productStatusMsg.textContent = 'Error: ' + error.message;
@@ -186,5 +227,5 @@ try {
     });
 
 } catch (error) {
-    console.error("Error crítico en la inicialización:", error);
+    console.error("Error crítico:", error);
 }
