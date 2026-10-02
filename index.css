@@ -86,12 +86,14 @@ body {
 }
 
 .data-table th {
-    background: rgba(255, 255, 255, 0.05);
+    background: #1e1b4b; /* Solid background to prevent overlap */
     padding: 1rem;
     font-weight: 600;
     color: var(--text-secondary);
     position: sticky;
     top: 0;
+    z-index: 10;
+    border-bottom: 2px solid var(--primary);
 }
 
 .data-table td {
