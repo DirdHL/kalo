@@ -33,6 +33,7 @@ try {
         const splitEfectivo = document.getElementById('splitEfectivo');
         const splitYape = document.getElementById('splitYape');
         const cobrarBtn = document.getElementById('cobrarBtn');
+        const cartDiscount = document.getElementById('cartDiscount');
 
         let globalProducts = [];
         let cart = [];
@@ -553,12 +554,16 @@ try {
             renderCart();
         }
 
+        cartDiscount.addEventListener('input', () => {
+            renderCart();
+        });
+
         function renderCart() {
             cartItemsContainer.innerHTML = '';
-            let total = 0;
+            let subtotal = 0;
             cart.forEach((item, index) => {
                 const itemTotal = (item.precio_venta || 0) * item.qty;
-                total += itemTotal;
+                subtotal += itemTotal;
                 
                 const div = document.createElement('div');
                 div.className = 'cart-item';
@@ -575,6 +580,9 @@ try {
                 `;
                 cartItemsContainer.appendChild(div);
             });
+
+            const discount = parseFloat(cartDiscount.value) || 0;
+            const total = Math.max(0, subtotal - discount);
             cartTotalValue.textContent = `S/ ${total.toFixed(2)}`;
         }
 
@@ -599,18 +607,25 @@ try {
         cobrarBtn.addEventListener('click', () => {
             if (cart.length === 0) return alert('El ticket está vacío.');
             
-            let total = 0;
-            cart.forEach(item => total += (item.precio_venta || 0) * item.qty);
+            let subtotal = 0;
+            cart.forEach(item => subtotal += (item.precio_venta || 0) * item.qty);
+            
+            const discount = parseFloat(cartDiscount.value) || 0;
+            const total = Math.max(0, subtotal - discount);
 
             const metodo = paymentMethod.value;
-            let msg = `¡Venta realizada con éxito!\nMétodo de pago: ${metodo}`;
+            let msg = `¡Venta realizada con éxito!\nTotal cobrado: S/ ${total.toFixed(2)}\nMétodo de pago: ${metodo}`;
             
+            if (discount > 0) {
+                msg += `\n(Descuento aplicado: S/ ${discount.toFixed(2)})`;
+            }
+
             if (metodo === 'Ambos') {
                 const ef = parseFloat(splitEfectivo.value) || 0;
                 const yp = parseFloat(splitYape.value) || 0;
                 
                 if (Math.abs((ef + yp) - total) > 0.01) {
-                    return alert(`Los montos divididos (S/ ${(ef + yp).toFixed(2)}) no coinciden con el total (S/ ${total.toFixed(2)}).`);
+                    return alert(`Los montos divididos (S/ ${(ef + yp).toFixed(2)}) no coinciden con el total a pagar (S/ ${total.toFixed(2)}).`);
                 }
                 
                 msg += `\nEfectivo: S/ ${ef.toFixed(2)}\nYape: S/ ${yp.toFixed(2)}`;
@@ -620,6 +635,7 @@ try {
             alert(msg);
             
             cart = [];
+            cartDiscount.value = '';
             renderCart();
             paymentMethod.value = 'Efectivo'; // reset
             splitPaymentSection.classList.add('hidden');
