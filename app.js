@@ -41,7 +41,7 @@ try {
         const paginationInfo = document.getElementById('paginationInfo');
         
         let invCurrentPage = 1;
-        const invItemsPerPage = 10;
+        const invItemsPerPage = 999999;
         let invFilteredProducts = [];
 
         // Nodos del Modal
