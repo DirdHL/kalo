@@ -29,6 +29,9 @@ try {
         const cartItemsContainer = document.getElementById('cartItems');
         const cartTotalValue = document.getElementById('cartTotalValue');
         const paymentMethod = document.getElementById('paymentMethod');
+        const splitPaymentSection = document.getElementById('splitPaymentSection');
+        const splitEfectivo = document.getElementById('splitEfectivo');
+        const splitYape = document.getElementById('splitYape');
         const cobrarBtn = document.getElementById('cobrarBtn');
 
         let globalProducts = [];
@@ -583,16 +586,43 @@ try {
             renderCart();
         };
 
+        paymentMethod.addEventListener('change', (e) => {
+            if (e.target.value === 'Ambos') {
+                splitPaymentSection.classList.remove('hidden');
+                splitEfectivo.value = '';
+                splitYape.value = '';
+            } else {
+                splitPaymentSection.classList.add('hidden');
+            }
+        });
+
         cobrarBtn.addEventListener('click', () => {
             if (cart.length === 0) return alert('El ticket está vacío.');
             
+            let total = 0;
+            cart.forEach(item => total += (item.precio_venta || 0) * item.qty);
+
             const metodo = paymentMethod.value;
+            let msg = `¡Venta realizada con éxito!\nMétodo de pago: ${metodo}`;
+            
+            if (metodo === 'Ambos') {
+                const ef = parseFloat(splitEfectivo.value) || 0;
+                const yp = parseFloat(splitYape.value) || 0;
+                
+                if (Math.abs((ef + yp) - total) > 0.01) {
+                    return alert(`Los montos divididos (S/ ${(ef + yp).toFixed(2)}) no coinciden con el total (S/ ${total.toFixed(2)}).`);
+                }
+                
+                msg += `\nEfectivo: S/ ${ef.toFixed(2)}\nYape: S/ ${yp.toFixed(2)}`;
+            }
+
             // Aquí en el futuro se descontaría el stock de Supabase y se guardaría la venta
-            alert(`¡Venta realizada con éxito!\nMétodo de pago: ${metodo}`);
+            alert(msg);
             
             cart = [];
             renderCart();
             paymentMethod.value = 'Efectivo'; // reset
+            splitPaymentSection.classList.add('hidden');
         });
 
         // --- AGREGAR PRODUCTO ---
