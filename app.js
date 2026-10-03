@@ -28,6 +28,7 @@ try {
         const posSearch = document.getElementById('posSearch');
         const cartItemsContainer = document.getElementById('cartItems');
         const cartTotalValue = document.getElementById('cartTotalValue');
+        const paymentMethod = document.getElementById('paymentMethod');
         const cobrarBtn = document.getElementById('cobrarBtn');
 
         let globalProducts = [];
@@ -584,10 +585,14 @@ try {
 
         cobrarBtn.addEventListener('click', () => {
             if (cart.length === 0) return alert('El ticket está vacío.');
-            // Aquí en el futuro se descontaría el stock de Supabase
-            alert('¡Venta realizada con éxito!');
+            
+            const metodo = paymentMethod.value;
+            // Aquí en el futuro se descontaría el stock de Supabase y se guardaría la venta
+            alert(`¡Venta realizada con éxito!\nMétodo de pago: ${metodo}`);
+            
             cart = [];
             renderCart();
+            paymentMethod.value = 'Efectivo'; // reset
         });
 
         // --- AGREGAR PRODUCTO ---

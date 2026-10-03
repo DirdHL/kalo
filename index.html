@@ -53,10 +53,19 @@
                     <div class="cart-items" id="cartItems">
                         <!-- Generado por JS -->
                     </div>
-                    <div class="cart-total">
+                    <div class="cart-total" style="margin-bottom: 0.5rem;">
                         <span>Total:</span>
                         <span id="cartTotalValue">S/ 0.00</span>
                     </div>
+                    
+                    <div style="margin-bottom: 1rem;">
+                        <select id="paymentMethod" class="styled-input" style="width: 100%; padding: 0.8rem; cursor: pointer; text-align: center; font-weight: bold; background: rgba(30, 27, 75, 0.5);">
+                            <option value="Efectivo">💵 Pago en Efectivo</option>
+                            <option value="Yape">📱 Yape / Plin</option>
+                            <option value="Ambos">💵📱 Ambos (Mixto)</option>
+                        </select>
+                    </div>
+
                     <button id="cobrarBtn" class="primary-btn" style="font-size: 1.2rem; padding: 1rem;">Cobrar</button>
                 </div>
             </div>
