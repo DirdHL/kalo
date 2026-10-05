@@ -237,10 +237,12 @@ try {
                 const div = document.createElement('div');
                 div.className = 'image-option';
 
+                const displayName = imgName.replace(/_/g, ' ').replace(/\.(svg|png|jpg)$/i, '');
+                
                 // Usamos import.meta.env.BASE_URL para que funcione tanto en localhost como en GitHub Pages (/kalo/)
                 div.innerHTML = `
                     <img src="${import.meta.env.BASE_URL}img/${imgName}" alt="${imgName}" onerror="this.src='https://via.placeholder.com/100?text=Falta+Foto'">
-                    <p>${imgName}</p>
+                    <p>${displayName}</p>
                 `;
                 div.addEventListener('click', () => {
                     selectedImageName = imgName;
@@ -381,7 +383,13 @@ try {
                 const { data, error } = await supabase.from('productos').select('*').order('id', { ascending: false });
                 if (error) throw error;
 
-                if (data.length === 0) {
+                // Limpiar guiones bajos de los nombres traídos de la base de datos
+                const cleanedData = data.map(p => ({
+                    ...p,
+                    nombre: p.nombre ? p.nombre.replace(/_/g, ' ') : p.nombre
+                }));
+
+                if (cleanedData.length === 0) {
                     globalProducts = [];
                     invFilteredProducts = [];
                     renderInventoryTable();
@@ -389,8 +397,8 @@ try {
                     return;
                 }
 
-                globalProducts = data;
-                invFilteredProducts = data;
+                globalProducts = cleanedData;
+                invFilteredProducts = cleanedData;
                 invCurrentPage = 1;
                 renderInventoryTable();
                 renderPosGrid(globalProducts);
