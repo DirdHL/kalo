@@ -538,10 +538,15 @@ try {
             let query = supabase.from('ventas').select('*').order('fecha', { ascending: true });
             
             if (startInput) {
-                query = query.gte('fecha', `${startInput}T00:00:00.000Z`);
+                // startInput is YYYY-MM
+                query = query.gte('fecha', `${startInput}-01T00:00:00.000Z`);
             }
             if (endInput) {
-                query = query.lte('fecha', `${endInput}T23:59:59.999Z`);
+                // Get the last day of the month
+                const [y, m] = endInput.split('-');
+                const endOfMonth = new Date(y, m, 0); // 0th day of next month is last day of current month
+                const lastDay = endOfMonth.getDate();
+                query = query.lte('fecha', `${endInput}-${lastDay}T23:59:59.999Z`);
             }
 
             try {
