@@ -203,6 +203,13 @@ body {
     margin-top: 1.5rem;
 }
 
+.active-discount {
+    background: var(--primary) !important;
+    border-radius: 50px !important;
+    box-shadow: 0 0 15px rgba(139, 92, 246, 0.6) !important;
+    transform: scale(1.05);
+}
+
 /* Galería de Imágenes */
 .image-grid {
     display: grid;

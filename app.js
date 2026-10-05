@@ -583,12 +583,18 @@ try {
         }
 
         cartDiscount.addEventListener('input', () => {
+            // Si el usuario edita el descuento manualmente, quitamos la selección de los botones
+            discountBtns.forEach(b => b.classList.remove('active-discount'));
             renderCart();
         });
 
         const discountBtns = document.querySelectorAll('.discount-btn');
         discountBtns.forEach(btn => {
             btn.addEventListener('click', (e) => {
+                // Quitar clase a todos y ponersela al clickeado
+                discountBtns.forEach(b => b.classList.remove('active-discount'));
+                e.target.classList.add('active-discount');
+
                 const percent = parseInt(e.target.getAttribute('data-percent'), 10);
                 let subtotal = 0;
                 cart.forEach(item => subtotal += (item.precio_venta || 0) * item.qty);
@@ -599,6 +605,7 @@ try {
                     renderCart();
                 } else {
                     cartDiscount.value = '';
+                    e.target.classList.remove('active-discount');
                     renderCart();
                 }
             });
@@ -682,6 +689,7 @@ try {
             
             cart = [];
             cartDiscount.value = '';
+            discountBtns.forEach(b => b.classList.remove('active-discount'));
             renderCart();
             paymentMethod.value = 'Efectivo'; // reset
             splitPaymentSection.classList.add('hidden');
