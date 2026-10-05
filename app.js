@@ -759,9 +759,14 @@ try {
             });
         }
 
-        const statsFilterBtn = document.getElementById('statsFilterBtn');
-        if (statsFilterBtn) {
-            statsFilterBtn.addEventListener('click', calcularEstadisticas);
+        const statsMonthInput = document.getElementById('statsMonth');
+        if (statsMonthInput) {
+            const today = new Date();
+            const yyyy = today.getFullYear();
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
+            statsMonthInput.value = `${yyyy}-${mm}`;
+            
+            statsMonthInput.addEventListener('change', calcularEstadisticas);
         }
 
         const exportExcelBtn = document.getElementById('exportExcelBtn');
