@@ -591,8 +591,19 @@ try {
         const discountBtns = document.querySelectorAll('.discount-btn');
         discountBtns.forEach(btn => {
             btn.addEventListener('click', (e) => {
-                // Quitar clase a todos y ponersela al clickeado
+                const isAlreadyActive = e.target.classList.contains('active-discount');
+                
+                // Quitar clase a todos
                 discountBtns.forEach(b => b.classList.remove('active-discount'));
+                
+                if (isAlreadyActive) {
+                    // Si ya estaba activo, lo desactivamos y quitamos el descuento
+                    cartDiscount.value = '';
+                    renderCart();
+                    return;
+                }
+
+                // Si no estaba activo, lo activamos
                 e.target.classList.add('active-discount');
 
                 const percent = parseInt(e.target.getAttribute('data-percent'), 10);
