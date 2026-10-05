@@ -36,6 +36,7 @@
                 <h1 style="font-size: 1.5rem; margin: 0; background: linear-gradient(90deg, #60a5fa, #a78bfa); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Kalo</h1>
                 <div style="display: flex; gap: 1rem;">
                     <button id="navPosBtn" class="nav-btn active">🛒 Punto de Venta</button>
+                    <button id="navHistoryBtn" class="nav-btn">🧾 Historial</button>
                     <button id="navInvBtn" class="nav-btn">📦 Inventario</button>
                     <button id="navStatsBtn" class="nav-btn">📊 Estadísticas</button>
                 </div>
@@ -208,17 +209,24 @@
                 </div>
 
                 <!-- Gráfico -->
-                <div style="background: rgba(0,0,0,0.2); border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); padding: 1rem; margin-bottom: 2rem; position: relative; height: 250px;">
+                <div style="background: rgba(0,0,0,0.2); border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); padding: 1rem; margin-bottom: 2rem; position: relative; height: 350px;">
                     <canvas id="salesChart"></canvas>
                 </div>
+            </div>
 
-                <!-- Historial de Ventas -->
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem;">
-                    <h2 style="font-size: 1.2rem;">Historial de Ventas</h2>
-                    <button id="exportExcelBtn" class="secondary-btn" style="width: auto; padding: 0.5rem 1rem; background: #10b981; color: white; border: none; font-weight: bold;">📥 Exportar a Excel</button>
+            <!-- Panel Historial de Ventas -->
+            <div class="glass-card hidden" id="historyView" style="flex: 1; display: flex; flex-direction: column; overflow-y: auto;">
+                <div class="dashboard-header" style="margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                    <div>
+                        <h1 style="margin-bottom: 0.2rem">Historial de Ventas 🧾</h1>
+                        <p style="color: var(--text-secondary); font-size: 0.9rem;">Revisa y gestiona tus transacciones</p>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem; align-items: center; background: rgba(0,0,0,0.2); padding: 0.5rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);">
+                        <button id="exportExcelBtn" class="secondary-btn" style="width: auto; padding: 0.4rem 1rem; background: #10b981; color: white; border: none; font-weight: bold;">📥 Exportar a Excel</button>
+                    </div>
                 </div>
-                
-                <div class="table-container" style="flex: none; max-height: 400px; overflow-y: auto;">
+
+                <div class="table-container" style="flex: 1; overflow-y: auto;">
                     <table class="data-table" style="font-size: 0.9rem;">
                         <thead>
                             <tr>
@@ -228,11 +236,12 @@
                                 <th>Productos</th>
                                 <th>Total Pagado</th>
                                 <th>Descuento</th>
-                                <th>Ganancia</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
                             </tr>
                         </thead>
                         <tbody id="ventasList">
-                            <tr><td colspan="7" style="text-align:center; color: gray;">No hay ventas para mostrar.</td></tr>
+                            <tr><td colspan="8" style="text-align:center; color: gray;">No hay ventas para mostrar.</td></tr>
                         </tbody>
                     </table>
                 </div>

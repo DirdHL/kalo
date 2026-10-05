@@ -459,27 +459,43 @@ try {
         const cancelPasswordBtn = document.getElementById('cancelPasswordBtn');
         const passwordErrorMsg = document.getElementById('passwordErrorMsg');
 
+        const navHistoryBtn = document.getElementById('navHistoryBtn');
+        const historyView = document.getElementById('historyView');
+
         let statsUnlocked = localStorage.getItem('statsUnlocked') === 'true';
 
-        navPosBtn.addEventListener('click', () => {
-            navPosBtn.classList.add('active');
-            navInvBtn.classList.remove('active');
-            if (navStatsBtn) navStatsBtn.classList.remove('active');
-            
-            posView.classList.remove('hidden');
+        function hideAllViews() {
+            posView.classList.add('hidden');
             inventoryView.classList.add('hidden');
             if (statsView) statsView.classList.add('hidden');
+            if (historyView) historyView.classList.add('hidden');
+            
+            navPosBtn.classList.remove('active');
+            navInvBtn.classList.remove('active');
+            if (navStatsBtn) navStatsBtn.classList.remove('active');
+            if (navHistoryBtn) navHistoryBtn.classList.remove('active');
+        }
+
+        navPosBtn.addEventListener('click', () => {
+            hideAllViews();
+            navPosBtn.classList.add('active');
+            posView.classList.remove('hidden');
         });
 
         navInvBtn.addEventListener('click', () => {
+            hideAllViews();
             navInvBtn.classList.add('active');
-            navPosBtn.classList.remove('active');
-            if (navStatsBtn) navStatsBtn.classList.remove('active');
-            
             inventoryView.classList.remove('hidden');
-            posView.classList.add('hidden');
-            if (statsView) statsView.classList.add('hidden');
         });
+
+        if (navHistoryBtn) {
+            navHistoryBtn.addEventListener('click', () => {
+                hideAllViews();
+                navHistoryBtn.classList.add('active');
+                historyView.classList.remove('hidden');
+                loadHistory();
+            });
+        }
 
         if (navStatsBtn) {
             navStatsBtn.addEventListener('click', () => {
@@ -519,14 +535,9 @@ try {
         }
 
         function showStatsView() {
+            hideAllViews();
             navStatsBtn.classList.add('active');
-            navPosBtn.classList.remove('active');
-            navInvBtn.classList.remove('active');
-            
             statsView.classList.remove('hidden');
-            posView.classList.add('hidden');
-            inventoryView.classList.add('hidden');
-            
             calcularEstadisticas();
         }
 
@@ -561,50 +572,33 @@ try {
                 let descuentos = 0;
                 let netas = 0;
                 let costos = 0;
+                let reembolsos = 0;
 
-                const ventasList = document.getElementById('ventasList');
-                ventasList.innerHTML = '';
-                
                 const ventasPorDia = {};
 
                 if (data.length === 0) {
                     renderEmptyStats();
                 } else {
                     data.forEach(v => {
-                        brutas += Number(v.subtotal) || 0;
-                        descuentos += Number(v.descuento) || 0;
-                        netas += Number(v.total) || 0;
-                        costos += Number(v.costo_total) || 0;
+                        const isRefunded = v.estado === 'reembolsada';
 
-                        // Historial tabla (orden inverso para tabla)
-                        const tr = document.createElement('tr');
-                        const dateObj = new Date(v.fecha);
-                        const fechaStr = dateObj.toLocaleDateString();
-                        const horaStr = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                        
-                        // Para grafico
-                        const dateKey = fechaStr;
-                        ventasPorDia[dateKey] = (ventasPorDia[dateKey] || 0) + (Number(v.total) || 0);
+                        if (isRefunded) {
+                            reembolsos += Number(v.total) || 0;
+                        } else {
+                            brutas += Number(v.subtotal) || 0;
+                            descuentos += Number(v.descuento) || 0;
+                            netas += Number(v.total) || 0;
+                            costos += Number(v.costo_total) || 0;
 
-                        let productosStr = 'Sin detalles';
-                        if (v.detalles && Array.isArray(v.detalles)) {
-                            productosStr = v.detalles.map(item => `${item.qty}x ${item.nombre}`).join(', ');
+                            const dateObj = new Date(v.fecha);
+                            const fechaStr = dateObj.toLocaleDateString();
+                            ventasPorDia[fechaStr] = (ventasPorDia[fechaStr] || 0) + (Number(v.total) || 0);
                         }
-
-                        tr.innerHTML = `
-                            <td>${fechaStr}</td>
-                            <td>${horaStr}</td>
-                            <td>${v.metodo_pago || 'Efectivo'}</td>
-                            <td style="font-size: 0.8rem; color: #cbd5e1; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${productosStr}">${productosStr}</td>
-                            <td style="font-weight:bold;">S/ ${Number(v.total).toFixed(2)}</td>
-                            <td style="color:#fca5a5;">S/ ${Number(v.descuento).toFixed(2)}</td>
-                            <td style="color:#a7f3d0;">S/ ${(Number(v.total) - Number(v.costo_total)).toFixed(2)}</td>
-                        `;
-                        ventasList.prepend(tr);
                     });
                 }
 
                 document.getElementById('statVentasBrutas').textContent = `S/ ${brutas.toFixed(2)}`;
+                document.getElementById('statReembolsos').textContent = `S/ ${reembolsos.toFixed(2)}`;
                 document.getElementById('statDescuentos').textContent = `S/ ${descuentos.toFixed(2)}`;
                 document.getElementById('statVentasNetas').textContent = `S/ ${netas.toFixed(2)}`;
                 document.getElementById('statBeneficioBruto').textContent = `S/ ${(netas - costos).toFixed(2)}`;
@@ -617,12 +611,115 @@ try {
             }
         }
 
+        window.refundSale = async (ventaId) => {
+            if (!confirm('¿Seguro que deseas reembolsar esta venta? El stock de los productos será devuelto al inventario.')) return;
+            
+            try {
+                // Obtener detalles de la venta
+                const { data: venta, error: fetchErr } = await supabase.from('ventas').select('*').eq('id', ventaId).single();
+                if (fetchErr) throw fetchErr;
+
+                if (venta.estado === 'reembolsada') return alert('Esta venta ya ha sido reembolsada.');
+
+                // Devolver stock
+                if (venta.detalles && Array.isArray(venta.detalles)) {
+                    for (const item of venta.detalles) {
+                        if (item.codigo && item.codigo.startsWith('COMBO:')) {
+                            const parts = item.codigo.replace('COMBO:', '').split(',');
+                            for (const part of parts) {
+                                if (!part) continue;
+                                const [idStr, qtyStr] = part.split('-');
+                                const subId = parseInt(idStr);
+                                const subQty = parseInt(qtyStr) * item.qty;
+                                
+                                const dbProd = globalProducts.find(p => p.id === subId);
+                                if (dbProd && dbProd.stock !== null) {
+                                    await supabase.from('productos').update({ stock: dbProd.stock + subQty }).eq('id', subId);
+                                }
+                            }
+                        } else {
+                            const dbProd = globalProducts.find(p => p.id === item.id);
+                            if (dbProd && dbProd.stock !== null) {
+                                await supabase.from('productos').update({ stock: dbProd.stock + item.qty }).eq('id', item.id);
+                            }
+                        }
+                    }
+                }
+
+                // Marcar como reembolsada
+                const { error: updErr } = await supabase.from('ventas').update({ estado: 'reembolsada' }).eq('id', ventaId);
+                if (updErr) throw updErr;
+
+                alert('Venta reembolsada con éxito.');
+                await loadProducts(); // recargar stock
+                loadHistory(); // recargar historial
+
+            } catch (err) {
+                console.error('Error al reembolsar:', err);
+                alert('No se pudo completar el reembolso. ' + err.message);
+            }
+        };
+
+        async function loadHistory() {
+            const ventasList = document.getElementById('ventasList');
+            ventasList.innerHTML = '<tr><td colspan="8" style="text-align:center;">Cargando...</td></tr>';
+            
+            try {
+                // Cargar ultimas 100 ventas
+                const { data, error } = await supabase.from('ventas').select('*').order('fecha', { ascending: false }).limit(100);
+                if (error) throw error;
+                
+                ventasList.innerHTML = '';
+                
+                if (data.length === 0) {
+                    ventasList.innerHTML = `<tr><td colspan="8" style="text-align:center; color: gray;">No hay ventas registradas.</td></tr>`;
+                    return;
+                }
+                
+                data.forEach(v => {
+                    const tr = document.createElement('tr');
+                    const dateObj = new Date(v.fecha);
+                    const fechaStr = dateObj.toLocaleDateString();
+                    const horaStr = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    
+                    let productosStr = 'Sin detalles';
+                    if (v.detalles && Array.isArray(v.detalles)) {
+                        productosStr = v.detalles.map(item => `${item.qty}x ${item.nombre}`).join(', ');
+                    }
+
+                    const isRefunded = v.estado === 'reembolsada';
+                    const estadoHtml = isRefunded 
+                        ? `<span style="background: rgba(239, 68, 68, 0.2); color: #fca5a5; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.8rem;">Reembolsada</span>`
+                        : `<span style="background: rgba(16, 185, 129, 0.2); color: #a7f3d0; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.8rem;">Completada</span>`;
+                    
+                    const accionHtml = isRefunded
+                        ? `-`
+                        : `<button class="secondary-btn" style="padding: 0.2rem 0.5rem; font-size: 0.8rem; border-color: #ef4444; color: #fca5a5;" onclick="refundSale(${v.id})">Reembolsar</button>`;
+
+                    tr.innerHTML = `
+                        <td>${fechaStr}</td>
+                        <td>${horaStr}</td>
+                        <td>${v.metodo_pago || 'Efectivo'}</td>
+                        <td style="font-size: 0.8rem; color: #cbd5e1; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${productosStr}">${productosStr}</td>
+                        <td style="font-weight:bold; ${isRefunded ? 'text-decoration: line-through; opacity: 0.5;' : ''}">S/ ${Number(v.total).toFixed(2)}</td>
+                        <td style="color:#fca5a5; ${isRefunded ? 'text-decoration: line-through; opacity: 0.5;' : ''}">S/ ${Number(v.descuento).toFixed(2)}</td>
+                        <td>${estadoHtml}</td>
+                        <td>${accionHtml}</td>
+                    `;
+                    ventasList.appendChild(tr);
+                });
+            } catch (err) {
+                console.error(err);
+                ventasList.innerHTML = `<tr><td colspan="8" style="text-align:center; color: #fca5a5;">Error al cargar historial.</td></tr>`;
+            }
+        }
+
         function renderEmptyStats() {
             document.getElementById('statVentasBrutas').textContent = `S/ 0.00`;
+            document.getElementById('statReembolsos').textContent = `S/ 0.00`;
             document.getElementById('statDescuentos').textContent = `S/ 0.00`;
             document.getElementById('statVentasNetas').textContent = `S/ 0.00`;
             document.getElementById('statBeneficioBruto').textContent = `S/ 0.00`;
-            document.getElementById('ventasList').innerHTML = `<tr><td colspan="7" style="text-align:center; color: gray;">No hay ventas para mostrar. Asegúrate de crear la tabla "ventas" en Supabase.</td></tr>`;
             renderChart({});
         }
 
@@ -672,7 +769,7 @@ try {
         const exportExcelBtn = document.getElementById('exportExcelBtn');
         if (exportExcelBtn) {
             exportExcelBtn.addEventListener('click', () => {
-                let csv = 'Fecha,Hora,Metodo,Productos,Total,Descuento,Ganancia\n';
+                let csv = 'Fecha,Hora,Metodo,Productos,Total,Descuento,Estado\n';
                 const rows = document.querySelectorAll('#ventasList tr');
                 rows.forEach(r => {
                     const cols = r.querySelectorAll('td');
