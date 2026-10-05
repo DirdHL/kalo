@@ -586,14 +586,19 @@ try {
                         const dateKey = fechaStr;
                         ventasPorDia[dateKey] = (ventasPorDia[dateKey] || 0) + (Number(v.total) || 0);
 
+                        let productosStr = 'Sin detalles';
+                        if (v.detalles && Array.isArray(v.detalles)) {
+                            productosStr = v.detalles.map(item => `${item.qty}x ${item.nombre}`).join(', ');
+                        }
+
                         tr.innerHTML = `
                             <td>${fechaStr}</td>
                             <td>${horaStr}</td>
                             <td>${v.metodo_pago || 'Efectivo'}</td>
+                            <td style="font-size: 0.8rem; color: #cbd5e1; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${productosStr}">${productosStr}</td>
                             <td style="font-weight:bold;">S/ ${Number(v.total).toFixed(2)}</td>
                             <td style="color:#fca5a5;">S/ ${Number(v.descuento).toFixed(2)}</td>
                             <td style="color:#a7f3d0;">S/ ${(Number(v.total) - Number(v.costo_total)).toFixed(2)}</td>
-                            <td><button class="secondary-btn" style="padding: 0.2rem 0.5rem; font-size: 0.8rem;" onclick="alert('Detalles pronto disponibles')">Ver</button></td>
                         `;
                         ventasList.prepend(tr);
                     });
@@ -667,12 +672,12 @@ try {
         const exportExcelBtn = document.getElementById('exportExcelBtn');
         if (exportExcelBtn) {
             exportExcelBtn.addEventListener('click', () => {
-                let csv = 'Fecha,Hora,Metodo,Subtotal,Descuento,Total,Ganancia\n';
+                let csv = 'Fecha,Hora,Metodo,Productos,Total,Descuento,Ganancia\n';
                 const rows = document.querySelectorAll('#ventasList tr');
                 rows.forEach(r => {
                     const cols = r.querySelectorAll('td');
                     if(cols.length > 1) {
-                        const rowData = Array.from(cols).slice(0,6).map(c => c.textContent.replace('S/ ', '').trim());
+                        const rowData = Array.from(cols).slice(0,7).map(c => `"${c.textContent.replace(/S\/\s?/g, '').trim()}"`);
                         csv += rowData.join(',') + '\n';
                     }
                 });
