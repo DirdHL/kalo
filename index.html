@@ -44,6 +44,19 @@
             <div id="posView" class="pos-layout">
                 <div class="pos-products-section">
                     <input type="text" id="posSearch" class="pos-search" placeholder="🔍 Buscar producto por nombre o código...">
+                    
+                    <div class="category-filters" id="posCategoryFilters" style="display: flex; gap: 0.5rem; overflow-x: auto; padding-bottom: 0.5rem; scrollbar-width: thin;">
+                        <button class="cat-filter-btn active" data-cat="Todos">Todos</button>
+                        <button class="cat-filter-btn" data-cat="Bebidas">🥤 Bebidas</button>
+                        <button class="cat-filter-btn" data-cat="Snacks">🍿 Snacks</button>
+                        <button class="cat-filter-btn" data-cat="Lácteos">🥛 Lácteos</button>
+                        <button class="cat-filter-btn" data-cat="Limpieza">🧼 Limpieza</button>
+                        <button class="cat-filter-btn" data-cat="Dulces">🍬 Dulces</button>
+                        <button class="cat-filter-btn" data-cat="Abarrotes">🥫 Abarrotes</button>
+                        <button class="cat-filter-btn" data-cat="Combos">🍔 Combos</button>
+                        <button class="cat-filter-btn" data-cat="Otros">📦 Otros</button>
+                    </div>
+
                     <div class="pos-grid" id="posGrid">
                         <!-- Generado por JS -->
                     </div>
@@ -181,6 +194,7 @@
                         <option value="Limpieza">🧼 Limpieza</option>
                         <option value="Dulces">🍬 Dulces</option>
                         <option value="Abarrotes">🥫 Abarrotes</option>
+                        <option value="Combos">🍔 Combos</option>
                         <option value="Otros">📦 Otros</option>
                     </select>
                 </div>

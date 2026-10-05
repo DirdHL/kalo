@@ -318,6 +318,36 @@ body {
     background: rgba(20, 20, 30, 0.8);
 }
 
+.category-filters::-webkit-scrollbar {
+    height: 4px;
+}
+.category-filters::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.2);
+    border-radius: 10px;
+}
+.cat-filter-btn {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text-secondary);
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s;
+}
+.cat-filter-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+}
+.cat-filter-btn.active {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+    font-weight: bold;
+    box-shadow: 0 2px 8px rgba(139, 92, 246, 0.4);
+}
+
 .pos-grid {
     display: grid;
     grid-template-columns: repeat(5, 1fr);

@@ -585,13 +585,30 @@ try {
             });
         }
 
-        posSearch.addEventListener('input', (e) => {
-            const term = e.target.value.toLowerCase();
-            const filtered = globalProducts.filter(p => 
-                p.nombre.toLowerCase().includes(term) || 
-                (p.codigo && p.codigo.toLowerCase().includes(term))
-            );
+        let posCurrentCategory = 'Todos';
+
+        function filterPosProducts() {
+            const term = posSearch.value.toLowerCase();
+            const filtered = globalProducts.filter(p => {
+                const matchSearch = p.nombre.toLowerCase().includes(term) || (p.codigo && p.codigo.toLowerCase().includes(term));
+                const matchCat = posCurrentCategory === 'Todos' || p.categoria === posCurrentCategory;
+                return matchSearch && matchCat;
+            });
             renderPosGrid(filtered, true);
+        }
+
+        posSearch.addEventListener('input', (e) => {
+            filterPosProducts();
+        });
+
+        const catBtns = document.querySelectorAll('.cat-filter-btn');
+        catBtns.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                catBtns.forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                posCurrentCategory = e.target.getAttribute('data-cat');
+                filterPosProducts();
+            });
         });
 
         // Soporte para Lector de Código de Barras en la barra de búsqueda
