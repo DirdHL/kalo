@@ -451,19 +451,105 @@ try {
         });
 
         // --- NAVEGACIÓN ---
+        const navStatsBtn = document.getElementById('navStatsBtn');
+        const statsView = document.getElementById('statsView');
+        const passwordModal = document.getElementById('passwordModal');
+        const statsPasswordInput = document.getElementById('statsPasswordInput');
+        const submitPasswordBtn = document.getElementById('submitPasswordBtn');
+        const cancelPasswordBtn = document.getElementById('cancelPasswordBtn');
+        const passwordErrorMsg = document.getElementById('passwordErrorMsg');
+
+        let statsUnlocked = false;
+
         navPosBtn.addEventListener('click', () => {
             navPosBtn.classList.add('active');
             navInvBtn.classList.remove('active');
+            if (navStatsBtn) navStatsBtn.classList.remove('active');
+            
             posView.classList.remove('hidden');
             inventoryView.classList.add('hidden');
+            if (statsView) statsView.classList.add('hidden');
         });
 
         navInvBtn.addEventListener('click', () => {
             navInvBtn.classList.add('active');
             navPosBtn.classList.remove('active');
+            if (navStatsBtn) navStatsBtn.classList.remove('active');
+            
             inventoryView.classList.remove('hidden');
             posView.classList.add('hidden');
+            if (statsView) statsView.classList.add('hidden');
         });
+
+        if (navStatsBtn) {
+            navStatsBtn.addEventListener('click', () => {
+                if (statsUnlocked) {
+                    showStatsView();
+                } else {
+                    passwordModal.classList.remove('hidden');
+                    statsPasswordInput.value = '';
+                    passwordErrorMsg.style.display = 'none';
+                    statsPasswordInput.focus();
+                }
+            });
+        }
+
+        if (cancelPasswordBtn) {
+            cancelPasswordBtn.addEventListener('click', () => {
+                passwordModal.classList.add('hidden');
+            });
+        }
+
+        if (submitPasswordBtn) {
+            submitPasswordBtn.addEventListener('click', verificarPassword);
+            statsPasswordInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') verificarPassword();
+            });
+        }
+
+        function verificarPassword() {
+            if (statsPasswordInput.value === 'Reservasupabase') {
+                statsUnlocked = true;
+                passwordModal.classList.add('hidden');
+                showStatsView();
+            } else {
+                passwordErrorMsg.style.display = 'block';
+            }
+        }
+
+        function showStatsView() {
+            navStatsBtn.classList.add('active');
+            navPosBtn.classList.remove('active');
+            navInvBtn.classList.remove('active');
+            
+            statsView.classList.remove('hidden');
+            posView.classList.add('hidden');
+            inventoryView.classList.add('hidden');
+            
+            calcularEstadisticas();
+        }
+
+        function calcularEstadisticas() {
+            let inversionTotal = 0;
+            let gananciaProyectada = 0;
+            let totalArticulos = 0;
+            
+            globalProducts.forEach(p => {
+                if (p.categoria !== 'Combos' && p.stock !== null && p.stock > 0) {
+                    const cant = p.stock;
+                    const compra = parseFloat(p.precio_compra) || 0;
+                    const venta = parseFloat(p.precio_venta) || 0;
+                    
+                    totalArticulos += cant;
+                    inversionTotal += (compra * cant);
+                    gananciaProyectada += ((venta - compra) * cant);
+                }
+            });
+            
+            document.getElementById('statInversion').textContent = `S/ ${inversionTotal.toFixed(2)}`;
+            document.getElementById('statGanancia').textContent = `S/ ${gananciaProyectada.toFixed(2)}`;
+            document.getElementById('statArticulos').textContent = totalArticulos;
+        }
 
         // --- AUTENTICACIÓN ---
         supabase.auth.onAuthStateChange((event, session) => {

@@ -36,6 +36,7 @@
                 <div style="display: flex; gap: 1rem;">
                     <button id="navPosBtn" class="nav-btn active">🛒 Punto de Venta</button>
                     <button id="navInvBtn" class="nav-btn">📦 Inventario</button>
+                    <button id="navStatsBtn" class="nav-btn">📊 Estadísticas</button>
                 </div>
                 <button id="logoutBtn" class="secondary-btn" style="width: auto; padding: 0.5rem 1.5rem;">Salir</button>
             </div>
@@ -168,6 +169,32 @@
                 </div>
             </div>
         </div>
+
+            <!-- Panel Estadísticas -->
+            <div class="glass-card hidden" id="statsView" style="flex: 1; display: flex; flex-direction: column;">
+                <div class="dashboard-header" style="margin-bottom: 1.5rem;">
+                    <h1 style="margin-bottom: 0.2rem">Estadísticas 📊</h1>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem;">Resumen de tu negocio e inventario</p>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+                    <div style="background: rgba(139, 92, 246, 0.1); border: 1px solid rgba(139, 92, 246, 0.3); padding: 1.5rem; border-radius: 12px; text-align: center;">
+                        <h3 style="color: var(--text-secondary); font-size: 1rem; margin-bottom: 0.5rem;">Inversión Total</h3>
+                        <p id="statInversion" style="font-size: 1.8rem; font-weight: bold; color: #a78bfa;">S/ 0.00</p>
+                        <p style="font-size: 0.75rem; color: gray;">(Costo total de productos en stock)</p>
+                    </div>
+                    <div style="background: rgba(167, 243, 208, 0.1); border: 1px solid rgba(167, 243, 208, 0.3); padding: 1.5rem; border-radius: 12px; text-align: center;">
+                        <h3 style="color: var(--text-secondary); font-size: 1rem; margin-bottom: 0.5rem;">Ganancia Proyectada</h3>
+                        <p id="statGanancia" style="font-size: 1.8rem; font-weight: bold; color: #a7f3d0;">S/ 0.00</p>
+                        <p style="font-size: 0.75rem; color: gray;">(Si se vende todo el stock actual)</p>
+                    </div>
+                    <div style="background: rgba(251, 191, 36, 0.1); border: 1px solid rgba(251, 191, 36, 0.3); padding: 1.5rem; border-radius: 12px; text-align: center;">
+                        <h3 style="color: var(--text-secondary); font-size: 1rem; margin-bottom: 0.5rem;">Total Artículos</h3>
+                        <p id="statArticulos" style="font-size: 1.8rem; font-weight: bold; color: #fcd34d;">0</p>
+                        <p style="font-size: 0.75rem; color: gray;">(Unidades físicas en tienda)</p>
+                    </div>
+                </div>
+            </div>
     </main>
 
     <!-- Modal para Nuevo Producto -->
@@ -295,6 +322,20 @@
             
             <div class="modal-actions">
                 <button id="closeImagePickerBtn" class="secondary-btn">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Password Estadisticas -->
+    <div class="modal-overlay hidden" id="passwordModal" style="z-index: 300;">
+        <div class="modal" style="max-width: 400px; text-align: center;">
+            <h2 style="margin-bottom: 1rem;">🔒 Acceso Restringido</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 1.5rem; font-size: 0.9rem;">Ingresa la contraseña para ver las estadísticas.</p>
+            <input type="password" id="statsPasswordInput" class="styled-input" placeholder="Contraseña..." style="margin-bottom: 1rem; text-align: center;">
+            <p id="passwordErrorMsg" style="color: #fca5a5; font-size: 0.9rem; margin-bottom: 1rem; display: none;">Contraseña incorrecta</p>
+            <div class="modal-actions" style="justify-content: center;">
+                <button id="cancelPasswordBtn" class="secondary-btn">Cancelar</button>
+                <button id="submitPasswordBtn" class="primary-btn">Ingresar</button>
             </div>
         </div>
     </div>
