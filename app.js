@@ -459,7 +459,7 @@ try {
         const cancelPasswordBtn = document.getElementById('cancelPasswordBtn');
         const passwordErrorMsg = document.getElementById('passwordErrorMsg');
 
-        let statsUnlocked = false;
+        let statsUnlocked = localStorage.getItem('statsUnlocked') === 'true';
 
         navPosBtn.addEventListener('click', () => {
             navPosBtn.classList.add('active');
@@ -510,6 +510,7 @@ try {
         function verificarPassword() {
             if (statsPasswordInput.value === 'Reservasupabase') {
                 statsUnlocked = true;
+                localStorage.setItem('statsUnlocked', 'true');
                 passwordModal.classList.add('hidden');
                 showStatsView();
             } else {
@@ -718,6 +719,7 @@ try {
             emailInput.value = '';
             passwordInput.value = '';
             productList.innerHTML = '';
+            localStorage.removeItem('statsUnlocked');
         });
 
         // --- CARGAR PRODUCTOS ---
