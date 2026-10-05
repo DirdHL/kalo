@@ -532,21 +532,16 @@ try {
         let salesChartInstance = null;
 
         async function calcularEstadisticas() {
-            const startInput = document.getElementById('statsDateStart').value;
-            const endInput = document.getElementById('statsDateEnd').value;
+            const monthInput = document.getElementById('statsMonth').value;
             
             let query = supabase.from('ventas').select('*').order('fecha', { ascending: true });
             
-            if (startInput) {
-                // startInput is YYYY-MM
-                query = query.gte('fecha', `${startInput}-01T00:00:00.000Z`);
-            }
-            if (endInput) {
-                // Get the last day of the month
-                const [y, m] = endInput.split('-');
+            if (monthInput) {
+                const [y, m] = monthInput.split('-');
                 const endOfMonth = new Date(y, m, 0); // 0th day of next month is last day of current month
                 const lastDay = endOfMonth.getDate();
-                query = query.lte('fecha', `${endInput}-${lastDay}T23:59:59.999Z`);
+                query = query.gte('fecha', `${monthInput}-01T00:00:00.000Z`)
+                             .lte('fecha', `${monthInput}-${lastDay}T23:59:59.999Z`);
             }
 
             try {
