@@ -598,7 +598,8 @@ try {
                     });
                 }
 
-                document.getElementById('statVentasBrutas').textContent = `S/ ${brutas.toFixed(2)}`;
+                // Mostrar 'netas' como Ingresos Totales (el dinero real que entró a caja tras descuentos)
+                document.getElementById('statVentasBrutas').textContent = `S/ ${netas.toFixed(2)}`;
                 document.getElementById('statReembolsos').textContent = `S/ ${reembolsos.toFixed(2)}`;
                 document.getElementById('statDescuentos').textContent = `S/ ${descuentos.toFixed(2)}`;
                 document.getElementById('statBeneficioBruto').textContent = `S/ ${(netas - costos).toFixed(2)}`;
