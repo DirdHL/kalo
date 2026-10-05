@@ -231,7 +231,7 @@ try {
             imagePickerModal.classList.add('hidden');
         });
 
-        function renderImageGrid() {
+        function renderImageGrid(isCombo = false) {
             imageGrid.innerHTML = '';
             availableImages.forEach(imgName => {
                 const div = document.createElement('div');
@@ -239,21 +239,25 @@ try {
 
                 const displayName = imgName.replace(/_/g, ' ').replace(/\.(svg|png|jpg)$/i, '');
                 
-                // Usamos import.meta.env.BASE_URL para que funcione tanto en localhost como en GitHub Pages (/kalo/)
                 div.innerHTML = `
                     <img src="${import.meta.env.BASE_URL}img/${imgName}" alt="${imgName}" onerror="this.src='https://via.placeholder.com/100?text=Falta+Foto'">
                     <p>${displayName}</p>
                 `;
                 div.addEventListener('click', () => {
-                    selectedImageName = imgName;
-                    previewImg.src = `${import.meta.env.BASE_URL}img/${imgName}`;
+                    if (isCombo) {
+                        comboSelectedImage = imgName;
+                        comboPreviewImg.src = `${import.meta.env.BASE_URL}img/${imgName}`;
+                    } else {
+                        selectedImageName = imgName;
+                        previewImg.src = `${import.meta.env.BASE_URL}img/${imgName}`;
+                    }
                     imagePickerModal.classList.add('hidden');
                 });
                 imageGrid.appendChild(div);
             });
         }
 
-        // --- MANEJO DEL MODAL ---
+        // --- MANEJO DEL MODAL DE PRODUCTO NORMAL ---
         openModalBtn.addEventListener('click', () => {
             productModal.classList.remove('hidden');
             productCodeInput.focus();
@@ -263,6 +267,127 @@ try {
             productModal.classList.add('hidden');
             limpiarFormulario();
         });
+
+        // --- MANEJO DEL MODAL DE COMBOS ---
+        const openComboModalBtn = document.getElementById('openComboModalBtn');
+        const closeComboModalBtn = document.getElementById('closeComboModalBtn');
+        const comboModal = document.getElementById('comboModal');
+        const comboNameInput = document.getElementById('comboNameInput');
+        const comboPriceInput = document.getElementById('comboPriceInput');
+        const comboPreviewImg = document.getElementById('comboPreviewImg');
+        const openComboImagePickerBtn = document.getElementById('openComboImagePickerBtn');
+        const comboProductList = document.getElementById('comboProductList');
+        const saveComboBtn = document.getElementById('saveComboBtn');
+        const comboStatusMsg = document.getElementById('comboStatusMsg');
+        
+        let comboSelectedImage = '';
+
+        if (openComboModalBtn) {
+            openComboModalBtn.addEventListener('click', () => {
+                comboModal.classList.remove('hidden');
+                comboNameInput.value = '';
+                comboPriceInput.value = '';
+                comboSelectedImage = '';
+                comboPreviewImg.src = 'https://via.placeholder.com/50?text=Img';
+                comboStatusMsg.textContent = '';
+                
+                comboProductList.innerHTML = '';
+                const normalProducts = globalProducts.filter(p => p.categoria !== 'Combos');
+                normalProducts.forEach(prod => {
+                    const div = document.createElement('div');
+                    div.style.display = 'flex';
+                    div.style.justifyContent = 'space-between';
+                    div.style.alignItems = 'center';
+                    div.style.padding = '0.5rem';
+                    div.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
+                    
+                    div.innerHTML = `
+                        <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer; flex: 1;">
+                            <input type="checkbox" class="combo-checkbox" value="${prod.id}" style="width:16px; height:16px;">
+                            ${prod.nombre} (Stock: ${prod.stock !== null ? prod.stock : '∞'})
+                        </label>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <span style="font-size: 0.8rem; color: var(--text-secondary);">Cant:</span>
+                            <input type="number" class="combo-qty-input styled-input" min="1" value="1" style="width:60px; padding:0.2rem; text-align: center;" disabled>
+                        </div>
+                    `;
+                    
+                    const checkbox = div.querySelector('.combo-checkbox');
+                    const qtyInput = div.querySelector('.combo-qty-input');
+                    
+                    checkbox.addEventListener('change', () => {
+                        qtyInput.disabled = !checkbox.checked;
+                    });
+                    
+                    comboProductList.appendChild(div);
+                });
+            });
+        }
+
+        if (closeComboModalBtn) {
+            closeComboModalBtn.addEventListener('click', () => {
+                comboModal.classList.add('hidden');
+            });
+        }
+
+        if (openComboImagePickerBtn) {
+            openComboImagePickerBtn.addEventListener('click', () => {
+                imagePickerModal.classList.remove('hidden');
+                renderImageGrid(true);
+            });
+        }
+
+        if (saveComboBtn) {
+            saveComboBtn.addEventListener('click', async () => {
+                const nombre = comboNameInput.value.trim();
+                const precio = parseFloat(comboPriceInput.value);
+                
+                if (!nombre || isNaN(precio) || precio <= 0) {
+                    comboStatusMsg.textContent = 'Ingresa un nombre y precio válido.';
+                    return;
+                }
+
+                const checkboxes = comboProductList.querySelectorAll('.combo-checkbox:checked');
+                if (checkboxes.length < 2) {
+                    comboStatusMsg.textContent = 'Selecciona al menos 2 productos para armar el combo.';
+                    return;
+                }
+
+                let comboCodeParts = [];
+                checkboxes.forEach(cb => {
+                    const qtyInput = cb.parentElement.nextElementSibling.querySelector('.combo-qty-input');
+                    const qty = qtyInput.value || 1;
+                    comboCodeParts.push(`${cb.value}-${qty}`);
+                });
+                const codigoEspecial = `COMBO:${comboCodeParts.join(',')}`;
+
+                saveComboBtn.disabled = true;
+                saveComboBtn.textContent = 'Guardando...';
+
+                try {
+                    const { error } = await supabase.from('productos').insert([{
+                        nombre: nombre,
+                        categoria: 'Combos',
+                        precio_compra: 0,
+                        precio_venta: precio,
+                        stock: null,
+                        alerta_stock: null,
+                        codigo: codigoEspecial,
+                        imagen: comboSelectedImage || null
+                    }]);
+                    
+                    if (error) throw error;
+                    
+                    comboModal.classList.add('hidden');
+                    await loadProducts();
+                } catch (err) {
+                    comboStatusMsg.textContent = 'Error: ' + err.message;
+                } finally {
+                    saveComboBtn.disabled = false;
+                    saveComboBtn.textContent = 'Guardar Combo';
+                }
+            });
+        }
 
         function limpiarFormulario() {
             editingProductId = null;
@@ -735,7 +860,7 @@ try {
             }
         });
 
-        cobrarBtn.addEventListener('click', () => {
+        cobrarBtn.addEventListener('click', async () => {
             if (cart.length === 0) return alert('El ticket está vacío.');
             
             let subtotal = 0;
@@ -762,15 +887,54 @@ try {
                 msg += `\nEfectivo: S/ ${ef.toFixed(2)}\nYape: S/ ${yp.toFixed(2)}`;
             }
 
-            // Aquí en el futuro se descontaría el stock de Supabase y se guardaría la venta
-            alert(msg);
-            
-            cart = [];
-            cartDiscount.value = '';
-            discountBtns.forEach(b => b.classList.remove('active-discount'));
-            renderCart();
-            paymentMethod.value = 'Efectivo'; // reset
-            splitPaymentSection.classList.add('hidden');
+            // Descontar stock en Supabase
+            try {
+                cobrarBtn.disabled = true;
+                cobrarBtn.textContent = 'Procesando...';
+
+                // Agrupar descuentos necesarios
+                const stockUpdates = {};
+                for (const item of cart) {
+                    if (item.codigo && item.codigo.startsWith('COMBO:')) {
+                        const parts = item.codigo.replace('COMBO:', '').split(',');
+                        for (const part of parts) {
+                            if (!part) continue;
+                            const [idStr, qtyStr] = part.split('-');
+                            const subId = parseInt(idStr);
+                            const subQty = parseInt(qtyStr) * item.qty;
+                            stockUpdates[subId] = (stockUpdates[subId] || 0) + subQty;
+                        }
+                    } else {
+                        stockUpdates[item.id] = (stockUpdates[item.id] || 0) + item.qty;
+                    }
+                }
+
+                // Ejecutar actualizaciones
+                for (const [idStr, qtyToDeduct] of Object.entries(stockUpdates)) {
+                    const prodId = parseInt(idStr);
+                    const dbProd = globalProducts.find(p => p.id === prodId);
+                    if (dbProd && dbProd.stock !== null) {
+                        const newStock = Math.max(0, dbProd.stock - qtyToDeduct);
+                        await supabase.from('productos').update({ stock: newStock }).eq('id', prodId);
+                    }
+                }
+                
+                await loadProducts(); // Recargar inventario visual
+                alert(msg);
+                
+                cart = [];
+                cartDiscount.value = '';
+                discountBtns.forEach(b => b.classList.remove('active-discount'));
+                renderCart();
+                paymentMethod.value = 'Efectivo';
+                splitPaymentSection.classList.add('hidden');
+                
+            } catch (err) {
+                alert('Error al procesar la venta: ' + err.message);
+            } finally {
+                cobrarBtn.disabled = false;
+                cobrarBtn.textContent = 'Cobrar';
+            }
         });
 
         // --- AGREGAR PRODUCTO ---

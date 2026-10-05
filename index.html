@@ -133,6 +133,7 @@
                     </div>
                     <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
                         <input type="text" id="invSearch" class="pos-search" style="width: 280px; padding: 0.8rem;" placeholder="🔍 Buscar producto...">
+                        <button id="openComboModalBtn" class="primary-btn" style="width: auto; padding: 0.8rem 1.5rem; background: #3b82f6;">🍔 Crear Combo</button>
                         <button id="openModalBtn" class="primary-btn" style="width: auto; padding: 0.8rem 1.5rem;">➕ Nuevo Producto</button>
                     </div>
                 </div>
@@ -238,6 +239,46 @@
             <div class="modal-actions">
                 <button id="closeModalBtn" class="secondary-btn">Cancelar</button>
                 <button id="addProductBtn" class="primary-btn">Guardar Producto</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para Crear Combo -->
+    <div class="modal-overlay hidden" id="comboModal">
+        <div class="modal" style="max-width: 600px;">
+            <h2 style="margin-bottom: 1.5rem;">Crear Combo Avanzado 🍔</h2>
+            
+            <div class="input-group">
+                <label>Nombre del Combo</label>
+                <input type="text" id="comboNameInput" placeholder="Ej. Combo Familiar" class="styled-input">
+            </div>
+            
+            <div class="form-grid">
+                <div class="input-group">
+                    <label>Precio de Venta Total (S/)</label>
+                    <input type="number" id="comboPriceInput" placeholder="0.00" step="0.01" class="styled-input">
+                </div>
+                <div class="input-group">
+                    <label>Imagen del Combo</label>
+                    <div style="display: flex; gap: 1rem; align-items: center;">
+                        <img id="comboPreviewImg" src="https://via.placeholder.com/50?text=Img" alt="Sin foto" style="width: 50px; height: 50px; border-radius: 8px; object-fit: cover; background: rgba(255,255,255,0.1);">
+                        <button id="openComboImagePickerBtn" class="secondary-btn" style="padding: 0.5rem; flex: 1; font-size: 0.9rem;">Escoger Img</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="input-group" style="margin-top: 1rem;">
+                <label>Seleccionar Productos del Combo</label>
+                <div style="background: rgba(0,0,0,0.2); border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); padding: 1rem; max-height: 200px; overflow-y: auto;" id="comboProductList">
+                    <!-- Se llenará con JS -->
+                </div>
+            </div>
+
+            <p id="comboStatusMsg" style="text-align: center; color: #fca5a5; margin-bottom: 1rem;"></p>
+
+            <div class="modal-actions">
+                <button id="closeComboModalBtn" class="secondary-btn">Cancelar</button>
+                <button id="saveComboBtn" class="primary-btn">Guardar Combo</button>
             </div>
         </div>
     </div>
