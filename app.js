@@ -544,6 +544,34 @@ try {
             renderPosGrid(filtered);
         });
 
+        // Soporte para Lector de Código de Barras en la barra de búsqueda
+        posSearch.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                const term = e.target.value.trim().toLowerCase();
+                if (!term) return;
+                
+                // Buscar coincidencia exacta por código de barras
+                const exactMatch = globalProducts.find(p => p.codigo && p.codigo.toLowerCase() === term);
+                
+                if (exactMatch) {
+                    addToCart(exactMatch);
+                    e.target.value = ''; // Limpiar barra
+                    renderPosGrid(globalProducts); // Restaurar cuadrícula
+                } else {
+                    // Si no hay match exacto de código, pero hay un solo resultado en la búsqueda
+                    const filtered = globalProducts.filter(p => 
+                        p.nombre.toLowerCase().includes(term) || 
+                        (p.codigo && p.codigo.toLowerCase().includes(term))
+                    );
+                    if (filtered.length === 1) {
+                        addToCart(filtered[0]);
+                        e.target.value = '';
+                        renderPosGrid(globalProducts);
+                    }
+                }
+            }
+        });
+
         function addToCart(prod) {
             const existing = cart.find(item => item.id === prod.id);
             if (existing) {
@@ -715,6 +743,55 @@ try {
                 addProductBtn.textContent = editingProductId ? 'Actualizar Producto' : 'Guardar Producto';
             }
         });
+        // --- LECTOR DE CÓDIGO DE BARRAS GLOBAL ---
+        let barcodeBuffer = '';
+        let barcodeTimeout = null;
+
+        document.addEventListener('keydown', (e) => {
+            // Ignorar si el usuario está tipeando activamente en cualquier campo de texto
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') {
+                return;
+            }
+
+            // Un lector envía teclas súper rápido (ej. 10ms-20ms).
+            // Si hay una pausa mayor a 50ms, limpiamos el buffer.
+            if (barcodeTimeout) {
+                clearTimeout(barcodeTimeout);
+            }
+
+            barcodeTimeout = setTimeout(() => {
+                barcodeBuffer = '';
+            }, 50);
+
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                if (barcodeBuffer.trim().length > 0) {
+                    const scannedCode = barcodeBuffer.trim().toLowerCase();
+                    const match = globalProducts.find(p => p.codigo && p.codigo.toLowerCase() === scannedCode);
+                    
+                    if (match) {
+                        // Cambiamos automáticamente a la vista de Punto de Venta si estamos en inventario
+                        if (!navPosBtn.classList.contains('active')) {
+                            navPosBtn.click();
+                        }
+                        addToCart(match);
+                    } else {
+                        // Notificación visual rápida en el carrito
+                        const prevColor = cartTotalValue.style.color;
+                        cartTotalValue.style.color = '#fca5a5';
+                        cartTotalValue.textContent = '❌ No found';
+                        setTimeout(() => {
+                            cartTotalValue.style.color = prevColor;
+                            renderCart();
+                        }, 1000);
+                    }
+                    barcodeBuffer = '';
+                }
+            } else if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+                barcodeBuffer += e.key;
+            }
+        });
+
     });
 
 } catch (error) {
