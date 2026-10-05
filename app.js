@@ -558,6 +558,24 @@ try {
             renderCart();
         });
 
+        const discountBtns = document.querySelectorAll('.discount-btn');
+        discountBtns.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const percent = parseInt(e.target.getAttribute('data-percent'), 10);
+                let subtotal = 0;
+                cart.forEach(item => subtotal += (item.precio_venta || 0) * item.qty);
+                
+                if (subtotal > 0) {
+                    const discountAmount = (subtotal * (percent / 100)).toFixed(2);
+                    cartDiscount.value = discountAmount;
+                    renderCart();
+                } else {
+                    cartDiscount.value = '';
+                    renderCart();
+                }
+            });
+        });
+
         function renderCart() {
             cartItemsContainer.innerHTML = '';
             let subtotal = 0;
