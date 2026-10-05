@@ -7,6 +7,7 @@
     <title>Kalo | Punto de Venta</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="index.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <div class="background-animation"></div>
@@ -171,28 +172,72 @@
         </div>
 
             <!-- Panel Estadísticas -->
-            <div class="glass-card hidden" id="statsView" style="flex: 1; display: flex; flex-direction: column;">
-                <div class="dashboard-header" style="margin-bottom: 1.5rem;">
-                    <h1 style="margin-bottom: 0.2rem">Estadísticas 📊</h1>
-                    <p style="color: var(--text-secondary); font-size: 0.9rem;">Resumen de tu negocio e inventario</p>
+            <div class="glass-card hidden" id="statsView" style="flex: 1; display: flex; flex-direction: column; overflow-y: auto;">
+                <div class="dashboard-header" style="margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                    <div>
+                        <h1 style="margin-bottom: 0.2rem">Estadísticas 📊</h1>
+                        <p style="color: var(--text-secondary); font-size: 0.9rem;">Rendimiento de tu negocio</p>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                        <input type="date" id="statsDateStart" class="styled-input" style="padding: 0.5rem; font-size: 0.9rem;">
+                        <span>-</span>
+                        <input type="date" id="statsDateEnd" class="styled-input" style="padding: 0.5rem; font-size: 0.9rem;">
+                        <button id="statsFilterBtn" class="primary-btn" style="padding: 0.5rem 1rem; width: auto; font-size: 0.9rem;">Filtrar</button>
+                    </div>
                 </div>
                 
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
-                    <div style="background: rgba(139, 92, 246, 0.1); border: 1px solid rgba(139, 92, 246, 0.3); padding: 1.5rem; border-radius: 12px; text-align: center;">
-                        <h3 style="color: var(--text-secondary); font-size: 1rem; margin-bottom: 0.5rem;">Inversión Total</h3>
-                        <p id="statInversion" style="font-size: 1.8rem; font-weight: bold; color: #a78bfa;">S/ 0.00</p>
-                        <p style="font-size: 0.75rem; color: gray;">(Costo total de productos en stock)</p>
+                <!-- KPIs -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+                    <div class="stat-card">
+                        <h3 class="stat-title">Ventas Brutas</h3>
+                        <p class="stat-value" id="statVentasBrutas">S/ 0.00</p>
                     </div>
-                    <div style="background: rgba(167, 243, 208, 0.1); border: 1px solid rgba(167, 243, 208, 0.3); padding: 1.5rem; border-radius: 12px; text-align: center;">
-                        <h3 style="color: var(--text-secondary); font-size: 1rem; margin-bottom: 0.5rem;">Ganancia Proyectada</h3>
-                        <p id="statGanancia" style="font-size: 1.8rem; font-weight: bold; color: #a7f3d0;">S/ 0.00</p>
-                        <p style="font-size: 0.75rem; color: gray;">(Si se vende todo el stock actual)</p>
+                    <div class="stat-card">
+                        <h3 class="stat-title">Reembolsos</h3>
+                        <p class="stat-value" id="statReembolsos">S/ 0.00</p>
                     </div>
-                    <div style="background: rgba(251, 191, 36, 0.1); border: 1px solid rgba(251, 191, 36, 0.3); padding: 1.5rem; border-radius: 12px; text-align: center;">
-                        <h3 style="color: var(--text-secondary); font-size: 1rem; margin-bottom: 0.5rem;">Total Artículos</h3>
-                        <p id="statArticulos" style="font-size: 1.8rem; font-weight: bold; color: #fcd34d;">0</p>
-                        <p style="font-size: 0.75rem; color: gray;">(Unidades físicas en tienda)</p>
+                    <div class="stat-card">
+                        <h3 class="stat-title">Descuentos</h3>
+                        <p class="stat-value" id="statDescuentos">S/ 0.00</p>
                     </div>
+                    <div class="stat-card" style="border-top-color: #10b981;">
+                        <h3 class="stat-title">Ventas Netas</h3>
+                        <p class="stat-value" id="statVentasNetas" style="color: #10b981;">S/ 0.00</p>
+                    </div>
+                    <div class="stat-card" style="border-top-color: #8b5cf6;">
+                        <h3 class="stat-title">Beneficio Bruto</h3>
+                        <p class="stat-value" id="statBeneficioBruto" style="color: #a78bfa;">S/ 0.00</p>
+                    </div>
+                </div>
+
+                <!-- Gráfico -->
+                <div style="background: rgba(0,0,0,0.2); border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); padding: 1rem; margin-bottom: 2rem; position: relative; height: 250px;">
+                    <canvas id="salesChart"></canvas>
+                </div>
+
+                <!-- Historial de Ventas -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem;">
+                    <h2 style="font-size: 1.2rem;">Historial de Ventas</h2>
+                    <button id="exportExcelBtn" class="secondary-btn" style="width: auto; padding: 0.5rem 1rem; background: #10b981; color: white; border: none; font-weight: bold;">📥 Exportar a Excel</button>
+                </div>
+                
+                <div class="table-container" style="flex: none; max-height: 400px; overflow-y: auto;">
+                    <table class="data-table" style="font-size: 0.9rem;">
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Hora</th>
+                                <th>Método</th>
+                                <th>Total Pagado</th>
+                                <th>Descuento</th>
+                                <th>Ganancia</th>
+                                <th>Detalles</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ventasList">
+                            <tr><td colspan="7" style="text-align:center; color: gray;">No hay ventas para mostrar.</td></tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
     </main>

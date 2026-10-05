@@ -529,26 +529,158 @@ try {
             calcularEstadisticas();
         }
 
-        function calcularEstadisticas() {
-            let inversionTotal = 0;
-            let gananciaProyectada = 0;
-            let totalArticulos = 0;
+        let salesChartInstance = null;
+
+        async function calcularEstadisticas() {
+            const startInput = document.getElementById('statsDateStart').value;
+            const endInput = document.getElementById('statsDateEnd').value;
             
-            globalProducts.forEach(p => {
-                if (p.categoria !== 'Combos' && p.stock !== null && p.stock > 0) {
-                    const cant = p.stock;
-                    const compra = parseFloat(p.precio_compra) || 0;
-                    const venta = parseFloat(p.precio_venta) || 0;
-                    
-                    totalArticulos += cant;
-                    inversionTotal += (compra * cant);
-                    gananciaProyectada += ((venta - compra) * cant);
+            let query = supabase.from('ventas').select('*').order('fecha', { ascending: true });
+            
+            if (startInput) {
+                query = query.gte('fecha', `${startInput}T00:00:00.000Z`);
+            }
+            if (endInput) {
+                query = query.lte('fecha', `${endInput}T23:59:59.999Z`);
+            }
+
+            try {
+                const { data, error } = await query;
+                if (error) {
+                    if (error.code === '42P01') {
+                        // La tabla no existe
+                        console.warn('La tabla ventas no existe todavía.');
+                        renderEmptyStats();
+                        return;
+                    }
+                    throw error;
+                }
+
+                let brutas = 0;
+                let descuentos = 0;
+                let netas = 0;
+                let costos = 0;
+
+                const ventasList = document.getElementById('ventasList');
+                ventasList.innerHTML = '';
+                
+                const ventasPorDia = {};
+
+                if (data.length === 0) {
+                    renderEmptyStats();
+                } else {
+                    data.forEach(v => {
+                        brutas += Number(v.subtotal) || 0;
+                        descuentos += Number(v.descuento) || 0;
+                        netas += Number(v.total) || 0;
+                        costos += Number(v.costo_total) || 0;
+
+                        // Historial tabla (orden inverso para tabla)
+                        const tr = document.createElement('tr');
+                        const dateObj = new Date(v.fecha);
+                        const fechaStr = dateObj.toLocaleDateString();
+                        const horaStr = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                        
+                        // Para grafico
+                        const dateKey = fechaStr;
+                        ventasPorDia[dateKey] = (ventasPorDia[dateKey] || 0) + (Number(v.total) || 0);
+
+                        tr.innerHTML = `
+                            <td>${fechaStr}</td>
+                            <td>${horaStr}</td>
+                            <td>${v.metodo_pago || 'Efectivo'}</td>
+                            <td style="font-weight:bold;">S/ ${Number(v.total).toFixed(2)}</td>
+                            <td style="color:#fca5a5;">S/ ${Number(v.descuento).toFixed(2)}</td>
+                            <td style="color:#a7f3d0;">S/ ${(Number(v.total) - Number(v.costo_total)).toFixed(2)}</td>
+                            <td><button class="secondary-btn" style="padding: 0.2rem 0.5rem; font-size: 0.8rem;" onclick="alert('Detalles pronto disponibles')">Ver</button></td>
+                        `;
+                        ventasList.prepend(tr);
+                    });
+                }
+
+                document.getElementById('statVentasBrutas').textContent = `S/ ${brutas.toFixed(2)}`;
+                document.getElementById('statDescuentos').textContent = `S/ ${descuentos.toFixed(2)}`;
+                document.getElementById('statVentasNetas').textContent = `S/ ${netas.toFixed(2)}`;
+                document.getElementById('statBeneficioBruto').textContent = `S/ ${(netas - costos).toFixed(2)}`;
+                
+                renderChart(ventasPorDia);
+
+            } catch (err) {
+                console.error('Error al obtener estadísticas:', err);
+                renderEmptyStats();
+            }
+        }
+
+        function renderEmptyStats() {
+            document.getElementById('statVentasBrutas').textContent = `S/ 0.00`;
+            document.getElementById('statDescuentos').textContent = `S/ 0.00`;
+            document.getElementById('statVentasNetas').textContent = `S/ 0.00`;
+            document.getElementById('statBeneficioBruto').textContent = `S/ 0.00`;
+            document.getElementById('ventasList').innerHTML = `<tr><td colspan="7" style="text-align:center; color: gray;">No hay ventas para mostrar. Asegúrate de crear la tabla "ventas" en Supabase.</td></tr>`;
+            renderChart({});
+        }
+
+        function renderChart(dataObj) {
+            const ctx = document.getElementById('salesChart').getContext('2d');
+            const labels = Object.keys(dataObj);
+            const values = Object.values(dataObj);
+
+            if (salesChartInstance) {
+                salesChartInstance.destroy();
+            }
+
+            salesChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels.length ? labels : ['Sin datos'],
+                    datasets: [{
+                        label: 'Ventas Netas (S/)',
+                        data: values.length ? values : [0],
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.2)',
+                        borderWidth: 2,
+                        tension: 0.3,
+                        fill: true,
+                        pointBackgroundColor: '#10b981'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: 'rgba(255,255,255,0.7)' } },
+                        x: { grid: { display: false }, ticks: { color: 'rgba(255,255,255,0.7)' } }
+                    },
+                    plugins: {
+                        legend: { labels: { color: 'rgba(255,255,255,0.9)' } }
+                    }
                 }
             });
-            
-            document.getElementById('statInversion').textContent = `S/ ${inversionTotal.toFixed(2)}`;
-            document.getElementById('statGanancia').textContent = `S/ ${gananciaProyectada.toFixed(2)}`;
-            document.getElementById('statArticulos').textContent = totalArticulos;
+        }
+
+        const statsFilterBtn = document.getElementById('statsFilterBtn');
+        if (statsFilterBtn) {
+            statsFilterBtn.addEventListener('click', calcularEstadisticas);
+        }
+
+        const exportExcelBtn = document.getElementById('exportExcelBtn');
+        if (exportExcelBtn) {
+            exportExcelBtn.addEventListener('click', () => {
+                let csv = 'Fecha,Hora,Metodo,Subtotal,Descuento,Total,Ganancia\n';
+                const rows = document.querySelectorAll('#ventasList tr');
+                rows.forEach(r => {
+                    const cols = r.querySelectorAll('td');
+                    if(cols.length > 1) {
+                        const rowData = Array.from(cols).slice(0,6).map(c => c.textContent.replace('S/ ', '').trim());
+                        csv += rowData.join(',') + '\n';
+                    }
+                });
+                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = 'Historial_Ventas_Kalo.csv';
+                link.click();
+            });
         }
 
         // --- AUTENTICACIÓN ---
@@ -995,16 +1127,37 @@ try {
                     }
                 }
 
+                let costoTotalVenta = 0;
+
                 // Ejecutar actualizaciones
                 for (const [idStr, qtyToDeduct] of Object.entries(stockUpdates)) {
                     const prodId = parseInt(idStr);
                     const dbProd = globalProducts.find(p => p.id === prodId);
-                    if (dbProd && dbProd.stock !== null) {
-                        const newStock = Math.max(0, dbProd.stock - qtyToDeduct);
-                        await supabase.from('productos').update({ stock: newStock }).eq('id', prodId);
+                    if (dbProd) {
+                        costoTotalVenta += (parseFloat(dbProd.precio_compra) || 0) * qtyToDeduct;
+                        if (dbProd.stock !== null) {
+                            const newStock = Math.max(0, dbProd.stock - qtyToDeduct);
+                            await supabase.from('productos').update({ stock: newStock }).eq('id', prodId);
+                        }
                     }
                 }
                 
+                // Guardar la venta en la tabla 'ventas'
+                try {
+                    await supabase.from('ventas').insert([{
+                        subtotal: subtotal,
+                        descuento: discount,
+                        total: total,
+                        metodo_pago: metodo,
+                        efectivo: metodo === 'Ambos' ? parseFloat(splitEfectivo.value) || 0 : (metodo === 'Efectivo' ? total : 0),
+                        yape: metodo === 'Ambos' ? parseFloat(splitYape.value) || 0 : (metodo === 'Yape' ? total : 0),
+                        costo_total: costoTotalVenta,
+                        detalles: cart
+                    }]);
+                } catch(e) {
+                    console.error("Error al registrar venta (quizas no existe la tabla): ", e);
+                }
+
                 await loadProducts(); // Recargar inventario visual
                 alert(msg);
                 

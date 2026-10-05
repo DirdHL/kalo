@@ -348,6 +348,26 @@ body {
     box-shadow: 0 2px 8px rgba(139, 92, 246, 0.4);
 }
 
+.stat-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-top: 3px solid var(--primary);
+    padding: 1rem;
+    border-radius: 8px;
+    text-align: center;
+}
+.stat-title {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    margin-bottom: 0.5rem;
+    font-weight: normal;
+}
+.stat-value {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: white;
+}
+
 .pos-grid {
     display: grid;
     grid-template-columns: repeat(5, 1fr);
