@@ -575,6 +575,7 @@ try {
                 let reembolsos = 0;
 
                 const ventasPorDia = {};
+                window.currentMonthVentas = data;
 
                 if (data.length === 0) {
                     renderEmptyStats();
@@ -769,22 +770,39 @@ try {
             statsMonthInput.addEventListener('change', calcularEstadisticas);
         }
 
-        const exportExcelBtn = document.getElementById('exportExcelBtn');
-        if (exportExcelBtn) {
-            exportExcelBtn.addEventListener('click', () => {
-                let csv = 'Fecha,Hora,Metodo,Productos,Total,Descuento,Estado\n';
-                const rows = document.querySelectorAll('#ventasList tr');
-                rows.forEach(r => {
-                    const cols = r.querySelectorAll('td');
-                    if(cols.length > 1) {
-                        const rowData = Array.from(cols).slice(0,7).map(c => `"${c.textContent.replace(/S\/\s?/g, '').trim()}"`);
-                        csv += rowData.join(',') + '\n';
+        const exportStatsBtn = document.getElementById('exportStatsBtn');
+        if (exportStatsBtn) {
+            exportStatsBtn.addEventListener('click', () => {
+                if (!window.currentMonthVentas || window.currentMonthVentas.length === 0) {
+                    return alert('No hay datos para exportar en este mes.');
+                }
+                
+                let csv = 'Fecha,Hora,Metodo,Productos,Subtotal,Descuento,Total Pagado,Ganancia Neta,Estado\n';
+                window.currentMonthVentas.forEach(v => {
+                    const dateObj = new Date(v.fecha);
+                    const fechaStr = dateObj.toLocaleDateString();
+                    const horaStr = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    
+                    let productosStr = 'Sin detalles';
+                    if (v.detalles && Array.isArray(v.detalles)) {
+                        productosStr = v.detalles.map(item => `${item.qty}x ${item.nombre}`).join('; ');
                     }
+                    const ganancia = Number(v.total) - Number(v.costo_total);
+                    
+                    const rowData = [
+                        fechaStr, horaStr, v.metodo_pago || 'Efectivo',
+                        `"${productosStr}"`, Number(v.subtotal).toFixed(2),
+                        Number(v.descuento).toFixed(2), Number(v.total).toFixed(2),
+                        ganancia.toFixed(2), v.estado || 'completada'
+                    ];
+                    csv += rowData.join(',') + '\n';
                 });
                 const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
                 const link = document.createElement('a');
                 link.href = URL.createObjectURL(blob);
-                link.download = 'Historial_Ventas_Kalo.csv';
+                
+                const mesInput = document.getElementById('statsMonth').value || 'Completo';
+                link.download = `Reporte_Estadisticas_${mesInput}.csv`;
                 link.click();
             });
         }
