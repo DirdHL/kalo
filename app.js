@@ -600,7 +600,6 @@ try {
                 document.getElementById('statVentasBrutas').textContent = `S/ ${brutas.toFixed(2)}`;
                 document.getElementById('statReembolsos').textContent = `S/ ${reembolsos.toFixed(2)}`;
                 document.getElementById('statDescuentos').textContent = `S/ ${descuentos.toFixed(2)}`;
-                document.getElementById('statVentasNetas').textContent = `S/ ${netas.toFixed(2)}`;
                 document.getElementById('statBeneficioBruto').textContent = `S/ ${(netas - costos).toFixed(2)}`;
                 
                 renderChart(ventasPorDia);
@@ -718,7 +717,6 @@ try {
             document.getElementById('statVentasBrutas').textContent = `S/ 0.00`;
             document.getElementById('statReembolsos').textContent = `S/ 0.00`;
             document.getElementById('statDescuentos').textContent = `S/ 0.00`;
-            document.getElementById('statVentasNetas').textContent = `S/ 0.00`;
             document.getElementById('statBeneficioBruto').textContent = `S/ 0.00`;
             renderChart({});
         }
