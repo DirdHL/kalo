@@ -516,9 +516,25 @@ try {
         });
 
         // --- LÓGICA DEL PUNTO DE VENTA (POS) ---
-        function renderPosGrid(productsToRender) {
+        let posCurrentPage = 1;
+        const posItemsPerPage = 25;
+        let posFilteredProducts = [];
+
+        const posPrevPageBtn = document.getElementById('posPrevPageBtn');
+        const posNextPageBtn = document.getElementById('posNextPageBtn');
+        const posPaginationInfo = document.getElementById('posPaginationInfo');
+
+        function renderPosGrid(productsToRender, resetPage = false) {
+            if (resetPage) posCurrentPage = 1;
+            posFilteredProducts = productsToRender;
+
             posGrid.innerHTML = '';
-            productsToRender.forEach(prod => {
+            const totalPages = Math.ceil(productsToRender.length / posItemsPerPage) || 1;
+            const startIndex = (posCurrentPage - 1) * posItemsPerPage;
+            const endIndex = startIndex + posItemsPerPage;
+            const paginatedItems = productsToRender.slice(startIndex, endIndex);
+
+            paginatedItems.forEach(prod => {
                 const div = document.createElement('div');
                 div.className = 'product-card';
                 const imgSrc = prod.imagen ? `${import.meta.env.BASE_URL}img/${prod.imagen}` : 'https://via.placeholder.com/80?text=No+Img';
@@ -533,6 +549,32 @@ try {
                 div.addEventListener('click', () => addToCart(prod));
                 posGrid.appendChild(div);
             });
+
+            if (posPaginationInfo) {
+                posPaginationInfo.textContent = `Página ${posCurrentPage} de ${totalPages}`;
+                posPrevPageBtn.disabled = posCurrentPage === 1;
+                posNextPageBtn.disabled = posCurrentPage === totalPages;
+                posPrevPageBtn.style.opacity = posPrevPageBtn.disabled ? '0.5' : '1';
+                posNextPageBtn.style.opacity = posNextPageBtn.disabled ? '0.5' : '1';
+            }
+        }
+
+        if (posPrevPageBtn) {
+            posPrevPageBtn.addEventListener('click', () => {
+                if (posCurrentPage > 1) {
+                    posCurrentPage--;
+                    renderPosGrid(posFilteredProducts);
+                }
+            });
+        }
+        if (posNextPageBtn) {
+            posNextPageBtn.addEventListener('click', () => {
+                const totalPages = Math.ceil(posFilteredProducts.length / posItemsPerPage) || 1;
+                if (posCurrentPage < totalPages) {
+                    posCurrentPage++;
+                    renderPosGrid(posFilteredProducts);
+                }
+            });
         }
 
         posSearch.addEventListener('input', (e) => {
@@ -541,7 +583,7 @@ try {
                 p.nombre.toLowerCase().includes(term) || 
                 (p.codigo && p.codigo.toLowerCase().includes(term))
             );
-            renderPosGrid(filtered);
+            renderPosGrid(filtered, true);
         });
 
         // Soporte para Lector de Código de Barras en la barra de búsqueda
@@ -556,7 +598,7 @@ try {
                 if (exactMatch) {
                     addToCart(exactMatch);
                     e.target.value = ''; // Limpiar barra
-                    renderPosGrid(globalProducts); // Restaurar cuadrícula
+                    renderPosGrid(globalProducts, true); // Restaurar cuadrícula
                 } else {
                     // Si no hay match exacto de código, pero hay un solo resultado en la búsqueda
                     const filtered = globalProducts.filter(p => 
@@ -566,7 +608,7 @@ try {
                     if (filtered.length === 1) {
                         addToCart(filtered[0]);
                         e.target.value = '';
-                        renderPosGrid(globalProducts);
+                        renderPosGrid(globalProducts, true);
                     }
                 }
             }
