@@ -777,7 +777,45 @@ try {
                     return alert('No hay datos para exportar en este mes.');
                 }
                 
-                let csv = 'Fecha,Hora,Metodo,Productos,Subtotal,Descuento,Total Pagado,Ganancia Neta,Estado\n';
+                let brutasStr = document.getElementById('statVentasBrutas').textContent;
+                let reembolsosStr = document.getElementById('statReembolsos').textContent;
+                let descuentosStr = document.getElementById('statDescuentos').textContent;
+                let gananciaStr = document.getElementById('statBeneficioBruto').textContent;
+                let mesInput = document.getElementById('statsMonth').value || 'Completo';
+
+                let html = `
+                <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+                <head><meta charset="utf-8"></head>
+                <body style="font-family: Arial, sans-serif;">
+                    <h2 style="color: #4f46e5; text-transform: uppercase;">Reporte Financiero Kalo - ${mesInput}</h2>
+                    
+                    <table border="1" cellpadding="6" cellspacing="0" style="border-collapse: collapse; margin-bottom: 20px;">
+                        <tr style="background-color: #10b981; color: white; font-size: 16px;">
+                            <th colspan="2">RESUMEN DEL MES</th>
+                        </tr>
+                        <tr><td style="font-weight: bold; width: 200px;">Ingresos Totales</td><td style="text-align: right;">${brutasStr}</td></tr>
+                        <tr><td style="font-weight: bold;">Reembolsos</td><td style="color: red; text-align: right;">${reembolsosStr}</td></tr>
+                        <tr><td style="font-weight: bold;">Descuentos</td><td style="text-align: right;">${descuentosStr}</td></tr>
+                        <tr style="background-color: #d1fae5;">
+                            <td style="font-weight: bold; font-size: 16px;">GANANCIA NETA</td>
+                            <td style="font-weight: bold; font-size: 16px; color: #047857; text-align: right;">${gananciaStr}</td>
+                        </tr>
+                    </table>
+
+                    <table border="1" cellpadding="6" cellspacing="0" style="border-collapse: collapse;">
+                        <tr style="background-color: #1e1b4b; color: white;">
+                            <th>Fecha</th>
+                            <th>Hora</th>
+                            <th>Método</th>
+                            <th>Productos</th>
+                            <th>Subtotal</th>
+                            <th>Descuento</th>
+                            <th>Total Pagado</th>
+                            <th style="background-color: #10b981; color: white;">Ganancia Neta</th>
+                            <th>Estado</th>
+                        </tr>
+                `;
+
                 window.currentMonthVentas.forEach(v => {
                     const dateObj = new Date(v.fecha);
                     const fechaStr = dateObj.toLocaleDateString();
@@ -788,21 +826,32 @@ try {
                         productosStr = v.detalles.map(item => `${item.qty}x ${item.nombre}`).join('; ');
                     }
                     const ganancia = Number(v.total) - Number(v.costo_total);
+                    const isRefunded = v.estado === 'reembolsada';
                     
-                    const rowData = [
-                        fechaStr, horaStr, v.metodo_pago || 'Efectivo',
-                        `"${productosStr}"`, Number(v.subtotal).toFixed(2),
-                        Number(v.descuento).toFixed(2), Number(v.total).toFixed(2),
-                        ganancia.toFixed(2), v.estado || 'completada'
-                    ];
-                    csv += rowData.join(',') + '\n';
+                    const rowBg = isRefunded ? 'background-color: #fee2e2;' : '';
+                    const strike = isRefunded ? 'text-decoration: line-through; color: #ef4444;' : '';
+                    const gananciaStyle = isRefunded ? strike : 'font-weight: bold; color: #047857;';
+
+                    html += `
+                    <tr style="${rowBg}">
+                        <td style="${strike}">${fechaStr}</td>
+                        <td style="${strike}">${horaStr}</td>
+                        <td style="${strike}">${v.metodo_pago || 'Efectivo'}</td>
+                        <td style="${strike}">${productosStr}</td>
+                        <td style="${strike}">${Number(v.subtotal).toFixed(2)}</td>
+                        <td style="${strike}">${Number(v.descuento).toFixed(2)}</td>
+                        <td style="${strike}">${Number(v.total).toFixed(2)}</td>
+                        <td style="${gananciaStyle}">${ganancia.toFixed(2)}</td>
+                        <td style="${strike}">${v.estado || 'completada'}</td>
+                    </tr>`;
                 });
-                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+
+                html += `</table></body></html>`;
+
+                const blob = new Blob(['\ufeff' + html], { type: 'application/vnd.ms-excel' });
                 const link = document.createElement('a');
                 link.href = URL.createObjectURL(blob);
-                
-                const mesInput = document.getElementById('statsMonth').value || 'Completo';
-                link.download = `Reporte_Estadisticas_${mesInput}.csv`;
+                link.download = `Reporte_Kalo_${mesInput}.xls`;
                 link.click();
             });
         }
