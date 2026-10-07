@@ -1576,15 +1576,80 @@ try {
                     console.error("Error al registrar venta (quizas no existe la tabla): ", e);
                 }
 
-                await loadProducts(); // Recargar inventario visual
-                await customAlert(msg, '¡Venta Exitosa!', '✅');
+                                await loadProducts(); // Recargar inventario visual
                 
-                cart = [];
-                cartDiscount.value = '';
-                discountBtns.forEach(b => b.classList.remove('active-discount'));
-                renderCart();
-                paymentMethod.value = 'Efectivo';
-                splitPaymentSection.classList.add('hidden');
+                // --- INICIO BOLETA AUTOMATICA ---
+                const receiptModal = document.getElementById('receiptModal');
+                if (receiptModal) {
+                    document.getElementById('receiptLocalName').textContent = 'Local: ' + currentLocal;
+                    const now = new Date();
+                    document.getElementById('receiptDate').textContent = now.toLocaleDateString() + ' ' + now.toLocaleTimeString();
+                    
+                    const tbody = document.getElementById('receiptItems');
+                    tbody.innerHTML = '';
+                    cart.forEach(item => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td style="padding: 0.2rem 0; border-bottom: 1px dashed #ccc;">
+                                ${item.qty}x ${item.nombre}
+                            </td>
+                            <td style="padding: 0.2rem 0; text-align: right; border-bottom: 1px dashed #ccc;">
+                                S/ ${((item.precio_venta || 0) * item.qty).toFixed(2)}
+                            </td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                    
+                    document.getElementById('receiptSubtotal').textContent = 'S/ ' + subtotal.toFixed(2);
+                    
+                    const discountRow = document.getElementById('receiptDiscountRow');
+                    if (discount > 0) {
+                        discountRow.style.display = 'flex';
+                        document.getElementById('receiptDiscount').textContent = '- S/ ' + discount.toFixed(2);
+                    } else {
+                        discountRow.style.display = 'none';
+                    }
+                    
+                    document.getElementById('receiptTotal').textContent = 'S/ ' + total.toFixed(2);
+                    
+                    if (metodo === 'Ambos') {
+                        const ef = parseFloat(splitEfectivo.value) || 0;
+                        const yp = parseFloat(splitYape.value) || 0;
+                        document.getElementById('receiptPaymentMethod').textContent = `S/ ${ef.toFixed(2)} Efvo | S/ ${yp.toFixed(2)} Yape`;
+                    } else {
+                        document.getElementById('receiptPaymentMethod').textContent = 'Pago: ' + metodo;
+                    }
+                    
+                    receiptModal.classList.remove('hidden');
+                    
+                    const finishSale = () => {
+                        receiptModal.classList.add('hidden');
+                        cart = [];
+                        cartDiscount.value = '';
+                        discountBtns.forEach(b => b.classList.remove('active-discount'));
+                        renderCart();
+                        splitPaymentSection.classList.add('hidden');
+                        window.removeEventListener('afterprint', finishSale);
+                    };
+
+                    document.getElementById('closeReceiptBtn').onclick = finishSale;
+                    document.getElementById('printReceiptBtn').onclick = () => window.print();
+
+                    // Disparar impresion automaticamente
+                    setTimeout(() => {
+                        window.addEventListener('afterprint', finishSale);
+                        window.print();
+                    }, 500);
+
+                } else {
+                    // Fallback si no hay modal
+                    cart = [];
+                    cartDiscount.value = '';
+                    discountBtns.forEach(b => b.classList.remove('active-discount'));
+                    renderCart();
+                    splitPaymentSection.classList.add('hidden');
+                }
+                // --- FIN BOLETA AUTOMATICA ---
                 
             } catch (err) {
                 await customAlert('Error al procesar la venta: ' + err.message, 'Error', '❌');
