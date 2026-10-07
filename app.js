@@ -373,7 +373,8 @@ try {
                         stock: null,
                         alerta_stock: null,
                         codigo: codigoEspecial,
-                        imagen: comboSelectedImage || null
+                        imagen: comboSelectedImage || null,
+                        local: currentLocal
                     }]);
                     
                     if (error) throw error;
@@ -528,7 +529,26 @@ try {
             }
         });
 
-        // --- NAVEGACIÓN ---
+        // --- NAVEGACIÓN Y MULTI-LOCAL ---
+        let currentLocal = localStorage.getItem('kalo_local') || 'LAS BRISAS';
+        const localSelector = document.getElementById('localSelector');
+        if (localSelector) {
+            localSelector.value = currentLocal;
+            localSelector.addEventListener('change', (e) => {
+                currentLocal = e.target.value;
+                localStorage.setItem('kalo_local', currentLocal);
+                loadProducts();
+                if (typeof loadHistory === 'function') {
+                    const hv = document.getElementById('historyView');
+                    if (hv && !hv.classList.contains('hidden')) loadHistory();
+                }
+                if (typeof calcularEstadisticas === 'function') {
+                    const sv = document.getElementById('statsView');
+                    if (sv && !sv.classList.contains('hidden') && statsUnlocked) calcularEstadisticas();
+                }
+            });
+        }
+
         const navStatsBtn = document.getElementById('navStatsBtn');
         const statsView = document.getElementById('statsView');
         const passwordModal = document.getElementById('passwordModal');
@@ -638,7 +658,7 @@ try {
         async function calcularEstadisticas() {
             const monthInput = document.getElementById('statsMonth').value;
             
-            let query = supabase.from('ventas').select('*').order('fecha', { ascending: true });
+            let query = supabase.from('ventas').select('*').eq('local', currentLocal).order('fecha', { ascending: true });
             
             if (monthInput) {
                 const [y, m] = monthInput.split('-');
@@ -759,7 +779,7 @@ try {
             
             try {
                 // Cargar ultimas 100 ventas
-                const { data, error } = await supabase.from('ventas').select('*').order('fecha', { ascending: false }).limit(100);
+                const { data, error } = await supabase.from('ventas').select('*').eq('local', currentLocal).order('fecha', { ascending: false }).limit(100);
                 if (error) throw error;
                 
                 ventasList.innerHTML = '';
@@ -990,7 +1010,7 @@ try {
         // --- CARGAR PRODUCTOS ---
         async function loadProducts() {
             try {
-                const { data, error } = await supabase.from('productos').select('*').order('id', { ascending: false });
+                const { data, error } = await supabase.from('productos').select('*').eq('local', currentLocal).order('id', { ascending: false });
                 if (error) throw error;
 
                 // Limpiar guiones bajos de los nombres traídos de la base de datos
@@ -1495,7 +1515,8 @@ try {
                         efectivo: metodo === 'Ambos' ? parseFloat(splitEfectivo.value) || 0 : (metodo === 'Efectivo' ? total : 0),
                         yape: metodo === 'Ambos' ? parseFloat(splitYape.value) || 0 : (metodo === 'Yape' ? total : 0),
                         costo_total: costoTotalVenta,
-                        detalles: cart
+                        detalles: cart,
+                        local: currentLocal
                     }]);
                 } catch(e) {
                     console.error("Error al registrar venta (quizas no existe la tabla): ", e);
@@ -1546,7 +1567,8 @@ try {
                     precio_venta: pVenta,
                     stock: stock,
                     alerta_stock: alerta,
-                    lotes: currentLotes.length > 0 ? currentLotes : null
+                    lotes: currentLotes.length > 0 ? currentLotes : null,
+                    local: currentLocal
                 };
 
                 let res;
