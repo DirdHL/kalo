@@ -7,6 +7,54 @@ try {
     document.addEventListener('DOMContentLoaded', () => {
         const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+        // --- MANEJO DE ALERTAS PERSONALIZADAS ---
+        window.customAlert = function(msg, title = "Atención", icon = "⚠️") {
+            return new Promise((resolve) => {
+                const overlay = document.getElementById('customDialogOverlay');
+                document.getElementById('customDialogTitle').textContent = title;
+                document.getElementById('customDialogMessage').textContent = msg;
+                document.getElementById('customDialogIcon').textContent = icon;
+                
+                const btnCancel = document.getElementById('customDialogCancel');
+                const btnOk = document.getElementById('customDialogOk');
+                
+                btnCancel.classList.add('hidden');
+                btnOk.textContent = 'Aceptar';
+                overlay.classList.remove('hidden');
+                
+                btnOk.onclick = () => {
+                    overlay.classList.add('hidden');
+                    resolve();
+                };
+            });
+        };
+
+        window.customConfirm = function(msg, title = "Confirmar", icon = "❓") {
+            return new Promise((resolve) => {
+                const overlay = document.getElementById('customDialogOverlay');
+                document.getElementById('customDialogTitle').textContent = title;
+                document.getElementById('customDialogMessage').textContent = msg;
+                document.getElementById('customDialogIcon').textContent = icon;
+                
+                const btnCancel = document.getElementById('customDialogCancel');
+                const btnOk = document.getElementById('customDialogOk');
+                
+                btnCancel.classList.remove('hidden');
+                btnOk.textContent = 'Sí, continuar';
+                overlay.classList.remove('hidden');
+                
+                btnCancel.onclick = () => {
+                    overlay.classList.add('hidden');
+                    resolve(false);
+                };
+                
+                btnOk.onclick = () => {
+                    overlay.classList.add('hidden');
+                    resolve(true);
+                };
+            });
+        };
+
         // Nodos Principales
         const loginCard = document.getElementById('loginCard');
         const appView = document.getElementById('appView');
@@ -453,7 +501,10 @@ try {
             addLoteBtn.addEventListener('click', () => {
                 const qty = parseInt(loteQtyInput.value);
                 const exp = loteExpInput.value;
-                if (!qty || qty <= 0 || !exp) return alert('Ingresa cantidad válida y fecha de vencimiento.');
+                if (!qty || qty <= 0 || !exp) {
+                    customAlert('Ingresa cantidad válida y fecha de vencimiento.', 'Datos Inválidos', '❌');
+                    return;
+                }
                 
                 currentLotes.push({ qty, vencimiento: exp });
                 loteQtyInput.value = '';
@@ -725,14 +776,17 @@ try {
         }
 
         window.refundSale = async (ventaId) => {
-            if (!confirm('¿Seguro que deseas reembolsar esta venta? El stock de los productos será devuelto al inventario.')) return;
+            if (!await customConfirm('¿Seguro que deseas reembolsar esta venta? El stock de los productos será devuelto al inventario.')) return;
             
             try {
                 // Obtener detalles de la venta
                 const { data: venta, error: fetchErr } = await supabase.from('ventas').select('*').eq('id', ventaId).single();
                 if (fetchErr) throw fetchErr;
 
-                if (venta.estado === 'reembolsada') return alert('Esta venta ya ha sido reembolsada.');
+                if (venta.estado === 'reembolsada') {
+                    await customAlert('Esta venta ya ha sido reembolsada.', 'Aviso', 'ℹ️');
+                    return;
+                }
 
                 // Devolver stock
                 if (venta.detalles && Array.isArray(venta.detalles)) {
@@ -763,13 +817,13 @@ try {
                 const { error: updErr } = await supabase.from('ventas').update({ estado: 'reembolsada' }).eq('id', ventaId);
                 if (updErr) throw updErr;
 
-                alert('Venta reembolsada con éxito.');
+                await customAlert('Venta reembolsada con éxito.', '¡Éxito!', '✅');
                 await loadProducts(); // recargar stock
                 loadHistory(); // recargar historial
 
             } catch (err) {
                 console.error('Error al reembolsar:', err);
-                alert('No se pudo completar el reembolso. ' + err.message);
+                await customAlert('No se pudo completar el reembolso. ' + err.message, 'Error', '❌');
             }
         };
 
@@ -885,9 +939,10 @@ try {
 
         const exportStatsBtn = document.getElementById('exportStatsBtn');
         if (exportStatsBtn) {
-            exportStatsBtn.addEventListener('click', () => {
+            exportStatsBtn.addEventListener('click', async () => {
                 if (!window.currentMonthVentas || window.currentMonthVentas.length === 0) {
-                    return alert('No hay datos para exportar en este mes.');
+                    await customAlert('No hay datos para exportar en este mes.', 'Sin datos', 'ℹ️');
+                    return;
                 }
                 
                 let brutasStr = document.getElementById('statVentasBrutas').textContent;
@@ -1161,14 +1216,14 @@ try {
                 btn.addEventListener('click', async (e) => {
                     const col = e.currentTarget.getAttribute('data-col');
                     const val = e.currentTarget.getAttribute('data-val');
-                    if (confirm('¿Seguro que deseas eliminar este producto?')) {
+                    if (await customConfirm('¿Seguro que deseas eliminar este producto?', 'Eliminar', '🗑️')) {
                         try {
                             e.currentTarget.style.opacity = '0.5';
                             const { error } = await supabase.from('productos').delete().eq(col, val);
                             if (error) throw error;
                             await loadProducts();
                         } catch (error) {
-                            alert('Error: ' + error.message);
+                            await customAlert('Error: ' + error.message, 'Error', '❌');
                             await loadProducts();
                         }
                     }
@@ -1422,7 +1477,10 @@ try {
         });
 
         cobrarBtn.addEventListener('click', async () => {
-            if (cart.length === 0) return alert('El ticket está vacío.');
+            if (cart.length === 0) {
+                await customAlert('El ticket está vacío.', 'Aviso', 'ℹ️');
+                return;
+            }
             
             let subtotal = 0;
             cart.forEach(item => subtotal += (item.precio_venta || 0) * item.qty);
@@ -1442,7 +1500,8 @@ try {
                 const yp = parseFloat(splitYape.value) || 0;
                 
                 if (Math.abs((ef + yp) - total) > 0.01) {
-                    return alert(`Los montos divididos (S/ ${(ef + yp).toFixed(2)}) no coinciden con el total a pagar (S/ ${total.toFixed(2)}).`);
+                    await customAlert(`Los montos divididos (S/ ${(ef + yp).toFixed(2)}) no coinciden con el total a pagar (S/ ${total.toFixed(2)}).`, 'Montos incorrectos', '❌');
+                    return;
                 }
                 
                 msg += `\nEfectivo: S/ ${ef.toFixed(2)}\nYape: S/ ${yp.toFixed(2)}`;
@@ -1523,7 +1582,7 @@ try {
                 }
 
                 await loadProducts(); // Recargar inventario visual
-                alert(msg);
+                await customAlert(msg, '¡Venta Exitosa!', '✅');
                 
                 cart = [];
                 cartDiscount.value = '';
@@ -1533,7 +1592,7 @@ try {
                 splitPaymentSection.classList.add('hidden');
                 
             } catch (err) {
-                alert('Error al procesar la venta: ' + err.message);
+                await customAlert('Error al procesar la venta: ' + err.message, 'Error', '❌');
             } finally {
                 cobrarBtn.disabled = false;
                 cobrarBtn.textContent = 'Cobrar';
