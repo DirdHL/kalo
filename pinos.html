@@ -330,7 +330,7 @@
 
             <div class="form-grid">
                 <div class="input-group" style="grid-column: span 2;">
-                    <label>Gestión de Lotes (Fechas de Vencimiento)</label>
+                    <label>Gestión de Lotes (Solo para alertas de vencimiento)</label>
                     <div style="background: rgba(0,0,0,0.2); padding: 0.5rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
                         <div id="lotesList" style="margin-bottom: 0.5rem; max-height: 100px; overflow-y: auto; font-size: 0.85rem;"></div>
                         <div style="display: flex; gap: 0.5rem;">
@@ -339,10 +339,10 @@
                             <button type="button" id="addLoteBtn" class="secondary-btn" style="width: auto; padding: 0.5rem;">+ Lote</button>
                         </div>
                     </div>
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem;">
-                        <span style="font-size: 0.8rem; color: var(--text-secondary);">Stock Total Calculado: <b id="calculatedStock">0</b></span>
-                        <input type="hidden" id="stock">
-                    </div>
+                </div>
+                <div class="input-group">
+                    <label>Stock Total</label>
+                    <input type="number" id="stock" placeholder="0" class="styled-input">
                 </div>
                 <div class="input-group">
                     <label>Alerta de Inventario Bajo</label>
