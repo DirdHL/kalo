@@ -440,6 +440,53 @@
         </div>
     </div>
 
+    
+    <!-- Modal de Boleta -->
+    <div id="receiptModal" class="modal hidden">
+        <div class="modal-content" style="max-width: 350px; background: #fff; color: #000; border-radius: 0; padding: 1rem; font-family: 'Courier New', Courier, monospace;">
+            <div id="receiptPrintArea">
+                <div style="text-align: center; margin-bottom: 1rem;">
+                    <h2 style="margin: 0; font-size: 1.8rem; text-transform: uppercase;">KALO</h2>
+                    <p style="margin: 0; font-size: 0.9rem;" id="receiptLocalName"></p>
+                    <p style="margin: 0; font-size: 0.8rem;" id="receiptDate"></p>
+                    <p style="margin: 0; font-size: 0.8rem;">--------------------------------</p>
+                </div>
+                <table style="width: 100%; font-size: 0.8rem; margin-bottom: 1rem; text-align: left; border-collapse: collapse;">
+                    <thead>
+                        <tr>
+                            <th style="padding-bottom: 0.5rem; border-bottom: 1px dashed #000;">CANT. DESCRIPCION</th>
+                            <th style="padding-bottom: 0.5rem; text-align: right; border-bottom: 1px dashed #000;">IMPORTE</th>
+                        </tr>
+                    </thead>
+                    <tbody id="receiptItems">
+                    </tbody>
+                </table>
+                <div style="font-size: 0.9rem; margin-bottom: 1rem; border-top: 1px dashed #000; padding-top: 0.5rem;">
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>SUBTOTAL:</span>
+                        <span id="receiptSubtotal"></span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;" id="receiptDiscountRow">
+                        <span>DESCUENTO:</span>
+                        <span id="receiptDiscount"></span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; font-weight: bold; margin-top: 0.3rem; font-size: 1.1rem;">
+                        <span>TOTAL:</span>
+                        <span id="receiptTotal"></span>
+                    </div>
+                </div>
+                <div style="text-align: center; font-size: 0.8rem;">
+                    <p style="margin: 0;" id="receiptPaymentMethod"></p>
+                    <p style="margin: 0; margin-top: 1rem; font-weight: bold;">¡Gracias por su compra!</p>
+                </div>
+            </div>
+            <div class="modal-actions" style="margin-top: 1.5rem; display: flex; gap: 0.5rem;">
+                <button id="closeReceiptBtn" class="secondary-btn" style="flex: 1; color: #fff; background: #374151; border: none;">Cerrar</button>
+                <button id="printReceiptBtn" class="primary-btn" style="flex: 1; border: none;">🖨️ Imprimir</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Script de la aplicación como módulo -->
     <script type="module" src="/app.js"></script>
 </body>
