@@ -581,23 +581,18 @@ try {
         });
 
         // --- NAVEGACIÓN Y MULTI-LOCAL ---
-        let currentLocal = localStorage.getItem('kalo_local') || 'LAS BRISAS';
-        const localSelector = document.getElementById('localSelector');
-        if (localSelector) {
-            localSelector.value = currentLocal;
-            localSelector.addEventListener('change', (e) => {
-                currentLocal = e.target.value;
-                localStorage.setItem('kalo_local', currentLocal);
-                loadProducts();
-                if (typeof loadHistory === 'function') {
-                    const hv = document.getElementById('historyView');
-                    if (hv && !hv.classList.contains('hidden')) loadHistory();
-                }
-                if (typeof calcularEstadisticas === 'function') {
-                    const sv = document.getElementById('statsView');
-                    if (sv && !sv.classList.contains('hidden') && statsUnlocked) calcularEstadisticas();
-                }
-            });
+        // --- NAVEGACIÓN Y MULTI-LOCAL ---
+        let currentLocal = 'LAS BRISAS';
+        const pathURL = window.location.pathname.toLowerCase();
+        if (pathURL.includes('brisas')) currentLocal = 'LAS BRISAS';
+        else if (pathURL.includes('pinos')) currentLocal = 'LOS PINOS';
+        else if (pathURL.includes('polideportivo')) currentLocal = 'EL POLIDEPORTIVO';
+
+        const localLabel = document.getElementById('localLabel');
+        if (localLabel) {
+            if (currentLocal === 'LAS BRISAS') localLabel.innerHTML = '📍 Las Brisas';
+            else if (currentLocal === 'LOS PINOS') localLabel.innerHTML = '📍 Los Pinos';
+            else if (currentLocal === 'EL POLIDEPORTIVO') localLabel.innerHTML = '📍 El Polideportivo';
         }
 
         const navStatsBtn = document.getElementById('navStatsBtn');

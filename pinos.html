@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Kalo - Punto de Venta">
+    <title>Kalo | Los Pinos</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/png" href="/kalo-logo.png">
+    <link rel="stylesheet" href="index.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="background-animation"></div>
+    <main class="container">
+        
+        <!-- Pantalla de Login -->
+        <div class="glass-card" id="loginCard">
+            <h1 style="margin-bottom: 0.5rem">Bienvenido.</h1>
+            <p style="margin-bottom: 2rem; color: var(--text-secondary)">Inicia sesión para acceder al sistema</p>
+            
+            <div class="input-group">
+                <input type="email" id="emailInput" placeholder="Correo electrónico" class="styled-input">
+            </div>
+            <div class="input-group">
+                <input type="password" id="passwordInput" placeholder="Contraseña" class="styled-input">
+            </div>
+            
+            <button id="loginBtn" class="primary-btn">Entrar</button>
+            <p id="loginStatusMsg" style="margin-top: 1rem; text-align: center; color: #fca5a5;"></p>
+        </div>
+
+        <!-- App View (Punto de Venta e Inventario) -->
+        <div id="appView" class="hidden app-layout">
+            <!-- Barra de Navegación -->
+            <div class="glass-card top-nav">
+                <div style="display: flex; align-items: center; gap: 1rem;">
+                    <img src="/kalo-logo.png" alt="Kalo Logo" style="height: 45px; object-fit: contain; filter: drop-shadow(0 0 8px rgba(96, 165, 250, 0.4));">
+                    <span id="localLabel" style="color:white; font-weight:bold; background: rgba(0,0,0,0.3); padding: 0.3rem 1rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);">📍 Local</span>
+                </div>
+                <div style="display: flex; gap: 1rem;">
+                    <button id="navPosBtn" class="nav-btn active">🛒 Punto de Venta</button>
+                    <button id="navHistoryBtn" class="nav-btn">🧾 Historial</button>
+                    <button id="navInvBtn" class="nav-btn">📦 Inventario</button>
+                    <button id="navStatsBtn" class="nav-btn">📊 Estadísticas</button>
+                    <button id="navAlertsBtn" class="nav-btn" style="position: relative;">🔔 Alertas <span id="alertsBadge" style="position: absolute; top: -5px; right: -5px; background: #ef4444; color: white; border-radius: 50%; padding: 2px 6px; font-size: 0.7rem; display: none;">0</span></button>
+                </div>
+                <button id="logoutBtn" class="secondary-btn" style="width: auto; padding: 0.5rem 1.5rem;">Salir</button>
+            </div>
+
+            <!-- Vista Punto de Venta -->
+            <div id="posView" class="pos-layout">
+                <div class="pos-products-section">
+                    <input type="text" id="posSearch" class="pos-search" placeholder="🔍 Buscar producto por nombre o código...">
+                    
+                    <div class="category-filters" id="posCategoryFilters" style="display: flex; gap: 0.5rem; overflow-x: auto; padding-bottom: 0.5rem; scrollbar-width: thin;">
+                        <button class="cat-filter-btn active" data-cat="Todos">Todos</button>
+                        <button class="cat-filter-btn" data-cat="Bebidas">🥤 Bebidas</button>
+                        <button class="cat-filter-btn" data-cat="Snacks">🍿 Snacks</button>
+                        <button class="cat-filter-btn" data-cat="Lácteos">🥛 Lácteos</button>
+                        <button class="cat-filter-btn" data-cat="Limpieza">🧼 Limpieza</button>
+                        <button class="cat-filter-btn" data-cat="Dulces">🍬 Dulces</button>
+                        <button class="cat-filter-btn" data-cat="Abarrotes">🥫 Abarrotes</button>
+                        <button class="cat-filter-btn" data-cat="Combos">🍔 Combos</button>
+                        <button class="cat-filter-btn" data-cat="Otros">📦 Otros</button>
+                    </div>
+
+                    <div class="pos-grid" id="posGrid">
+                        <!-- Generado por JS -->
+                    </div>
+                    <!-- POS Pagination -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0; border-top: 1px solid rgba(255,255,255,0.1);">
+                        <button id="posPrevPageBtn" class="secondary-btn" style="width: auto; padding: 0.5rem 1rem;">Anterior</button>
+                        <span id="posPaginationInfo" style="font-size: 0.9rem; color: var(--text-secondary);">Página 1</span>
+                        <button id="posNextPageBtn" class="secondary-btn" style="width: auto; padding: 0.5rem 1rem;">Siguiente</button>
+                    </div>
+                </div>
+                <div class="pos-cart-section">
+                    <h2 style="margin-bottom: 1rem; font-size: 1.2rem; text-align: center;">Ticket de Venta</h2>
+                    <div class="cart-items" id="cartItems">
+                        <!-- Generado por JS -->
+                    </div>
+                    
+                    <div style="display: flex; gap: 0.5rem; justify-content: space-between; margin-bottom: 0.5rem; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 1rem;">
+                        <button class="discount-btn secondary-btn" data-percent="25" style="padding: 0.2rem 0.5rem; font-size: 0.8rem; flex: 1; min-width: 0;">25%</button>
+                        <button class="discount-btn secondary-btn" data-percent="50" style="padding: 0.2rem 0.5rem; font-size: 0.8rem; flex: 1; min-width: 0;">50%</button>
+                        <button class="discount-btn secondary-btn" data-percent="75" style="padding: 0.2rem 0.5rem; font-size: 0.8rem; flex: 1; min-width: 0;">75%</button>
+                        <button class="discount-btn secondary-btn" data-percent="100" style="padding: 0.2rem 0.5rem; font-size: 0.8rem; flex: 1; min-width: 0;">100%</button>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                        <span style="color: var(--text-secondary); font-size: 0.95rem;">Descuento (S/):</span>
+                        <input type="number" id="cartDiscount" class="styled-input" style="width: 100px; padding: 0.5rem; text-align: right; border-color: var(--primary);" placeholder="0.00" step="0.01">
+                    </div>
+
+                    <div class="cart-total" style="margin-bottom: 0.5rem;">
+                        <span>Total a Pagar:</span>
+                        <span id="cartTotalValue">S/ 0.00</span>
+                    </div>
+                    
+                    <div style="margin-bottom: 1rem;">
+                        <select id="paymentMethod" class="styled-input" style="width: 100%; padding: 0.8rem; cursor: pointer; text-align: center; font-weight: bold; background: rgba(30, 27, 75, 0.5);">
+                            <option value="Efectivo">💵 Pago en Efectivo</option>
+                            <option value="Yape">📱 Yape / Plin</option>
+                            <option value="Ambos">💵📱 Ambos (Mixto)</option>
+                        </select>
+                    </div>
+
+                    <div id="splitPaymentSection" class="hidden" style="margin-bottom: 1rem; padding: 1.2rem; background: linear-gradient(145deg, rgba(30, 27, 75, 0.4), rgba(0,0,0,0.3)); border-radius: 12px; border: 1px solid rgba(139, 92, 246, 0.3); box-shadow: inset 0 2px 10px rgba(0,0,0,0.2);">
+                        <p style="text-align: center; font-size: 0.85rem; color: #a78bfa; margin-bottom: 1rem; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">Montos a Dividir</p>
+                        
+                        <div style="display: flex; gap: 1rem; flex-direction: column;">
+                            <div style="display: flex; align-items: center; gap: 0.8rem; background: rgba(0,0,0,0.4); padding: 0.6rem 1rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); transition: border-color 0.3s;" onfocusin="this.style.borderColor='var(--primary)'" onfocusout="this.style.borderColor='rgba(255,255,255,0.05)'">
+                                <span style="font-size: 1.5rem;">💵</span>
+                                <div style="flex: 1;">
+                                    <span style="display: block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.1rem;">Efectivo</span>
+                                    <input type="number" id="splitEfectivo" style="width: 100%; background: transparent; border: none; color: #fff; font-size: 1.1rem; outline: none; font-weight: bold;" placeholder="S/ 0.00" step="0.01">
+                                </div>
+                            </div>
+                            
+                            <div style="display: flex; align-items: center; gap: 0.8rem; background: rgba(0,0,0,0.4); padding: 0.6rem 1rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); transition: border-color 0.3s;" onfocusin="this.style.borderColor='var(--primary)'" onfocusout="this.style.borderColor='rgba(255,255,255,0.05)'">
+                                <span style="font-size: 1.5rem;">📱</span>
+                                <div style="flex: 1;">
+                                    <span style="display: block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.1rem;">Yape / Plin</span>
+                                    <input type="number" id="splitYape" style="width: 100%; background: transparent; border: none; color: #fff; font-size: 1.1rem; outline: none; font-weight: bold;" placeholder="S/ 0.00" step="0.01">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+
+                    <button id="cobrarBtn" class="primary-btn" style="font-size: 1.2rem; padding: 1rem;">Cobrar</button>
+                </div>
+            </div>
+
+            <!-- Panel Principal: Inventario -->
+            <div class="glass-card hidden" id="dashboardCard" style="flex: 1; display: flex; flex-direction: column; overflow: visible;">
+                <div class="dashboard-header" style="margin-bottom: 1.5rem; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 1rem; align-items: center;">
+                    <div>
+                        <h1 style="margin-bottom: 0.2rem">Inventario 📦</h1>
+                        <p style="color: var(--text-secondary); font-size: 0.9rem;">Gestiona tus productos y stock</p>
+                    </div>
+                    <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+                        <input type="text" id="invSearch" class="pos-search" style="width: 280px; padding: 0.8rem;" placeholder="🔍 Buscar producto...">
+                        <button id="openComboModalBtn" class="primary-btn" style="width: auto; padding: 0.8rem 1.5rem; background: #3b82f6;">🍔 Crear Combo</button>
+                        <button id="openModalBtn" class="primary-btn" style="width: auto; padding: 0.8rem 1.5rem;">➕ Nuevo Producto</button>
+                    </div>
+                </div>
+
+                <div class="table-container" style="flex: 1; overflow: visible;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Img</th>
+                                <th>Código</th>
+                                <th>Nombre</th>
+                                <th>Categoría</th>
+                                <th>Compra</th>
+                                <th>Venta</th>
+                                <th>Stock</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="productList">
+                            <!-- Productos generados por JS -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Paginación Oculta (El usuario prefiere ver todos los items) -->
+                <div style="display: none; justify-content: space-between; align-items: center; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.1);">
+                    <div style="color: var(--text-secondary); font-size: 0.9rem;" id="paginationInfo">Mostrando 0 productos</div>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button id="prevPageBtn" class="secondary-btn" style="width: auto; padding: 0.5rem 1rem;">Anterior</button>
+                        <button id="nextPageBtn" class="secondary-btn" style="width: auto; padding: 0.5rem 1rem;">Siguiente</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Panel Estadísticas -->
+            <div class="glass-card hidden" id="statsView" style="flex: 1; display: flex; flex-direction: column; overflow-y: auto;">
+                <div class="dashboard-header" style="margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                    <div>
+                        <h1 style="margin-bottom: 0.2rem">Estadísticas 📊</h1>
+                        <p style="color: var(--text-secondary); font-size: 0.9rem;">Rendimiento de tu negocio</p>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem; align-items: center; background: rgba(0,0,0,0.2); padding: 0.5rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);">
+                        <button id="exportStatsBtn" class="secondary-btn" style="width: auto; padding: 0.4rem 1rem; background: #10b981; color: white; border: none; font-weight: bold; border-radius: 8px;">📥 Exportar Excel</button>
+                        <div style="width: 1px; height: 20px; background: rgba(255,255,255,0.2); margin: 0 0.5rem;"></div>
+                        <input type="month" id="statsMonth" style="background: transparent; border: none; color: white; color-scheme: dark; font-family: inherit; font-size: 0.9rem; outline: none; cursor: pointer;">
+                    </div>
+                </div>
+                
+                <!-- KPIs -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+                    <div class="stat-card">
+                        <h3 class="stat-title">Ingresos Totales</h3>
+                        <p class="stat-value" id="statVentasBrutas">S/ 0.00</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3 class="stat-title">Reembolsos</h3>
+                        <p class="stat-value" id="statReembolsos" style="color: #fca5a5;">S/ 0.00</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3 class="stat-title">Descuentos</h3>
+                        <p class="stat-value" id="statDescuentos">S/ 0.00</p>
+                    </div>
+                    <div class="stat-card" style="border-top-color: #10b981;">
+                        <h3 class="stat-title">Ganancia Neta</h3>
+                        <p class="stat-value" id="statBeneficioBruto" style="color: #10b981;">S/ 0.00</p>
+                    </div>
+                </div>
+
+                <!-- Gráfico -->
+                <div style="background: rgba(0,0,0,0.2); border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); padding: 1rem; margin-bottom: 2rem; position: relative; height: 350px;">
+                    <canvas id="salesChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Panel Historial de Ventas -->
+            <div class="glass-card hidden" id="historyView" style="flex: 1; display: flex; flex-direction: column; overflow-y: auto;">
+                <div class="dashboard-header" style="margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                    <div>
+                        <h1 style="margin-bottom: 0.2rem">Historial de Ventas 🧾</h1>
+                        <p style="color: var(--text-secondary); font-size: 0.9rem;">Revisa y gestiona tus transacciones</p>
+                    </div>
+                </div>
+
+                <div class="table-container" style="flex: 1; overflow-y: auto;">
+                    <table class="data-table" style="font-size: 0.9rem;">
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Hora</th>
+                                <th>Método</th>
+                                <th>Productos</th>
+                                <th>Total Pagado</th>
+                                <th>Descuento</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ventasList">
+                            <tr><td colspan="8" style="text-align:center; color: gray;">No hay ventas para mostrar.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Pestaña de Alertas -->
+            <div class="glass-card hidden" id="alertsView" style="flex: 1; display: flex; flex-direction: column; overflow-y: auto;">
+                <div class="dashboard-header" style="margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                    <div>
+                        <h1 style="margin-bottom: 0.2rem">Alertas de Vencimiento 🔔</h1>
+                        <p style="color: var(--text-secondary); font-size: 0.9rem;">Productos vencidos o próximos a vencer en los siguientes 30 días.</p>
+                    </div>
+                </div>
+
+                <div class="table-container" style="flex: 1; overflow-y: auto;">
+                    <table class="data-table" style="font-size: 0.9rem;">
+                        <thead>
+                            <tr>
+                                <th>Producto</th>
+                                <th>Cantidad</th>
+                                <th>Fecha Vencimiento</th>
+                                <th>Estado</th>
+                                <th>Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="alertsList">
+                            <tr><td colspan="5" style="text-align:center; color: gray;">Todo en orden. No hay productos por vencer.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal para Nuevo Producto -->
+    <div class="modal-overlay hidden" id="productModal">
+        <div class="modal">
+            <h2 style="margin-bottom: 1.5rem;">Registrar Producto</h2>
+            
+            <div class="input-group">
+                <label>Código de Barras</label>
+                <input type="text" id="productCode" placeholder="Escanea o escribe el código" class="styled-input">
+            </div>
+            
+            <div class="input-group">
+                <label>Nombre del Producto</label>
+                <input type="text" id="productName" placeholder="Ej. Galletas de Chocolate" class="styled-input">
+            </div>
+
+            <div class="form-grid">
+                <div class="input-group">
+                    <label>Categoría</label>
+                    <select id="categoria" class="styled-input">
+                        <option value="Bebidas">🥤 Bebidas</option>
+                        <option value="Snacks">🍿 Snacks</option>
+                        <option value="Lácteos">🥛 Lácteos</option>
+                        <option value="Limpieza">🧼 Limpieza</option>
+                        <option value="Dulces">🍬 Dulces</option>
+                        <option value="Abarrotes">🥫 Abarrotes</option>
+                        <option value="Combos">🍔 Combos</option>
+                        <option value="Otros">📦 Otros</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label>Imagen del Producto</label>
+                    <div style="display: flex; gap: 1rem; align-items: center;">
+                        <img id="previewImg" src="https://via.placeholder.com/50?text=Img" alt="Sin foto" style="width: 50px; height: 50px; border-radius: 8px; object-fit: cover; background: rgba(255,255,255,0.1);">
+                        <button id="openImagePickerBtn" class="secondary-btn" style="padding: 0.5rem; flex: 1; font-size: 0.9rem;">Escoger Img</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-grid">
+                <div class="input-group">
+                    <label>Precio de Compra (S/)</label>
+                    <input type="number" id="precioCompra" placeholder="0.00" step="0.01" class="styled-input">
+                </div>
+                <div class="input-group">
+                    <label>Precio de Venta (S/)</label>
+                    <input type="number" id="precioVenta" placeholder="0.00" step="0.01" class="styled-input">
+                </div>
+                <div class="input-group" style="grid-column: span 2;">
+                    <label>Ganancia Calculada (S/)</label>
+                    <input type="text" id="ganancia" placeholder="0.00" class="styled-input" readonly>
+                </div>
+            </div>
+
+            <div class="form-grid">
+                <div class="input-group" style="grid-column: span 2;">
+                    <label>Gestión de Lotes (Fechas de Vencimiento)</label>
+                    <div style="background: rgba(0,0,0,0.2); padding: 0.5rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+                        <div id="lotesList" style="margin-bottom: 0.5rem; max-height: 100px; overflow-y: auto; font-size: 0.85rem;"></div>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <input type="number" id="loteQtyInput" class="styled-input" placeholder="Cant." style="width: 80px;" min="1">
+                            <input type="date" id="loteExpInput" class="styled-input" style="flex: 1;">
+                            <button type="button" id="addLoteBtn" class="secondary-btn" style="width: auto; padding: 0.5rem;">+ Lote</button>
+                        </div>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem;">
+                        <span style="font-size: 0.8rem; color: var(--text-secondary);">Stock Total Calculado: <b id="calculatedStock">0</b></span>
+                        <input type="hidden" id="stock">
+                    </div>
+                </div>
+                <div class="input-group">
+                    <label>Alerta de Inventario Bajo</label>
+                    <input type="number" id="alertaStock" placeholder="Ej. 2" class="styled-input">
+                </div>
+            </div>
+
+            <p id="productStatusMsg" style="text-align: center; color: #fca5a5; margin-bottom: 1rem;"></p>
+
+            <div class="modal-actions">
+                <button id="closeModalBtn" class="secondary-btn">Cancelar</button>
+                <button id="addProductBtn" class="primary-btn">Guardar Producto</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para Crear Combo -->
+    <div class="modal-overlay hidden" id="comboModal">
+        <div class="modal" style="max-width: 600px;">
+            <h2 style="margin-bottom: 1.5rem;">Crear Combo Avanzado 🍔</h2>
+            
+            <div class="input-group">
+                <label>Nombre del Combo</label>
+                <input type="text" id="comboNameInput" placeholder="Ej. Combo Familiar" class="styled-input">
+            </div>
+            
+            <div class="form-grid">
+                <div class="input-group">
+                    <label>Precio de Venta Total (S/)</label>
+                    <input type="number" id="comboPriceInput" placeholder="0.00" step="0.01" class="styled-input">
+                </div>
+                <div class="input-group">
+                    <label>Imagen del Combo</label>
+                    <div style="display: flex; gap: 1rem; align-items: center;">
+                        <img id="comboPreviewImg" src="https://via.placeholder.com/50?text=Img" alt="Sin foto" style="width: 50px; height: 50px; border-radius: 8px; object-fit: cover; background: rgba(255,255,255,0.1);">
+                        <button id="openComboImagePickerBtn" class="secondary-btn" style="padding: 0.5rem; flex: 1; font-size: 0.9rem;">Escoger Img</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="input-group" style="margin-top: 1rem;">
+                <label>Seleccionar Productos del Combo</label>
+                <div style="background: rgba(0,0,0,0.2); border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); padding: 1rem; max-height: 200px; overflow-y: auto;" id="comboProductList">
+                    <!-- Se llenará con JS -->
+                </div>
+            </div>
+
+            <p id="comboStatusMsg" style="text-align: center; color: #fca5a5; margin-bottom: 1rem;"></p>
+
+            <div class="modal-actions">
+                <button id="closeComboModalBtn" class="secondary-btn">Cancelar</button>
+                <button id="saveComboBtn" class="primary-btn">Guardar Combo</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Seleccionador de Imágenes -->
+    <div class="modal-overlay hidden" id="imagePickerModal" style="z-index: 200;">
+        <div class="modal" style="max-width: 700px;">
+            <h2 style="margin-bottom: 1.5rem;">Escoger Imagen 📸</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 1rem; font-size: 0.9rem;">Haz clic en la fotografía que corresponda al producto.</p>
+            
+            <div class="image-grid" id="imageGrid">
+                <!-- Se llenará con JS con las fotos reales de tu carpeta -->
+            </div>
+            
+            <div class="modal-actions">
+                <button id="closeImagePickerBtn" class="secondary-btn">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Password Estadisticas -->
+    <div class="modal-overlay hidden" id="passwordModal" style="z-index: 300;">
+        <div class="modal" style="max-width: 400px; text-align: center;">
+            <h2 style="margin-bottom: 1.5rem;">Ingresar la contraseña</h2>
+            <input type="password" id="statsPasswordInput" class="styled-input" placeholder="Contraseña..." style="margin-bottom: 1rem; text-align: center;">
+            <p id="passwordErrorMsg" style="color: #fca5a5; font-size: 0.9rem; margin-bottom: 1rem; display: none;">Contraseña incorrecta</p>
+            <div class="modal-actions" style="justify-content: center;">
+                <button id="cancelPasswordBtn" class="secondary-btn">Cancelar</button>
+                <button id="submitPasswordBtn" class="primary-btn">Ingresar</button>
+            </div>
+        </div>
+    </div>
+    <!-- Custom Alert/Confirm Modal -->
+    <div id="customDialogOverlay" class="modal-overlay hidden" style="z-index: 9999;">
+        <div class="modal" style="max-width: 400px; text-align: center; padding: 2rem;">
+            <div id="customDialogIcon" style="font-size: 3rem; margin-bottom: 1rem;">⚠️</div>
+            <h2 id="customDialogTitle" style="margin-bottom: 1rem;">Atención</h2>
+            <p id="customDialogMessage" style="color: var(--text-secondary); margin-bottom: 2rem; font-size: 1.1rem; line-height: 1.5;"></p>
+            <div style="display: flex; gap: 1rem; justify-content: center;">
+                <button id="customDialogCancel" class="secondary-btn hidden" style="width: auto; padding: 0.5rem 1.5rem;">Cancelar</button>
+                <button id="customDialogOk" class="primary-btn" style="width: auto; padding: 0.5rem 2rem;">Aceptar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script de la aplicación como módulo -->
+    <script type="module" src="/app.js"></script>
+</body>
+</html>

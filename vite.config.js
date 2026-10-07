@@ -1,6 +1,16 @@
 import { defineConfig } from 'vite'
+import { resolve } from 'path'
 
 export default defineConfig({
-  // Asegúrate de que esto coincida con el nombre de tu repositorio en GitHub
-  base: '/kalo/'
+  base: '/kalo/',
+  build: {
+    rollupOptions: {
+      input: {
+        main: resolve(__dirname, 'index.html'),
+        brisas: resolve(__dirname, 'brisas.html'),
+        pinos: resolve(__dirname, 'pinos.html'),
+        polideportivo: resolve(__dirname, 'polideportivo.html')
+      }
+    }
+  }
 })
