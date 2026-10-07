@@ -288,7 +288,7 @@ try {
                 const displayName = imgName.replace(/_/g, ' ').replace(/\.(svg|png|jpg)$/i, '');
                 
                 div.innerHTML = `
-                    <img src="${import.meta.env.BASE_URL}img/${imgName}" alt="${imgName}" onerror="this.src='https://via.placeholder.com/100?text=Falta+Foto'">
+                    <img src="${import.meta.env.BASE_URL}img/${imgName}" alt="${imgName}" onerror="this.src='./img/kalo-logo.png'">
                     <p>${displayName}</p>
                 `;
                 div.addEventListener('click', () => {
@@ -336,7 +336,7 @@ try {
                 comboNameInput.value = '';
                 comboPriceInput.value = '';
                 comboSelectedImage = '';
-                comboPreviewImg.src = 'https://via.placeholder.com/50?text=Img';
+                comboPreviewImg.src = './img/kalo-logo.png';
                 comboStatusMsg.textContent = '';
                 
                 comboProductList.innerHTML = '';
@@ -527,7 +527,7 @@ try {
             alertaStockInput.value = '';
             productStatusMsg.textContent = '';
             selectedImageName = '';
-            previewImg.src = 'https://via.placeholder.com/50?text=Img';
+            previewImg.src = './img/kalo-logo.png';
             currentLotes = [];
             if(loteQtyInput) loteQtyInput.value = '';
             if(loteExpInput) loteExpInput.value = '';
@@ -553,7 +553,7 @@ try {
             if (selectedImageName) {
                 previewImg.src = `${import.meta.env.BASE_URL}img/${selectedImageName}`;
             } else {
-                previewImg.src = 'https://via.placeholder.com/50?text=Img';
+                previewImg.src = './img/kalo-logo.png';
             }
 
             calcularGanancia();
@@ -1181,10 +1181,10 @@ try {
                 const pVenta = prod.precio_venta ? `S/ ${prod.precio_venta.toFixed(2)}` : '—';
                 const pStock = prod.stock !== null ? prod.stock : '—';
                 const cat = prod.categoria ? prod.categoria : '—';
-                const imgSrc = prod.imagen ? `${import.meta.env.BASE_URL}img/${prod.imagen}` : 'https://via.placeholder.com/40?text=No+Img';
+                const imgSrc = prod.imagen ? `${import.meta.env.BASE_URL}img/${prod.imagen}` : './img/kalo-logo.png';
 
                 tr.innerHTML = `
-                    <td><img src="${imgSrc}" style="width: 40px; height: 40px; border-radius: 8px; object-fit: cover;" onerror="this.src='https://via.placeholder.com/40?text=?'"></td>
+                    <td><img src="${imgSrc}" style="width: 40px; height: 40px; border-radius: 8px; object-fit: cover;" onerror="this.src='./img/kalo-logo.png'"></td>
                     <td><code>${codigo}</code></td>
                     <td>${prod.nombre}</td>
                     <td>${cat}</td>
@@ -1281,11 +1281,11 @@ try {
             paginatedItems.forEach(prod => {
                 const div = document.createElement('div');
                 div.className = 'product-card';
-                const imgSrc = prod.imagen ? `${import.meta.env.BASE_URL}img/${prod.imagen}` : 'https://via.placeholder.com/80?text=No+Img';
+                const imgSrc = prod.imagen ? `${import.meta.env.BASE_URL}img/${prod.imagen}` : './img/kalo-logo.png';
                 const precio = prod.precio_venta ? `S/ ${prod.precio_venta.toFixed(2)}` : 'S/ 0.00';
                 
                 div.innerHTML = `
-                    <img src="${imgSrc}" onerror="this.src='https://via.placeholder.com/80?text=?'">
+                    <img src="${imgSrc}" onerror="this.src='./img/kalo-logo.png'">
                     <h3>${prod.nombre}</h3>
                     <p>${precio}</p>
                 `;
