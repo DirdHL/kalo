@@ -1213,7 +1213,7 @@ try {
                     const val = e.currentTarget.getAttribute('data-val');
                     if (await customConfirm('¿Seguro que deseas eliminar este producto?', 'Eliminar', '🗑️')) {
                         try {
-                            e.currentTarget.style.opacity = '0.5';
+                            btn.style.opacity = '0.5';
                             const { error } = await supabase.from('productos').delete().eq(col, val);
                             if (error) throw error;
                             await loadProducts();
