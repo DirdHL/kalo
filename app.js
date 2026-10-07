@@ -389,6 +389,78 @@ try {
             });
         }
 
+        // --- MANEJO DE LOTES Y VENCIMIENTOS ---
+        let currentLotes = [];
+        const lotesList = document.getElementById('lotesList');
+        const loteQtyInput = document.getElementById('loteQtyInput');
+        const loteExpInput = document.getElementById('loteExpInput');
+        const addLoteBtn = document.getElementById('addLoteBtn');
+        const calculatedStockText = document.getElementById('calculatedStock');
+
+        function renderLotes() {
+            if (!lotesList) return;
+            lotesList.innerHTML = '';
+            let totalStock = 0;
+            
+            if (currentLotes.length === 0) {
+                lotesList.innerHTML = '<span style="color: gray;">Sin lotes. Stock será infinito o manual.</span>';
+                calculatedStockText.textContent = stockInput.value || '0';
+                return;
+            }
+
+            // sort currentLotes by expiration
+            currentLotes.sort((a, b) => new Date(a.vencimiento) - new Date(b.vencimiento));
+
+            currentLotes.forEach((lote, index) => {
+                totalStock += parseInt(lote.qty) || 0;
+                const div = document.createElement('div');
+                div.style.display = 'flex';
+                div.style.justifyContent = 'space-between';
+                div.style.borderBottom = '1px solid rgba(255,255,255,0.1)';
+                div.style.padding = '0.2rem 0';
+                
+                const expDate = new Date(lote.vencimiento);
+                const today = new Date();
+                today.setHours(0,0,0,0);
+                
+                const isExpired = expDate < today;
+                const thirtyDaysLater = new Date(today);
+                thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30);
+                const isNear = !isExpired && expDate <= thirtyDaysLater;
+                
+                let color = 'var(--text-primary)';
+                if (isExpired) color = '#ef4444'; // rojo
+                else if (isNear) color = '#f59e0b'; // naranja
+
+                div.innerHTML = `
+                    <span style="color: ${color}">Cant: ${lote.qty} | Vence: ${lote.vencimiento}</span>
+                    <button type="button" class="secondary-btn" style="padding: 0 0.5rem; border-color: #ef4444; color: #ef4444;" onclick="removeLote(${index})">x</button>
+                `;
+                lotesList.appendChild(div);
+            });
+            
+            calculatedStockText.textContent = totalStock;
+            stockInput.value = totalStock;
+        }
+
+        window.removeLote = (index) => {
+            currentLotes.splice(index, 1);
+            renderLotes();
+        };
+
+        if (addLoteBtn) {
+            addLoteBtn.addEventListener('click', () => {
+                const qty = parseInt(loteQtyInput.value);
+                const exp = loteExpInput.value;
+                if (!qty || qty <= 0 || !exp) return alert('Ingresa cantidad válida y fecha de vencimiento.');
+                
+                currentLotes.push({ qty, vencimiento: exp });
+                loteQtyInput.value = '';
+                loteExpInput.value = '';
+                renderLotes();
+            });
+        }
+
         function limpiarFormulario() {
             editingProductId = null;
             document.querySelector('#productModal h2').textContent = 'Registrar Producto';
@@ -404,6 +476,10 @@ try {
             productStatusMsg.textContent = '';
             selectedImageName = '';
             previewImg.src = 'https://via.placeholder.com/50?text=Img';
+            currentLotes = [];
+            if(loteQtyInput) loteQtyInput.value = '';
+            if(loteExpInput) loteExpInput.value = '';
+            renderLotes();
         }
 
         function abrirModalEdicion(prod) {
@@ -418,6 +494,8 @@ try {
             precioVentaInput.value = prod.precio_venta || '';
             stockInput.value = prod.stock !== null ? prod.stock : '';
             alertaStockInput.value = prod.alerta_stock !== null ? prod.alerta_stock : '';
+            currentLotes = prod.lotes ? [...prod.lotes] : [];
+            renderLotes();
 
             selectedImageName = prod.imagen || '';
             if (selectedImageName) {
@@ -469,11 +547,15 @@ try {
             inventoryView.classList.add('hidden');
             if (statsView) statsView.classList.add('hidden');
             if (historyView) historyView.classList.add('hidden');
+            const alertsView = document.getElementById('alertsView');
+            if (alertsView) alertsView.classList.add('hidden');
             
             navPosBtn.classList.remove('active');
             navInvBtn.classList.remove('active');
             if (navStatsBtn) navStatsBtn.classList.remove('active');
             if (navHistoryBtn) navHistoryBtn.classList.remove('active');
+            const navAlertsBtn = document.getElementById('navAlertsBtn');
+            if (navAlertsBtn) navAlertsBtn.classList.remove('active');
         }
 
         navPosBtn.addEventListener('click', () => {
@@ -494,6 +576,16 @@ try {
                 navHistoryBtn.classList.add('active');
                 historyView.classList.remove('hidden');
                 loadHistory();
+            });
+        }
+
+        const navAlertsBtn = document.getElementById('navAlertsBtn');
+        const alertsView = document.getElementById('alertsView');
+        if (navAlertsBtn) {
+            navAlertsBtn.addEventListener('click', () => {
+                hideAllViews();
+                navAlertsBtn.classList.add('active');
+                if(alertsView) alertsView.classList.remove('hidden');
             });
         }
 
@@ -920,11 +1012,67 @@ try {
                 invCurrentPage = 1;
                 renderInventoryTable();
                 renderPosGrid(globalProducts);
-
+                checkAlerts();
             } catch (error) {
                 productList.innerHTML = `<tr><td colspan="8" style="color:#fca5a5; text-align:center">Error al cargar: ${error.message}</td></tr>`;
             }
         }
+
+        function checkAlerts() {
+            const alertsBadge = document.getElementById('alertsBadge');
+            const alertsList = document.getElementById('alertsList');
+            if(!alertsBadge || !alertsList) return;
+            
+            alertsList.innerHTML = '';
+            let alertCount = 0;
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            
+            const thirtyDaysLater = new Date(today);
+            thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30);
+            
+            globalProducts.forEach(prod => {
+                if(prod.lotes && Array.isArray(prod.lotes)) {
+                    prod.lotes.forEach(lote => {
+                        const expDate = new Date(lote.vencimiento);
+                        const isExpired = expDate < today;
+                        const isNear = !isExpired && expDate <= thirtyDaysLater;
+                        
+                        if(isExpired || isNear) {
+                            alertCount++;
+                            const tr = document.createElement('tr');
+                            const color = isExpired ? '#fca5a5' : '#fcd34d';
+                            const estado = isExpired ? 'Vencido' : 'Próximo a Vencer';
+                            
+                            tr.innerHTML = `
+                                <td>${prod.nombre}</td>
+                                <td>${lote.qty} unidades</td>
+                                <td style="color: ${color}; font-weight: bold;">${lote.vencimiento}</td>
+                                <td style="color: ${color};">${estado}</td>
+                                <td><button class="secondary-btn" style="padding: 0.2rem 0.5rem; font-size: 0.8rem;" onclick="abrirModalEdicionById(${prod.id})">Revisar</button></td>
+                            `;
+                            alertsList.appendChild(tr);
+                        }
+                    });
+                }
+            });
+            
+            if(alertCount > 0) {
+                alertsBadge.textContent = alertCount;
+                alertsBadge.style.display = 'block';
+            } else {
+                alertsBadge.style.display = 'none';
+                alertsList.innerHTML = '<tr><td colspan="5" style="text-align:center; color: gray;">Todo en orden. No hay productos por vencer.</td></tr>';
+            }
+        }
+        
+        window.abrirModalEdicionById = (id) => {
+            const prod = globalProducts.find(p => p.id === id);
+            if(prod) {
+                navInvBtn.click();
+                abrirModalEdicion(prod);
+            }
+        };
 
         // --- RENDERIZAR TABLA DE INVENTARIO CON PAGINACIÓN ---
         function renderInventoryTable() {
@@ -1311,8 +1459,28 @@ try {
                     if (dbProd) {
                         costoTotalVenta += (parseFloat(dbProd.precio_compra) || 0) * qtyToDeduct;
                         if (dbProd.stock !== null) {
-                            const newStock = Math.max(0, dbProd.stock - qtyToDeduct);
-                            await supabase.from('productos').update({ stock: newStock }).eq('id', prodId);
+                            let newStock = Math.max(0, dbProd.stock - qtyToDeduct);
+                            let payloadUpdate = { stock: newStock };
+                            
+                            if (dbProd.lotes && dbProd.lotes.length > 0) {
+                                let rem = qtyToDeduct;
+                                let currentL = [...dbProd.lotes];
+                                currentL.sort((a, b) => new Date(a.vencimiento) - new Date(b.vencimiento));
+                                
+                                for (let lote of currentL) {
+                                    if (rem <= 0) break;
+                                    if (lote.qty > 0) {
+                                        let dec = Math.min(lote.qty, rem);
+                                        lote.qty -= dec;
+                                        rem -= dec;
+                                    }
+                                }
+                                currentL = currentL.filter(l => l.qty > 0);
+                                payloadUpdate.lotes = currentL.length > 0 ? currentL : null;
+                                payloadUpdate.stock = currentL.length > 0 ? currentL.reduce((s, l) => s + l.qty, 0) : newStock;
+                            }
+                            
+                            await supabase.from('productos').update(payloadUpdate).eq('id', prodId);
                         }
                     }
                 }
@@ -1377,7 +1545,8 @@ try {
                     precio_compra: pCompra,
                     precio_venta: pVenta,
                     stock: stock,
-                    alerta_stock: alerta
+                    alerta_stock: alerta,
+                    lotes: currentLotes.length > 0 ? currentLotes : null
                 };
 
                 let res;
