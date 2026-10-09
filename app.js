@@ -1113,27 +1113,26 @@ try {
             
             globalProducts.forEach(prod => {
                 if(prod.lotes && Array.isArray(prod.lotes)) {
-                    prod.lotes.forEach(lote => {
-                        const expDate = new Date(lote.vencimiento);
-                        const isExpired = expDate < today;
-                        const isNear = !isExpired && expDate <= thirtyDaysLater;
-                        
-                        if(isExpired || isNear) {
-                            alertCount++;
-                            const tr = document.createElement('tr');
-                            const color = isExpired ? '#fca5a5' : '#fcd34d';
-                            const estado = isExpired ? 'Vencido' : 'Próximo a Vencer';
-                            
-                            tr.innerHTML = `
-                                <td>${prod.nombre}</td>
-                                <td>${lote.qty} unidades</td>
-                                <td style="color: ${color}; font-weight: bold;">${lote.vencimiento}</td>
-                                <td style="color: ${color};">${estado}</td>
-                                <td><button class="secondary-btn" style="padding: 0.2rem 0.5rem; font-size: 0.8rem;" onclick="abrirModalEdicionById(${prod.id})">Revisar</button></td>
-                            `;
-                            alertsList.appendChild(tr);
-                        }
-                    });
+                    prod.lotes.forEach((lote, index) => {
+                          const expDate = new Date(lote.vencimiento);
+                          const isExpired = expDate < today;
+                          const isNear = !isExpired && expDate <= thirtyDaysLater;
+                          
+                          if(isExpired || isNear) {
+                              alertCount++;
+                              const tr = document.createElement('tr');
+                              const color = isExpired ? '#fca5a5' : '#fcd34d';
+                              const estado = isExpired ? 'Vencido' : 'Próximo a Vencer';
+                              tr.innerHTML = `
+                                  <td>${prod.nombre}</td>
+                                  <td>${lote.qty} unidades</td>
+                                  <td style="color: ${color}; font-weight: bold;">${lote.vencimiento}</td>
+                                  <td style="color: ${color};">${estado}</td>
+                                  <td><button class="secondary-btn" style="padding: 0.2rem 0.5rem; font-size: 0.8rem; background: rgba(239, 68, 68, 0.2); border-color: #ef4444; color: #ef4444;" onclick="depurarLote(${prod.id}, ${index})">Depurado</button></td>
+                              `;
+                              alertsList.appendChild(tr);
+                          }
+                      });
                 }
             });
             
@@ -1208,6 +1207,38 @@ try {
                 `;
                 productList.appendChild(tr);
             });
+
+          window.depurarLote = async (prodId, loteIndex) => {
+              if(!confirm('¿Confirmas que ya retiraste este lote de los estantes? Esta acción lo eliminará del sistema y de las alertas.')) return;
+              
+              const prod = globalProducts.find(p => p.id === prodId);
+              if(!prod) return;
+              
+              const updatedLotes = prod.lotes.filter((_, i) => i !== loteIndex);
+              
+              try {
+                  const { error } = await supabase.from('productos').update({ lotes: updatedLotes }).eq('id', prodId);
+                  if (error) throw error;
+                  
+                  await loadProducts(); 
+                  
+                  // Make sure alerts view stays visible if we were in it, since loadProducts re-renders everything
+                  const alertsView = document.getElementById('alertsView');
+                  if (alertsView) {
+                      hideAllViews();
+                      document.getElementById('navAlertsBtn').classList.add('active');
+                      alertsView.classList.remove('hidden');
+                  }
+                  
+              } catch (error) {
+                  if (typeof customAlert === 'function') {
+                      customAlert('Error al depurar lote: ' + error.message, 'Error', '❌');
+                  } else {
+                      alert('Error: ' + error.message);
+                  }
+              }
+          };
+
 
             // Listeners para editar
             document.querySelectorAll('.edit-btn').forEach((btn, index) => {
