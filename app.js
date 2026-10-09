@@ -456,7 +456,7 @@ try {
             
             if (currentLotes.length === 0) {
                 lotesList.innerHTML = '<span style="color: gray;">Sin lotes. Stock ser infinito o manual.</span>';
-                calculatedStockText.textContent = stockInput.value || '0';
+                if(calculatedStockText) calculatedStockText.textContent = stockInput ? (stockInput.value || '0') : '0';
                 return;
             }
 
@@ -491,8 +491,8 @@ try {
                 lotesList.appendChild(div);
             });
             
-            calculatedStockText.textContent = totalStock;
-            stockInput.value = totalStock;
+            if(calculatedStockText) calculatedStockText.textContent = totalStock;
+            if(stockInput) stockInput.value = totalStock;
         }
 
         window.removeLote = (index) => {
@@ -538,6 +538,7 @@ try {
         }
 
         function abrirModalEdicion(prod) {
+            limpiarFormulario();
             editingProductId = prod.id;
             const mh2 = document.querySelector('#productModal h2'); if(mh2) mh2.textContent = 'Editar Producto ';
             if(addProductBtn) addProductBtn.textContent = 'Actualizar Producto';
@@ -1244,8 +1245,8 @@ try {
                     <td><strong style="color: #a7f3d0">${pVenta}</strong></td>
                     <td>${pStock}${stockWarning}</td>
                     <td style="display: flex; gap: 0.5rem; justify-content: center;">
-                        <button class="edit-btn" style="background: transparent; border: none; cursor: pointer; font-size: 1.2rem; color: #60a5fa; transition: transform 0.2s;" title="Editar"></button>
-                        <button class="delete-btn" data-col="${delCol}" data-val="${delVal}" style="background: transparent; border: none; cursor: pointer; font-size: 1.2rem; color: #fca5a5; transition: transform 0.2s;" title="Eliminar"></button>
+                        <button class="edit-btn" style="background: transparent; border: none; cursor: pointer; font-size: 1.2rem; color: #60a5fa; transition: transform 0.2s;" title="Editar">Editar</button>
+                        <button class="delete-btn" data-col="${delCol}" data-val="${delVal}" style="background: transparent; border: none; cursor: pointer; font-size: 1.2rem; color: #fca5a5; transition: transform 0.2s;" title="Eliminar">Borrar</button>
                     </td>
                 `;
                 productList.appendChild(tr);
