@@ -655,43 +655,17 @@ try {
             });
         }
 
+        const adminEmails = ['zzenisx1234@gmail.com', 'nuevohorizonte@gmail.com'];
         if (navStatsBtn) {
-            navStatsBtn.addEventListener('click', () => {
-                if (statsUnlocked) {
+            navStatsBtn.addEventListener('click', async () => {
+                if (currentUserEmail && adminEmails.includes(currentUserEmail)) {
                     showStatsView();
                 } else {
-                    passwordModal.classList.remove('hidden');
-                    statsPasswordInput.value = '';
-                    passwordErrorMsg.style.display = 'none';
-                    statsPasswordInput.focus();
+                    await customAlert('Acceso Denegado. Solo administradores pueden ver esta sección.', 'Acceso Restringido', '🔒');
                 }
             });
         }
-
-        if (cancelPasswordBtn) {
-            cancelPasswordBtn.addEventListener('click', () => {
-                passwordModal.classList.add('hidden');
-            });
-        }
-
-        if (submitPasswordBtn) {
-            submitPasswordBtn.addEventListener('click', verificarPassword);
-            statsPasswordInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') verificarPassword();
-            });
-        }
-
-        function verificarPassword() {
-            if (statsPasswordInput.value === 'Reservasupabase') {
-                statsUnlocked = true;
-                localStorage.setItem('statsUnlocked', 'true');
-                passwordModal.classList.add('hidden');
-                showStatsView();
-            } else {
-                passwordErrorMsg.style.display = 'block';
-            }
-        }
-
+        
         function showStatsView() {
             hideAllViews();
             navStatsBtn.classList.add('active');
@@ -1020,7 +994,9 @@ try {
         }
 
         // --- AUTENTICACIÓN ---
+        let currentUserEmail = null;
         supabase.auth.onAuthStateChange((event, session) => {
+            if (session && session.user) currentUserEmail = session.user.email;
             if (session) {
                 loginCard.classList.add('hidden');
                 appView.classList.remove('hidden');
@@ -1054,7 +1030,7 @@ try {
             emailInput.value = '';
             passwordInput.value = '';
             productList.innerHTML = '';
-            localStorage.removeItem('statsUnlocked');
+            currentUserEmail = null;
         });
 
         // --- CARGAR PRODUCTOS ---
