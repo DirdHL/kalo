@@ -1026,6 +1026,7 @@ try {
                     } else {
                         alert('Acceso Denegado para este local.');
                     }
+                    window.location.href = './index.html';
                     return;
                 }
 
@@ -1063,6 +1064,7 @@ try {
             passwordInput.value = '';
             productList.innerHTML = '';
             currentUserEmail = null;
+            window.location.href = './index.html';
         });
 
         // --- CARGAR PRODUCTOS ---
