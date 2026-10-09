@@ -1,3 +1,5 @@
+import { supabase } from '../supabase.js';
+
 document.addEventListener('DOMContentLoaded', () => {
 
     // 1. Set current date
@@ -8,14 +10,6 @@ document.addEventListener('DOMContentLoaded', () => {
         month: '2-digit',
         year: 'numeric'
     });
-
-    // 2. Supabase Configuration (Mock/Template)
-    // Replace these with your actual Supabase project URL and anon key
-    const SUPABASE_URL = 'https://xyzcompany.supabase.co';
-    const SUPABASE_ANON_KEY = 'sb_publishable_glXjG1vnuH4r_GFYNmGjbQ_yY_dqP4L';
-
-    // Initialize Supabase Client
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     // ID of the founding company as defined in the SQL schema
     const EMPRESA_ID = '550e8400-e29b-41d4-a716-446655440000';
@@ -61,19 +55,39 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         try {
-            // Uncomment the following block to actually insert into Supabase
-            /*
+            // 1. Insertar en Supabase
             const { data: responseData, error } = await supabase
                 .from('reclamaciones')
                 .insert([payload])
                 .select();
 
             if (error) throw error;
-            */
 
-            // Simulate API Call for demonstration
-            await new Promise(resolve => setTimeout(resolve, 1500));
-            console.log('Payload a enviar a Supabase:', payload);
+            // 2. Enviar correo electrónico mediante FormSubmit (Sin backend)
+            // Reemplaza 'tu_correo@gmail.com' con el correo del negocio.
+            const emailDestino = 'iibr.nuevohorizonte@gmail.com';
+
+            await fetch(`https://formsubmit.co/ajax/${emailDestino}`, {
+                method: "POST",
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({
+                    _subject: `Nueva Reclamación - ${payload.tipo_reclamacion}`,
+                    Nombre: payload.nombre_consumidor,
+                    Documento: `${payload.documento_identidad_tipo} ${payload.documento_identidad_numero}`,
+                    Teléfono: payload.telefono_consumidor,
+                    Email_Cliente: payload.email_consumidor,
+                    Tipo_Bien: payload.tipo_bien,
+                    Monto_Reclamado: payload.monto_reclamado,
+                    Descripción: payload.descripcion_bien,
+                    Detalle: payload.detalle_reclamacion,
+                    Pedido: payload.pedido_consumidor
+                })
+            });
+
+            console.log('Reclamación guardada en DB y correo enviado.');
 
             // Success feedback
             alert('Su hoja de reclamación ha sido registrada exitosamente. Nos pondremos en contacto con usted.');
