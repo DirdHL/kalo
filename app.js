@@ -1,4 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
+console.log(">>> APP.JS ESTÁ CARGANDO CORRECTAMENTE (NUEVA VERSIÓN)");
+
 
 try {
     const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
