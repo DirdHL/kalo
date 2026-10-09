@@ -1258,8 +1258,8 @@ try {
                     <td><strong style="color: #a7f3d0">${pVenta}</strong></td>
                     <td>${pStock}${stockWarning}</td>
                     <td style="display: flex; gap: 0.5rem; justify-content: center;">
-                        <button class="edit-btn" style="background: transparent; border: none; cursor: pointer; font-size: 1.2rem; color: #60a5fa; transition: transform 0.2s;" title="Editar">Editar</button>
-                        <button class="delete-btn" data-col="${delCol}" data-val="${delVal}" style="background: transparent; border: none; cursor: pointer; font-size: 1.2rem; color: #fca5a5; transition: transform 0.2s;" title="Eliminar">Borrar</button>
+                        <button class="edit-btn" data-prodid="${prod.id}" style="background: transparent; border: none; cursor: pointer; font-size: 1.2rem; color: #60a5fa; transition: transform 0.2s;" title="Editar">Editar</button>
+                        <button class="delete-btn" data-prodid="${prod.id}" data-col="${delCol}" data-val="${delVal}" style="background: transparent; border: none; cursor: pointer; font-size: 1.2rem; color: #fca5a5; transition: transform 0.2s;" title="Eliminar">Borrar</button>
                     </td>
                 `;
                 productList.appendChild(tr);
@@ -1270,9 +1270,10 @@ try {
                 productList.addEventListener('click', async (e) => {
                     const btnEdit = e.target.closest('.edit-btn');
                     if(btnEdit) {
-                        const tr = btnEdit.closest('tr');
-                        const idx = Array.from(tr.parentNode.children).indexOf(tr);
-                        if(currentData[idx]) abrirModalEdicion(currentData[idx]);
+                        const prodId = btnEdit.getAttribute('data-prodid');
+                        const pId = isNaN(prodId) ? prodId : Number(prodId);
+                        const prod = globalProducts.find(p => p.id === pId);
+                        if(prod) abrirModalEdicion(prod);
                     }
                     
                     const btnDel = e.target.closest('.delete-btn');
