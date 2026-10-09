@@ -1608,23 +1608,6 @@ try {
                             let newStock = Math.max(0, dbProd.stock - qtyToDeduct);
                             let payloadUpdate = { stock: newStock };
                             
-                            if (dbProd.lotes && dbProd.lotes.length > 0) {
-                                let rem = qtyToDeduct;
-                                let currentL = [...dbProd.lotes];
-                                currentL.sort((a, b) => new Date(a.vencimiento) - new Date(b.vencimiento));
-                                
-                                for (let lote of currentL) {
-                                    if (rem <= 0) break;
-                                    if (lote.qty > 0) {
-                                        let dec = Math.min(lote.qty, rem);
-                                        lote.qty -= dec;
-                                        rem -= dec;
-                                    }
-                                }
-                                currentL = currentL.filter(l => l.qty > 0);
-                                payloadUpdate.lotes = currentL.length > 0 ? currentL : null;
-                                payloadUpdate.stock = currentL.length > 0 ? currentL.reduce((s, l) => s + l.qty, 0) : newStock;
-                            }
                             const { error: updateErr } = await supabase.from('productos').update(payloadUpdate).eq('id', prodId);
                             if (updateErr) {
                                 console.error('Error descontando stock para producto', prodId, updateErr);
