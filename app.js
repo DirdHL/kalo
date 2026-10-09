@@ -995,13 +995,45 @@ try {
 
         // --- AUTENTICACIÓN ---
         let currentUserEmail = null;
-        supabase.auth.onAuthStateChange((event, session) => {
-            if (session && session.user) currentUserEmail = session.user.email;
-            if (session) {
+        supabase.auth.onAuthStateChange(async (event, session) => {
+            if (session && session.user) {
+                currentUserEmail = session.user.email;
+                
+                // Verificación de permisos por local
+                const adminEmails = ['zzenisx1234@gmail.com', 'nuevohorizonte@gmail.com'];
+                let hasAccess = false;
+                
+                if (adminEmails.includes(currentUserEmail)) {
+                    hasAccess = true;
+                } else if (currentLocal === 'LAS BRISAS' && currentUserEmail === 'lasbrisas_kalo@gmail.com') {
+                    hasAccess = true;
+                } else if (currentLocal === 'LOS PINOS' && currentUserEmail === 'lospinos_kalo@gmail.com') {
+                    hasAccess = true;
+                } else if (currentLocal === 'EL POLIDEPORTIVO' && currentUserEmail === 'poli_kalo@gmail.com') {
+                    hasAccess = true;
+                }
+                
+                const pathUrl = window.location.pathname.toLowerCase();
+                if (pathUrl.endsWith('/') || pathUrl.endsWith('index.html')) {
+                    hasAccess = true;
+                }
+
+                if (!hasAccess) {
+                    await supabase.auth.signOut();
+                    currentUserEmail = null;
+                    if (typeof customAlert === 'function') {
+                        await customAlert('Tu cuenta no tiene permiso para acceder a la sucursal de ' + currentLocal, 'Acceso Denegado', '🚫');
+                    } else {
+                        alert('Acceso Denegado para este local.');
+                    }
+                    return;
+                }
+
                 loginCard.classList.add('hidden');
                 appView.classList.remove('hidden');
                 loadProducts();
             } else {
+                currentUserEmail = null;
                 appView.classList.add('hidden');
                 loginCard.classList.remove('hidden');
                 productList.innerHTML = '';
