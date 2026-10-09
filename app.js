@@ -1154,6 +1154,46 @@ try {
             }
         };
 
+        window.depurarLote = async (prodId, loteIndex) => {
+            if(!confirm('¿Confirmas que ya retiraste este lote de los estantes? Esta acción lo eliminará del sistema y de las alertas.')) return;
+            
+            const prod = globalProducts.find(p => p.id === prodId);
+            if(!prod) return;
+            
+            const updatedLotes = prod.lotes.filter((_, i) => i !== loteIndex);
+            
+            try {
+                const { error } = await supabase.from('productos').update({ lotes: updatedLotes }).eq('id', prodId);
+                if (error) throw error;
+                
+                await loadProducts(); 
+                
+                const alertsView = document.getElementById('alertsView');
+                if (alertsView && !alertsView.classList.contains('hidden')) {
+                    // Do nothing, loadProducts already calls checkAlerts which updates the table
+                    if (typeof customAlert === 'function') {
+                        customAlert('Lote depurado con éxito.', 'Depurado', '✅');
+                    }
+                }
+                
+            } catch (error) {
+                if (typeof customAlert === 'function') {
+                    customAlert('Error al depurar lote: ' + error.message, 'Error', '❌');
+                } else {
+                    alert('Error: ' + error.message);
+                }
+            }
+        };
+
+        window.abrirModalEdicionById = (id) => {
+            const prod = globalProducts.find(p => p.id === id);
+            if(prod) {
+                const navInvBtnLocal = document.getElementById('navInvBtn');
+                if (navInvBtnLocal) navInvBtnLocal.click();
+                abrirModalEdicion(prod);
+            }
+        };
+
         // --- RENDERIZAR TABLA DE INVENTARIO CON PAGINACIÓN ---
         function renderInventoryTable() {
             productList.innerHTML = '';
@@ -1209,59 +1249,12 @@ try {
                 productList.appendChild(tr);
             });
 
-          window.depurarLote = async (prodId, loteIndex) => {
-              if(!confirm('¿Confirmas que ya retiraste este lote de los estantes? Esta acción lo eliminará del sistema y de las alertas.')) return;
-              
-              const prod = globalProducts.find(p => p.id === prodId);
-              if(!prod) return;
-              
-              const updatedLotes = prod.lotes.filter((_, i) => i !== loteIndex);
-              
-              try {
-                  const { error } = await supabase.from('productos').update({ lotes: updatedLotes }).eq('id', prodId);
-                  if (error) throw error;
-                  
-                  await loadProducts(); 
-                  
-                  // Make sure alerts view stays visible if we were in it, since loadProducts re-renders everything
-                  const alertsView = document.getElementById('alertsView');
-                  if (alertsView) {
-                      hideAllViews();
-                      document.getElementById('navAlertsBtn').classList.add('active');
-                      alertsView.classList.remove('hidden');
-                  }
-                  
-              } catch (error) {
-                  if (typeof customAlert === 'function') {
-                      customAlert('Error al depurar lote: ' + error.message, 'Error', '❌');
-                  } else {
-                      alert('Error: ' + error.message);
-                  }
-              }
-          };
-
-
             // Listeners para editar
-            document.querySelectorAll('.edit-btn').forEach((btn, index) => {
-                btn.addEventListener('click', () => {
-                    abrirModalEdicion(currentData[index]);
-                });
-            });
-
-            
-          window.abrirModalEdicionById = (id) => {
-              const prod = globalProducts.find(p => p.id === id);
-              if(prod) {
-                  const navInvBtnLocal = document.getElementById('navInvBtn');
-                  if (navInvBtnLocal) navInvBtnLocal.click();
-                  abrirModalEdicion(prod);
-              }
-          };
-
-            // Listeners para editar
-            document.querySelectorAll('.edit-btn').forEach((btn, index) => {
-                btn.addEventListener('click', () => {
-                    abrirModalEdicion(currentData[index]);
+            document.querySelectorAll("#productList .edit-btn").forEach((btn, index) => {
+                btn.addEventListener("click", () => {
+                    if (currentData[index]) {
+                        abrirModalEdicion(currentData[index]);
+                    }
                 });
             });
 
