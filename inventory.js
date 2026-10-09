@@ -101,18 +101,15 @@ export function setupInventory({ onProductsLoaded }) {
     function renderLotes() {
         if (!lotesList) return;
         lotesList.innerHTML = '';
-        let totalStock = 0;
         
         if (currentLotes.length === 0) {
-            lotesList.innerHTML = '<span style="color: gray;">Sin lotes. Stock será infinito o manual.</span>';
-            if (calculatedStockText) calculatedStockText.textContent = stockInput ? (stockInput.value || '0') : '0';
+            lotesList.innerHTML = '<span style="color: gray;">Sin lotes (informativo).</span>';
             return;
         }
 
         currentLotes.sort((a, b) => new Date(a.vencimiento) - new Date(b.vencimiento));
 
         currentLotes.forEach((lote, index) => {
-            totalStock += parseInt(lote.qty) || 0;
             const div = document.createElement('div');
             div.style.display = 'flex';
             div.style.justifyContent = 'space-between';
@@ -138,9 +135,6 @@ export function setupInventory({ onProductsLoaded }) {
             `;
             lotesList.appendChild(div);
         });
-        
-        if (calculatedStockText) calculatedStockText.textContent = totalStock;
-        if (stockInput) stockInput.value = totalStock;
     }
 
     if (lotesList) {
