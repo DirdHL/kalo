@@ -1,67 +1,93 @@
+import { supabase } from "./supabase.js";
+import { state } from "./state.js";
+import { ADMIN_EMAILS } from "./constants.js";
+import { customAlert, customConfirm } from "./ui.js";
 
-import { supabase } from './supabase.js';
+export function setupAuth({ onLoginSuccess }) {
+    const loginCard = document.getElementById('loginCard');
+    const appView = document.getElementById('appView');
+    const emailInput = document.getElementById('emailInput');
+    const passwordInput = document.getElementById('passwordInput');
+    const loginBtn = document.getElementById('loginBtn');
+    const loginStatusMsg = document.getElementById('loginStatusMsg');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const productList = document.getElementById('productList');
 
-export function setupAuth(loginContainer, appContainer, currentLocal, logoutBtn, userSpan, loginForm, emailInput, passwordInput, loginError, customAlert) {
-    
-    window.checkSession = async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-            loginContainer.style.display = 'none';
-            appContainer.style.display = 'flex';
-            if (userSpan) userSpan.textContent = session.user.email;
+    supabase.auth.onAuthStateChange(async (event, session) => {
+        if (session && session.user) {
+            state.currentUserEmail = session.user.email;
             
-            if (typeof window.loadProducts === 'function') await window.loadProducts();
-            if (typeof window.loadStats === 'function') await window.loadStats();
+            // Verificación de permisos por local
+            let hasAccess = false;
+            
+            if (ADMIN_EMAILS.includes(state.currentUserEmail)) {
+                hasAccess = true;
+            } else if (state.currentLocal === 'LAS BRISAS' && state.currentUserEmail === 'lasbrisas_kalo@gmail.com') {
+                hasAccess = true;
+            } else if (state.currentLocal === 'LOS PINOS' && state.currentUserEmail === 'lospinos_kalo@gmail.com') {
+                hasAccess = true;
+            } else if (state.currentLocal === 'EL POLIDEPORTIVO' && state.currentUserEmail === 'poli_kalo@gmail.com') {
+                hasAccess = true;
+            }
+            
+            const pathUrl = window.location.pathname.toLowerCase();
+            if (pathUrl.endsWith('/') || pathUrl.endsWith('index.html')) {
+                hasAccess = true;
+            }
+
+            if (!hasAccess) {
+                await supabase.auth.signOut();
+                state.currentUserEmail = null;
+                await customAlert('Tu cuenta no tiene permiso para acceder a la sucursal de ' + state.currentLocal, 'Acceso Denegado', '⛔');
+                window.location.href = './index.html';
+                return;
+            }
+
+            if (loginCard) loginCard.classList.add('hidden');
+            if (appView) appView.classList.remove('hidden');
+            if (typeof onLoginSuccess === 'function') {
+                onLoginSuccess();
+            }
         } else {
-            loginContainer.style.display = 'flex';
-            appContainer.style.display = 'none';
-            emailInput.value = '';
-            passwordInput.value = '';
-            if (loginError) loginError.style.display = 'none';
+            state.currentUserEmail = null;
+            if (appView) appView.classList.add('hidden');
+            if (loginCard) loginCard.classList.remove('hidden');
+            if (productList) productList.innerHTML = '';
         }
-    };
+    });
 
-    if (loginForm) {
-        loginForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const email = emailInput.value.trim();
-            const pass = passwordInput.value;
-            
-            if (!email || !pass) return;
-            
-            const btn = loginForm.querySelector('button');
-            btn.textContent = 'Iniciando...';
-            btn.disabled = true;
-            
-            const { data, error } = await supabase.auth.signInWithPassword({ email, password: pass });
-            
-            btn.textContent = 'Ingresar';
-            btn.disabled = false;
-            
-            if (error) {
-                if (loginError) {
-                    loginError.textContent = 'Credenciales incorrectas o error de red';
-                    loginError.style.display = 'block';
-                }
-            } else {
-                if (loginError) loginError.style.display = 'none';
-                window.checkSession();
+    if (loginBtn) {
+        loginBtn.addEventListener('click', async () => {
+            const email = emailInput ? emailInput.value.trim() : '';
+            const password = passwordInput ? passwordInput.value.trim() : '';
+            if (!email || !password) {
+                if (loginStatusMsg) loginStatusMsg.textContent = 'Ingresa correo y contraseña.';
+                return;
+            }
+
+            try {
+                loginBtn.textContent = 'Iniciando...';
+                if (loginStatusMsg) loginStatusMsg.textContent = '';
+                const { error } = await supabase.auth.signInWithPassword({ email, password });
+                if (error) throw error;
+            } catch (error) {
+                if (loginStatusMsg) loginStatusMsg.textContent = 'Error: Credenciales inválidas.';
+            } finally {
+                loginBtn.textContent = 'Entrar';
             }
         });
     }
 
     if (logoutBtn) {
         logoutBtn.addEventListener('click', async () => {
-            if (await customConfirm('Seguro que deseas cerrar sesin?', 'Cerrar Sesin', '')) {
-                await supabase.auth.signOut();
-                window.location.reload();
-            }
+            const confirmed = await customConfirm('¿Estás seguro de que deseas cerrar sesión?', 'Cerrar Sesión', '🚪');
+            if (!confirmed) return;
+            await supabase.auth.signOut();
+            if (emailInput) emailInput.value = '';
+            if (passwordInput) passwordInput.value = '';
+            if (productList) productList.innerHTML = '';
+            state.currentUserEmail = null;
+            window.location.href = './index.html';
         });
     }
-
-    supabase.auth.onAuthStateChange((event, session) => {
-        if (event === 'SIGNED_OUT') {
-            window.location.reload();
-        }
-    });
 }

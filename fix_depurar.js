@@ -1,1 +1,0 @@
-const fs=require('fs'); let app=fs.readFileSync('app.js','utf8'); app=app.replace(/onclick=\"depurarLote\(\\\$\{prod\.id\}, \\\$\{index\}\)\"/g, 'class=\"secondary-btn depurar-btn\" data-prodid=\"\\\" data-loteidx=\"\\\"'); fs.writeFileSync('app.js', app);
