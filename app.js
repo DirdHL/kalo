@@ -1171,7 +1171,8 @@ try {
         };
 
         window.depurarLote = async (prodId, loteIndex) => {
-            if(!confirm('Confirmas que ya retiraste este lote de los estantes? Esta accin lo eliminar del sistema y de las alertas.')) return;
+            const isConfirmed = await customConfirm('Confirmas que ya retiraste este lote de los estantes? Esta accin lo eliminar del sistema y de las alertas.', 'Confirmar Depuracin', '⚠️');
+            if(!isConfirmed) return;
             
             const prod = globalProducts.find(p => p.id === prodId);
             if(!prod) return;
