@@ -75,10 +75,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         try {
             // 1. Insertar en Supabase
-            const { data: responseData, error } = await supabase
+            const { error } = await supabase
                 .from('reclamaciones')
-                .insert([payload])
-                .select();
+                .insert([payload]);
 
             if (error) throw error;
 
