@@ -1247,6 +1247,23 @@ try {
                 });
             });
 
+            
+          window.abrirModalEdicionById = (id) => {
+              const prod = globalProducts.find(p => p.id === id);
+              if(prod) {
+                  const navInvBtnLocal = document.getElementById('navInvBtn');
+                  if (navInvBtnLocal) navInvBtnLocal.click();
+                  abrirModalEdicion(prod);
+              }
+          };
+
+            // Listeners para editar
+            document.querySelectorAll('.edit-btn').forEach((btn, index) => {
+                btn.addEventListener('click', () => {
+                    abrirModalEdicion(currentData[index]);
+                });
+            });
+
             // Listeners para eliminar
             document.querySelectorAll('.delete-btn').forEach(btn => {
                 btn.addEventListener('click', async (e) => {
