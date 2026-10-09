@@ -518,8 +518,8 @@ try {
 
         function limpiarFormulario() {
             editingProductId = null;
-            document.querySelector('#productModal h2').textContent = 'Registrar Producto';
-            addProductBtn.textContent = 'Guardar Producto';
+            const mh2 = document.querySelector('#productModal h2'); if(mh2) mh2.textContent = 'Registrar Producto';
+            if(addProductBtn) addProductBtn.textContent = 'Guardar Producto';
             productCodeInput.value = '';
             productNameInput.value = '';
             categoriaInput.value = 'Bebidas';
@@ -528,7 +528,7 @@ try {
             gananciaInput.value = '';
             stockInput.value = '';
             alertaStockInput.value = '';
-            productStatusMsg.textContent = '';
+            if(productStatusMsg) productStatusMsg.textContent = '';
             selectedImageName = '';
             previewImg.src = './kalo-logo.png';
             currentLotes = [];
@@ -539,8 +539,8 @@ try {
 
         function abrirModalEdicion(prod) {
             editingProductId = prod.id;
-            document.querySelector('#productModal h2').textContent = 'Editar Producto ';
-            addProductBtn.textContent = 'Actualizar Producto';
+            const mh2 = document.querySelector('#productModal h2'); if(mh2) mh2.textContent = 'Editar Producto ';
+            if(addProductBtn) addProductBtn.textContent = 'Actualizar Producto';
 
             productCodeInput.value = prod.codigo || '';
             productNameInput.value = prod.nombre || '';
@@ -1727,12 +1727,12 @@ try {
             const cat = categoriaInput.value;
 
             if (!productName) {
-                productStatusMsg.textContent = 'El nombre del producto es obligatorio.';
+                if(productStatusMsg) productStatusMsg.textContent = 'El nombre del producto es obligatorio.';
                 return;
             }
 
             try {
-                addProductBtn.textContent = 'Guardando...';
+                if(addProductBtn) addProductBtn.textContent = 'Guardando...';
 
                 const payload = {
                     codigo: productCode || null,
@@ -1757,7 +1757,7 @@ try {
                 if (res.error) throw res.error;
 
                 productStatusMsg.style.color = '#86efac';
-                productStatusMsg.textContent = editingProductId ? 'Producto actualizado exitosamente!' : 'Producto guardado exitosamente!';
+                if(productStatusMsg) productStatusMsg.textContent = editingProductId ? 'Producto actualizado exitosamente!' : 'Producto guardado exitosamente!';
 
                 await loadProducts();
 
@@ -1769,9 +1769,9 @@ try {
 
             } catch (error) {
                 productStatusMsg.style.color = '#fca5a5';
-                productStatusMsg.textContent = 'Error: ' + error.message;
+                if(productStatusMsg) productStatusMsg.textContent = 'Error: ' + error.message;
             } finally {
-                addProductBtn.textContent = editingProductId ? 'Actualizar Producto' : 'Guardar Producto';
+                if(addProductBtn) addProductBtn.textContent = editingProductId ? 'Actualizar Producto' : 'Guardar Producto';
             }
         });
         // --- LECTOR DE CDIGO DE BARRAS GLOBAL ---
