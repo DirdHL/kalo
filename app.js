@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-console.log(">>> APP.JS ESTÁ CARGANDO CORRECTAMENTE (NUEVA VERSIÓN)");
+console.log(">>> APP.JS EST CARGANDO CORRECTAMENTE (NUEVA VERSIN)");
 
 
 try {
@@ -10,7 +10,7 @@ try {
         const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         // --- MANEJO DE ALERTAS PERSONALIZADAS ---
-        window.customAlert = function(msg, title = "Atención", icon = "⚠️") {
+        window.customAlert = function(msg, title = "Atencin", icon = "") {
             return new Promise((resolve) => {
                 const overlay = document.getElementById('customDialogOverlay');
                 document.getElementById('customDialogTitle').textContent = title;
@@ -31,7 +31,7 @@ try {
             });
         };
 
-        window.customConfirm = function(msg, title = "Confirmar", icon = "❓") {
+        window.customConfirm = function(msg, title = "Confirmar", icon = "?") {
             return new Promise((resolve) => {
                 const overlay = document.getElementById('customDialogOverlay');
                 document.getElementById('customDialogTitle').textContent = title;
@@ -42,7 +42,7 @@ try {
                 const btnOk = document.getElementById('customDialogOk');
                 
                 btnCancel.classList.remove('hidden');
-                btnOk.textContent = 'Sí, continuar';
+                btnOk.textContent = 'S, continuar';
                 overlay.classList.remove('hidden');
                 
                 btnCancel.onclick = () => {
@@ -67,7 +67,7 @@ try {
         const logoutBtn = document.getElementById('logoutBtn');
         const productList = document.getElementById('productList');
 
-        // Navegación
+        // Navegacin
         const navPosBtn = document.getElementById('navPosBtn');
         const navInvBtn = document.getElementById('navInvBtn');
         const posView = document.getElementById('posView');
@@ -88,7 +88,7 @@ try {
         let globalProducts = [];
         let cart = [];
 
-        // Paginación y Búsqueda Inventario
+        // Paginacin y Bsqueda Inventario
         const invSearch = document.getElementById('invSearch');
         const prevPageBtn = document.getElementById('prevPageBtn');
         const nextPageBtn = document.getElementById('nextPageBtn');
@@ -122,10 +122,10 @@ try {
         const closeImagePickerBtn = document.getElementById('closeImagePickerBtn');
         const imageGrid = document.getElementById('imageGrid');
 
-        let selectedImageName = ''; // Guardará el nombre del archivo
+        let selectedImageName = ''; // Guardar el nombre del archivo
         let editingProductId = null; // ID del producto al editar
 
-        // Aquí pones exactamente los nombres de las fotos que vayas metiendo a la carpeta
+        // Aqu pones exactamente los nombres de las fotos que vayas metiendo a la carpeta
         const availableImages = [
             'AGUA_SAN_CARLOS_500ML.svg',
             'Agua_Loa_1L_chupon.svg',
@@ -135,7 +135,7 @@ try {
             'Agua_cielo_625ml_Sin_Gas.svg',
             'Agua_cielo_chupon_1lt_Sin_Gas.svg',
             'Agua_san_luis_750ml.svg',
-            'Agua_san_luis_limón_625ml.svg',
+            'Agua_san_luis_limn_625ml.svg',
             'Agua_san_mateo_600ml.svg',
             'Animalito_san_jorge_60gr.svg',
             'BOMBONE_ D\'ONOFRIO.svg',
@@ -178,7 +178,7 @@ try {
             'Cuate_sin_picar_43g.svg',
             'Doritos_fuego_45gr.svg',
             'Doritos_natural_45gr.svg',
-            'Doña_pepa_23gr.svg',
+            'Doa_pepa_23gr.svg',
             'EMPANADA_CARNE.svg',
             'EMPANADA_POLLO.svg',
             'FANTA_ROJA_500ML.svg',
@@ -210,14 +210,14 @@ try {
             'LOA_LIMON_500ML.svg',
             'LOA_LIMON_600ML.svg',
             'MIKE_SURTIDO.svg',
-            'MINI_DOÑA_PEPA.svg',
+            'MINI_DOA_PEPA.svg',
             'MINI_GELATINA_GRANEL.svg',
             'MINI_MOROCHAS.svg',
             'Margarita_tubular.svg',
             'Morochas_clasica_30gr.svg',
             'Nick_chocolate_72g.svg',
             'Oreo_36gr.svg',
-            'PAPA JALAPEÑO 135.svg',
+            'PAPA JALAPEO 135.svg',
             'PAPAS_INCA_CHIPS_33GR.svg',
             'PAPAS_LAYS_39g.svg',
             'PEPESI_LATA.svg',
@@ -239,7 +239,7 @@ try {
             'Ritz_taco_70gr.svg',
             'SPORADE_UVA.svg',
             'STRUDENT_DE_MANZANA.svg',
-            'STRUDENT_PIÑA.svg',
+            'STRUDENT_PIA.svg',
             'Soda_san_jorge_40gr.svg',
             'Sporade_Mandarina_500ml.svg',
             'Sporade_tropical_1500ml.svg',
@@ -271,7 +271,7 @@ try {
             'trident_mora_ocho_punto_cinco_g.svg'
         ];
 
-        // --- MANEJO DEL MODAL DE IMÁGENES ---
+        // --- MANEJO DEL MODAL DE IMGENES ---
         openImagePickerBtn.addEventListener('click', () => {
             imagePickerModal.classList.remove('hidden');
             renderImageGrid();
@@ -355,7 +355,7 @@ try {
                     div.innerHTML = `
                         <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer; flex: 1;">
                             <input type="checkbox" class="combo-checkbox" value="${prod.id}" style="width:16px; height:16px;">
-                            ${prod.nombre} (Stock: ${prod.stock !== null ? prod.stock : '∞'})
+                            ${prod.nombre} (Stock: ${prod.stock !== null ? prod.stock : ''})
                         </label>
                         <div style="display: flex; align-items: center; gap: 0.5rem;">
                             <span style="font-size: 0.8rem; color: var(--text-secondary);">Cant:</span>
@@ -394,7 +394,7 @@ try {
                 const precio = parseFloat(comboPriceInput.value);
                 
                 if (!nombre || isNaN(precio) || precio <= 0) {
-                    comboStatusMsg.textContent = 'Ingresa un nombre y precio válido.';
+                    comboStatusMsg.textContent = 'Ingresa un nombre y precio vlido.';
                     return;
                 }
 
@@ -455,7 +455,7 @@ try {
             let totalStock = 0;
             
             if (currentLotes.length === 0) {
-                lotesList.innerHTML = '<span style="color: gray;">Sin lotes. Stock será infinito o manual.</span>';
+                lotesList.innerHTML = '<span style="color: gray;">Sin lotes. Stock ser infinito o manual.</span>';
                 calculatedStockText.textContent = stockInput.value || '0';
                 return;
             }
@@ -505,7 +505,7 @@ try {
                 const qty = parseInt(loteQtyInput.value);
                 const exp = loteExpInput.value;
                 if (!qty || qty <= 0 || !exp) {
-                    customAlert('Ingresa cantidad válida y fecha de vencimiento.', 'Datos Inválidos', '❌');
+                    customAlert('Ingresa cantidad vlida y fecha de vencimiento.', 'Datos Invlidos', '');
                     return;
                 }
                 
@@ -539,7 +539,7 @@ try {
 
         function abrirModalEdicion(prod) {
             editingProductId = prod.id;
-            document.querySelector('#productModal h2').textContent = 'Editar Producto ✏️';
+            document.querySelector('#productModal h2').textContent = 'Editar Producto ';
             addProductBtn.textContent = 'Actualizar Producto';
 
             productCodeInput.value = prod.codigo || '';
@@ -563,7 +563,7 @@ try {
             productModal.classList.remove('hidden');
         }
 
-        // --- CÁLCULO DE GANANCIA EN TIEMPO REAL ---
+        // --- CLCULO DE GANANCIA EN TIEMPO REAL ---
         function calcularGanancia() {
             const compra = parseFloat(precioCompraInput.value) || 0;
             const venta = parseFloat(precioVentaInput.value) || 0;
@@ -575,7 +575,7 @@ try {
         precioCompraInput.addEventListener('input', calcularGanancia);
         precioVentaInput.addEventListener('input', calcularGanancia);
 
-        // Escuchar "Enter" en el código para saltar al nombre
+        // Escuchar "Enter" en el cdigo para saltar al nombre
         productCodeInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 e.preventDefault();
@@ -583,8 +583,8 @@ try {
             }
         });
 
-        // --- NAVEGACIÓN Y MULTI-LOCAL ---
-        // --- NAVEGACIÓN Y MULTI-LOCAL ---
+        // --- NAVEGACIN Y MULTI-LOCAL ---
+        // --- NAVEGACIN Y MULTI-LOCAL ---
         let currentLocal = 'LAS BRISAS';
         const pathURL = window.location.pathname.toLowerCase();
         if (pathURL.includes('brisas')) currentLocal = 'LAS BRISAS';
@@ -593,9 +593,9 @@ try {
 
         const localLabel = document.getElementById('localLabel');
         if (localLabel) {
-            if (currentLocal === 'LAS BRISAS') localLabel.innerHTML = '📍 Las Brisas';
-            else if (currentLocal === 'LOS PINOS') localLabel.innerHTML = '📍 Los Pinos';
-            else if (currentLocal === 'EL POLIDEPORTIVO') localLabel.innerHTML = '📍 El Polideportivo';
+            if (currentLocal === 'LAS BRISAS') localLabel.innerHTML = ' Las Brisas';
+            else if (currentLocal === 'LOS PINOS') localLabel.innerHTML = ' Los Pinos';
+            else if (currentLocal === 'EL POLIDEPORTIVO') localLabel.innerHTML = ' El Polideportivo';
         }
 
         const navStatsBtn = document.getElementById('navStatsBtn');
@@ -664,7 +664,7 @@ try {
                 if (currentUserEmail && adminEmails.includes(currentUserEmail)) {
                     showStatsView();
                 } else {
-                    await customAlert('Acceso Denegado. Solo administradores pueden ver esta sección.', 'Acceso Restringido', '🔒');
+                    await customAlert('Acceso Denegado. Solo administradores pueden ver esta seccin.', 'Acceso Restringido', '');
                 }
             });
         }
@@ -696,7 +696,7 @@ try {
                 if (error) {
                     if (error.code === '42P01') {
                         // La tabla no existe
-                        console.warn('La tabla ventas no existe todavía.');
+                        console.warn('La tabla ventas no existe todava.');
                         renderEmptyStats();
                         return;
                     }
@@ -733,7 +733,7 @@ try {
                     });
                 }
 
-                // Mostrar 'netas' como Ingresos Totales (el dinero real que entró a caja tras descuentos)
+                // Mostrar 'netas' como Ingresos Totales (el dinero real que entr a caja tras descuentos)
                 document.getElementById('statVentasBrutas').textContent = `S/ ${netas.toFixed(2)}`;
                 document.getElementById('statReembolsos').textContent = `S/ ${reembolsos.toFixed(2)}`;
                 document.getElementById('statDescuentos').textContent = `S/ ${descuentos.toFixed(2)}`;
@@ -742,13 +742,13 @@ try {
                 renderChart(ventasPorDia);
 
             } catch (err) {
-                console.error('Error al obtener estadísticas:', err);
+                console.error('Error al obtener estadsticas:', err);
                 renderEmptyStats();
             }
         }
 
         window.refundSale = async (ventaId) => {
-            if (!await customConfirm('¿Seguro que deseas reembolsar esta venta? El stock de los productos será devuelto al inventario.')) return;
+            if (!await customConfirm('Seguro que deseas reembolsar esta venta? El stock de los productos ser devuelto al inventario.')) return;
             
             try {
                 // Obtener detalles de la venta
@@ -756,7 +756,7 @@ try {
                 if (fetchErr) throw fetchErr;
 
                 if (venta.estado === 'reembolsada') {
-                    await customAlert('Esta venta ya ha sido reembolsada.', 'Aviso', 'ℹ️');
+                    await customAlert('Esta venta ya ha sido reembolsada.', 'Aviso', '');
                     return;
                 }
 
@@ -789,13 +789,13 @@ try {
                 const { error: updErr } = await supabase.from('ventas').update({ estado: 'reembolsada' }).eq('id', ventaId);
                 if (updErr) throw updErr;
 
-                await customAlert('Venta reembolsada con éxito.', '¡Éxito!', '✅');
+                await customAlert('Venta reembolsada con xito.', 'xito!', '');
                 await loadProducts(); // recargar stock
                 loadHistory(); // recargar historial
 
             } catch (err) {
                 console.error('Error al reembolsar:', err);
-                await customAlert('No se pudo completar el reembolso. ' + err.message, 'Error', '❌');
+                await customAlert('No se pudo completar el reembolso. ' + err.message, 'Error', '');
             }
         };
 
@@ -913,7 +913,7 @@ try {
         if (exportStatsBtn) {
             exportStatsBtn.addEventListener('click', async () => {
                 if (!window.currentMonthVentas || window.currentMonthVentas.length === 0) {
-                    await customAlert('No hay datos para exportar en este mes.', 'Sin datos', 'ℹ️');
+                    await customAlert('No hay datos para exportar en este mes.', 'Sin datos', '');
                     return;
                 }
                 
@@ -946,7 +946,7 @@ try {
                         <tr style="background-color: #1e1b4b; color: white;">
                             <th>Fecha</th>
                             <th>Hora</th>
-                            <th>Método</th>
+                            <th>Mtodo</th>
                             <th>Productos</th>
                             <th>Subtotal</th>
                             <th>Descuento</th>
@@ -996,13 +996,13 @@ try {
             });
         }
 
-        // --- AUTENTICACIÓN ---
+        // --- AUTENTICACIN ---
         let currentUserEmail = null;
         supabase.auth.onAuthStateChange(async (event, session) => {
             if (session && session.user) {
                 currentUserEmail = session.user.email;
                 
-                // Verificación de permisos por local
+                // Verificacin de permisos por local
                 const adminEmails = ['zzenisx1234@gmail.com', 'nuevohorizonte@gmail.com'];
                 let hasAccess = false;
                 
@@ -1025,7 +1025,7 @@ try {
                     await supabase.auth.signOut();
                     currentUserEmail = null;
                     if (typeof customAlert === 'function') {
-                        await customAlert('Tu cuenta no tiene permiso para acceder a la sucursal de ' + currentLocal, 'Acceso Denegado', '🚫');
+                        await customAlert('Tu cuenta no tiene permiso para acceder a la sucursal de ' + currentLocal, 'Acceso Denegado', '');
                     } else {
                         alert('Acceso Denegado para este local.');
                     }
@@ -1047,7 +1047,7 @@ try {
         loginBtn.addEventListener('click', async () => {
             const email = emailInput.value.trim();
             const password = passwordInput.value.trim();
-            if (!email || !password) return (loginStatusMsg.textContent = 'Ingresa correo y contraseña.');
+            if (!email || !password) return (loginStatusMsg.textContent = 'Ingresa correo y contrasea.');
 
             try {
                 loginBtn.textContent = 'Iniciando...';
@@ -1055,7 +1055,7 @@ try {
                 const { error } = await supabase.auth.signInWithPassword({ email, password });
                 if (error) throw error;
             } catch (error) {
-                loginStatusMsg.textContent = 'Error: Credenciales inválidas.';
+                loginStatusMsg.textContent = 'Error: Credenciales invlidas.';
             } finally {
                 loginBtn.textContent = 'Entrar';
             }
@@ -1076,7 +1076,7 @@ try {
                 const { data, error } = await supabase.from('productos').select('*').eq('local', currentLocal).order('id', { ascending: false });
                 if (error) throw error;
 
-                // Limpiar guiones bajos de los nombres traídos de la base de datos
+                // Limpiar guiones bajos de los nombres trados de la base de datos
                 const cleanedData = data.map(p => ({
                     ...p,
                     nombre: p.nombre ? p.nombre.replace(/_/g, ' ') : p.nombre
@@ -1125,7 +1125,7 @@ try {
                               alertCount++;
                               const tr = document.createElement('tr');
                               const color = isExpired ? '#fca5a5' : '#fcd34d';
-                              const estado = isExpired ? 'Vencido' : 'Próximo a Vencer';
+                              const estado = isExpired ? 'Vencido' : 'Prximo a Vencer';
                               tr.innerHTML = `
                                   <td>${prod.nombre}</td>
                                   <td>${lote.qty} unidades</td>
@@ -1157,7 +1157,7 @@ try {
         };
 
         window.depurarLote = async (prodId, loteIndex) => {
-            if(!confirm('¿Confirmas que ya retiraste este lote de los estantes? Esta acción lo eliminará del sistema y de las alertas.')) return;
+            if(!confirm('Confirmas que ya retiraste este lote de los estantes? Esta accin lo eliminar del sistema y de las alertas.')) return;
             
             const prod = globalProducts.find(p => p.id === prodId);
             if(!prod) return;
@@ -1174,13 +1174,13 @@ try {
                 if (alertsView && !alertsView.classList.contains('hidden')) {
                     // Do nothing, loadProducts already calls checkAlerts which updates the table
                     if (typeof customAlert === 'function') {
-                        customAlert('Lote depurado con éxito.', 'Depurado', '✅');
+                        customAlert('Lote depurado con xito.', 'Depurado', '');
                     }
                 }
                 
             } catch (error) {
                 if (typeof customAlert === 'function') {
-                    customAlert('Error al depurar lote: ' + error.message, 'Error', '❌');
+                    customAlert('Error al depurar lote: ' + error.message, 'Error', '');
                 } else {
                     alert('Error: ' + error.message);
                 }
@@ -1196,7 +1196,7 @@ try {
             }
         };
 
-        // --- RENDERIZAR TABLA DE INVENTARIO CON PAGINACIÓN ---
+        // --- RENDERIZAR TABLA DE INVENTARIO CON PAGINACIN ---
         function renderInventoryTable() {
             productList.innerHTML = '';
             
@@ -1223,16 +1223,16 @@ try {
                 let stockWarning = '';
                 if (prod.stock !== null && prod.alerta_stock !== null && prod.stock <= prod.alerta_stock) {
                     tr.classList.add('warning-row');
-                    stockWarning = ' <span title="¡Inventario Bajo!" style="color: #f59e0b;">⚠️</span>';
+                    stockWarning = ' <span title="Inventario Bajo!" style="color: #f59e0b;"></span>';
                 }
 
                 const delCol = prod.id !== undefined ? 'id' : 'nombre';
                 const delVal = prod.id !== undefined ? prod.id : prod.nombre;
-                const codigo = prod.codigo ? prod.codigo : '—';
-                const pCompra = prod.precio_compra ? `S/ ${prod.precio_compra.toFixed(2)}` : '—';
-                const pVenta = prod.precio_venta ? `S/ ${prod.precio_venta.toFixed(2)}` : '—';
-                const pStock = prod.stock !== null ? prod.stock : '—';
-                const cat = prod.categoria ? prod.categoria : '—';
+                const codigo = prod.codigo ? prod.codigo : '';
+                const pCompra = prod.precio_compra ? `S/ ${prod.precio_compra.toFixed(2)}` : '';
+                const pVenta = prod.precio_venta ? `S/ ${prod.precio_venta.toFixed(2)}` : '';
+                const pStock = prod.stock !== null ? prod.stock : '';
+                const cat = prod.categoria ? prod.categoria : '';
                 const imgSrc = prod.imagen ? `./img/${prod.imagen}` : './img/kalo-logo.png';
 
                 tr.innerHTML = `
@@ -1244,8 +1244,8 @@ try {
                     <td><strong style="color: #a7f3d0">${pVenta}</strong></td>
                     <td>${pStock}${stockWarning}</td>
                     <td style="display: flex; gap: 0.5rem; justify-content: center;">
-                        <button class="edit-btn" style="background: transparent; border: none; cursor: pointer; font-size: 1.2rem; color: #60a5fa; transition: transform 0.2s;" title="Editar">✏️</button>
-                        <button class="delete-btn" data-col="${delCol}" data-val="${delVal}" style="background: transparent; border: none; cursor: pointer; font-size: 1.2rem; color: #fca5a5; transition: transform 0.2s;" title="Eliminar">🗑️</button>
+                        <button class="edit-btn" style="background: transparent; border: none; cursor: pointer; font-size: 1.2rem; color: #60a5fa; transition: transform 0.2s;" title="Editar"></button>
+                        <button class="delete-btn" data-col="${delCol}" data-val="${delVal}" style="background: transparent; border: none; cursor: pointer; font-size: 1.2rem; color: #fca5a5; transition: transform 0.2s;" title="Eliminar"></button>
                     </td>
                 `;
                 productList.appendChild(tr);
@@ -1265,7 +1265,7 @@ try {
                     if(btnDel) {
                         const col = btnDel.getAttribute('data-col');
                         const val = btnDel.getAttribute('data-val');
-                        if (await customConfirm('¿Seguro que deseas eliminar este producto?', 'Eliminar', '🗑️')) {
+                        if (await customConfirm('Seguro que deseas eliminar este producto?', 'Eliminar', '')) {
                             try {
                                 btnDel.style.opacity = '0.5';
                                 const { error } = await supabase.from('productos').delete().eq(col, val);
@@ -1273,7 +1273,7 @@ try {
                                 await loadProducts();
                             } catch (error) {
                                 btnDel.style.opacity = '1';
-                                await customAlert('Error: ' + error.message, 'Error', '❌');
+                                await customAlert('Error: ' + error.message, 'Error', '');
                                 await loadProducts();
                             }
                         }
@@ -1282,7 +1282,7 @@ try {
                 window.inventoryDelegated = true;
             }
 
-            // Actualizar paginación visual
+            // Actualizar paginacin visual
             paginationInfo.textContent = `Mostrando ${startIndex + 1} - ${Math.min(endIndex, invFilteredProducts.length)} de ${invFilteredProducts.length} productos`;
             prevPageBtn.disabled = invCurrentPage === 1;
             nextPageBtn.disabled = invCurrentPage === totalPages;
@@ -1316,7 +1316,7 @@ try {
             }
         });
 
-        // --- LÓGICA DEL PUNTO DE VENTA (POS) ---
+        // --- LGICA DEL PUNTO DE VENTA (POS) ---
         let posCurrentPage = 1;
         const posItemsPerPage = 25;
         let posFilteredProducts = [];
@@ -1352,7 +1352,7 @@ try {
             });
 
             if (posPaginationInfo) {
-                posPaginationInfo.textContent = `Página ${posCurrentPage} de ${totalPages}`;
+                posPaginationInfo.textContent = `Pgina ${posCurrentPage} de ${totalPages}`;
                 posPrevPageBtn.disabled = posCurrentPage === 1;
                 posNextPageBtn.disabled = posCurrentPage === totalPages;
                 posPrevPageBtn.style.opacity = posPrevPageBtn.disabled ? '0.5' : '1';
@@ -1404,21 +1404,21 @@ try {
             });
         });
 
-        // Soporte para Lector de Código de Barras en la barra de búsqueda
+        // Soporte para Lector de Cdigo de Barras en la barra de bsqueda
         posSearch.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
                 const term = e.target.value.trim().toLowerCase();
                 if (!term) return;
                 
-                // Buscar coincidencia exacta por código de barras
+                // Buscar coincidencia exacta por cdigo de barras
                 const exactMatch = globalProducts.find(p => p.codigo && p.codigo.toLowerCase() === term);
                 
                 if (exactMatch) {
                     addToCart(exactMatch);
                     e.target.value = ''; // Limpiar barra
-                    renderPosGrid(globalProducts, true); // Restaurar cuadrícula
+                    renderPosGrid(globalProducts, true); // Restaurar cuadrcula
                 } else {
-                    // Si no hay match exacto de código, pero hay un solo resultado en la búsqueda
+                    // Si no hay match exacto de cdigo, pero hay un solo resultado en la bsqueda
                     const filtered = globalProducts.filter(p => 
                         p.nombre.toLowerCase().includes(term) || 
                         (p.codigo && p.codigo.toLowerCase().includes(term))
@@ -1443,7 +1443,7 @@ try {
         }
 
         cartDiscount.addEventListener('input', () => {
-            // Si el usuario edita el descuento manualmente, quitamos la selección de los botones
+            // Si el usuario edita el descuento manualmente, quitamos la seleccin de los botones
             discountBtns.forEach(b => b.classList.remove('active-discount'));
             renderCart();
         });
@@ -1530,7 +1530,7 @@ try {
 
         cobrarBtn.addEventListener('click', async () => {
             if (cart.length === 0) {
-                await customAlert('El ticket está vacío.', 'Aviso', 'ℹ️');
+                await customAlert('El ticket est vaco.', 'Aviso', '');
                 return;
             }
             
@@ -1541,7 +1541,7 @@ try {
             const total = Math.max(0, subtotal - discount);
 
             const metodo = paymentMethod.value;
-            let msg = `¡Venta realizada con éxito!\nTotal cobrado: S/ ${total.toFixed(2)}\nMétodo de pago: ${metodo}`;
+            let msg = `Venta realizada con xito!\nTotal cobrado: S/ ${total.toFixed(2)}\nMtodo de pago: ${metodo}`;
             
             if (discount > 0) {
                 msg += `\n(Descuento aplicado: S/ ${discount.toFixed(2)})`;
@@ -1552,7 +1552,7 @@ try {
                 const yp = parseFloat(splitYape.value) || 0;
                 
                 if (Math.abs((ef + yp) - total) > 0.01) {
-                    await customAlert(`Los montos divididos (S/ ${(ef + yp).toFixed(2)}) no coinciden con el total a pagar (S/ ${total.toFixed(2)}).`, 'Montos incorrectos', '❌');
+                    await customAlert(`Los montos divididos (S/ ${(ef + yp).toFixed(2)}) no coinciden con el total a pagar (S/ ${total.toFixed(2)}).`, 'Montos incorrectos', '');
                     return;
                 }
                 
@@ -1709,7 +1709,7 @@ try {
                 // --- FIN BOLETA AUTOMATICA ---
                 
             } catch (err) {
-                await customAlert('Error al procesar la venta: ' + err.message, 'Error', '❌');
+                await customAlert('Error al procesar la venta: ' + err.message, 'Error', '');
             } finally {
                 cobrarBtn.disabled = false;
                 cobrarBtn.textContent = 'Cobrar';
@@ -1757,11 +1757,11 @@ try {
                 if (res.error) throw res.error;
 
                 productStatusMsg.style.color = '#86efac';
-                productStatusMsg.textContent = editingProductId ? '¡Producto actualizado exitosamente!' : '¡Producto guardado exitosamente!';
+                productStatusMsg.textContent = editingProductId ? 'Producto actualizado exitosamente!' : 'Producto guardado exitosamente!';
 
                 await loadProducts();
 
-                // Cerrar modal automáticamente después de un segundo
+                // Cerrar modal automticamente despus de un segundo
                 setTimeout(() => {
                     productModal.classList.add('hidden');
                     limpiarFormulario();
@@ -1774,17 +1774,17 @@ try {
                 addProductBtn.textContent = editingProductId ? 'Actualizar Producto' : 'Guardar Producto';
             }
         });
-        // --- LECTOR DE CÓDIGO DE BARRAS GLOBAL ---
+        // --- LECTOR DE CDIGO DE BARRAS GLOBAL ---
         let barcodeBuffer = '';
         let barcodeTimeout = null;
 
         document.addEventListener('keydown', (e) => {
-            // Ignorar si el usuario está tipeando activamente en cualquier campo de texto
+            // Ignorar si el usuario est tipeando activamente en cualquier campo de texto
             if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') {
                 return;
             }
 
-            // Un lector envía teclas súper rápido (ej. 10ms-20ms).
+            // Un lector enva teclas sper rpido (ej. 10ms-20ms).
             // Si hay una pausa mayor a 50ms, limpiamos el buffer.
             if (barcodeTimeout) {
                 clearTimeout(barcodeTimeout);
@@ -1801,16 +1801,16 @@ try {
                     const match = globalProducts.find(p => p.codigo && p.codigo.toLowerCase() === scannedCode);
                     
                     if (match) {
-                        // Cambiamos automáticamente a la vista de Punto de Venta si estamos en inventario
+                        // Cambiamos automticamente a la vista de Punto de Venta si estamos en inventario
                         if (!navPosBtn.classList.contains('active')) {
                             navPosBtn.click();
                         }
                         addToCart(match);
                     } else {
-                        // Notificación visual rápida en el carrito
+                        // Notificacin visual rpida en el carrito
                         const prevColor = cartTotalValue.style.color;
                         cartTotalValue.style.color = '#fca5a5';
-                        cartTotalValue.textContent = '❌ No found';
+                        cartTotalValue.textContent = ' No found';
                         setTimeout(() => {
                             cartTotalValue.style.color = prevColor;
                             renderCart();
@@ -1826,5 +1826,5 @@ try {
     });
 
 } catch (error) {
-    console.error("Error crítico:", error);
+    console.error("Error crtico:", error);
 }
