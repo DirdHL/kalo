@@ -108,12 +108,35 @@ document.addEventListener('DOMContentLoaded', async () => {
             console.log('Reclamación guardada en DB y correo enviado.');
 
             // Success feedback
-            alert('Su hoja de reclamación ha sido registrada exitosamente. Nos pondremos en contacto con usted.');
-            form.reset();
+            Swal.fire({
+                title: '¡Formulario Registrado!',
+                html: `
+                    <div style="text-align: left;">
+                        <p style="font-size: 1.1rem; color: #2d3748; margin-bottom: 1rem;">Su <strong>${payload.tipo_reclamacion.toLowerCase()}</strong> ha sido ingresado correctamente a nuestro sistema y se le ha asignado el código de seguimiento automático.</p>
+                        <p style="font-size: 0.95rem; color: #4a5568; line-height: 1.6;">En <strong>Bungalows de Tomayquichua</strong> nos tomamos muy en serio la calidad de nuestro servicio y la opinión de nuestros clientes. Nuestro equipo gerencial ha sido notificado y revisará su caso detalladamente para brindarle una respuesta formal al correo proporcionado en el menor tiempo posible.</p>
+                        <hr style="margin: 1.5rem 0; border: 0; border-top: 1px solid #e2e8f0;">
+                        <p style="font-size: 0.85rem; color: #718096; text-align: center;"><i>Gracias por ayudarnos a mejorar.</i></p>
+                    </div>
+                `,
+                icon: 'success',
+                confirmButtonText: 'Entendido',
+                confirmButtonColor: '#1a365d',
+                allowOutsideClick: false,
+                customClass: {
+                    popup: 'glass-panel'
+                }
+            }).then(() => {
+                window.location.reload();
+            });
 
         } catch (error) {
             console.error('Error al guardar la reclamación:', error);
-            alert('Ocurrió un error al registrar la reclamación. Por favor intente nuevamente.');
+            Swal.fire({
+                title: 'Ocurrió un error',
+                text: 'Hubo un problema de conexión al intentar registrar su solicitud. Por favor intente nuevamente en unos minutos.',
+                icon: 'error',
+                confirmButtonColor: '#e53e3e'
+            });
         } finally {
             // Restore UI
             submitBtn.disabled = false;
