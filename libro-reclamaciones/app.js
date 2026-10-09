@@ -1,6 +1,6 @@
-// JS del Libro de Reclamaciones
+import { supabase } from '../supabase.js';
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
 
     // 1. Set current date
     const dateElement = document.getElementById('current-date');
@@ -13,6 +13,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // ID of the founding company as defined in the SQL schema
     const EMPRESA_ID = '550e8400-e29b-41d4-a716-446655440000';
+
+    // 2. Fetch Correlative Number
+    const correlativeElement = document.querySelector('.correlative-value');
+    try {
+        const { data, error } = await supabase
+            .from('reclamaciones')
+            .select('numero_correlativo')
+            .order('numero_correlativo', { ascending: false })
+            .limit(1);
+        
+        let nextNum = 1;
+        if (data && data.length > 0) {
+            nextNum = parseInt(data[0].numero_correlativo) + 1;
+        }
+        correlativeElement.textContent = nextNum.toString().padStart(6, '0');
+    } catch (e) {
+        console.error('No se pudo obtener correlativo:', e);
+        correlativeElement.textContent = '000001';
+    }
 
     // 3. Form Submission Handling
     const form = document.getElementById('reclamacion-form');
@@ -55,6 +74,14 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         try {
+            // 1. Insertar en Supabase
+            const { data: responseData, error } = await supabase
+                .from('reclamaciones')
+                .insert([payload])
+                .select();
+
+            if (error) throw error;
+
             // Enviar correo electrónico mediante FormSubmit (Sin backend)
             // Ya configuraste el correo: iibr.nuevohorizonte@gmail.com
             const emailDestino = 'iibr.nuevohorizonte@gmail.com';
