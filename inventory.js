@@ -252,6 +252,45 @@ export function setupInventory({ onProductsLoaded }) {
 
     if (addProductBtn) {
         addProductBtn.addEventListener('click', async () => {
+            // VERIFICACIÓN INTELIGENTE: Lotes sin agregar
+            const pendingQty = loteQtyInput ? loteQtyInput.value.trim() : '';
+            const pendingExp = loteExpInput ? loteExpInput.value.trim() : '';
+            
+            if (pendingQty || pendingExp) {
+                const addPending = await customConfirm(
+                    'Escribiste datos en un lote pero olvidaste presionar "+ Lote".\n\n¿Quieres que lo agreguemos automáticamente y luego guardemos el producto?', 
+                    'Lote sin agregar detectado', 
+                    '💡'
+                );
+                
+                if (addPending) {
+                    // Forzar click en el botón de agregar
+                    if (addLoteBtn) addLoteBtn.click();
+                    
+                    // Si el input sigue con texto, significa que la validación falló (ej: faltó fecha)
+                    // y la adición del lote fue bloqueada, entonces detenemos el guardado principal.
+                    if (loteQtyInput && loteQtyInput.value.trim() !== '') {
+                        return; 
+                    }
+                } else {
+                    // Si dijo que NO quiere agregarlo automáticamente
+                    const forceSave = await customConfirm(
+                        'Entonces, ¿deseas guardar el producto ignorando y borrando los datos de ese lote incompleto?', 
+                        'Guardar sin lote', 
+                        '❓'
+                    );
+                    
+                    if (forceSave) {
+                        // Limpiamos los campos para ignorarlos y continuamos
+                        if (loteQtyInput) loteQtyInput.value = '';
+                        if (loteExpInput) loteExpInput.value = '';
+                    } else {
+                        // Detenemos el proceso de guardado para que el usuario arregle todo a mano
+                        return;
+                    }
+                }
+            }
+
             const productCode = productCodeInput ? productCodeInput.value.trim() : '';
             const productName = productNameInput ? productNameInput.value.trim() : '';
             const pCompra = parseFloat(precioCompraInput.value) || null;
