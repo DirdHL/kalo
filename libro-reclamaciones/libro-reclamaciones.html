@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Libro de Reclamaciones Virtual - Bungalows de Tomayquichua</title>
+    
+    <!-- Modern Typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="page-background"></div>
+    
+    <div class="container">
+        <!-- Header -->
+        <header class="header-section glass-panel">
+            <div class="header-content">
+                <div class="brand-info">
+                    <h1>LIBRO DE RECLAMACIONES</h1>
+                    <h2>BUNGALOWS DE TOMAYQUICHUA</h2>
+                    <p class="company-details">
+                        <strong>Razón Social:</strong> INVERSIONES INMOBILIARIAS BIENES RAICES NUEVO HORIONTE S.R.L<br>
+                        <strong>RUC:</strong> 20519442591<br>
+                        <strong>Dirección:</strong> AV. ALFREDO MENDIOLA N 3847 OFICINA 202 - LOS OLIVOS
+                    </p>
+                </div>
+                <div class="doc-info">
+                    <div class="date-box">
+                        <span class="date-label">FECHA</span>
+                        <span class="date-value" id="current-date">--/--/----</span>
+                    </div>
+                    <div class="correlative-box">
+                        <span class="correlative-label">HOJA DE RECLAMACIÓN N°</span>
+                        <span class="correlative-value">000000000</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <form id="reclamacion-form" class="reclamacion-form">
+            
+            <!-- SECCIÓN 1: IDENTIFICACIÓN DEL CONSUMIDOR -->
+            <section class="form-section glass-panel">
+                <div class="section-header">
+                    <span class="section-number">1</span>
+                    <h3>IDENTIFICACIÓN DEL CONSUMIDOR RECLAMANTE</h3>
+                </div>
+                <div class="section-body">
+                    <div class="form-group full-width">
+                        <label for="nombre_consumidor">Nombre y Apellidos</label>
+                        <input type="text" id="nombre_consumidor" name="nombre_consumidor" required placeholder="Ej: Juan Pérez">
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="documento_identidad_tipo">Tipo Doc.</label>
+                            <select id="documento_identidad_tipo" name="documento_identidad_tipo" required>
+                                <option value="DNI">DNI</option>
+                                <option value="CE">CE</option>
+                                <option value="PASAPORTE">Pasaporte</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="documento_identidad_numero">N° Documento</label>
+                            <input type="text" id="documento_identidad_numero" name="documento_identidad_numero" required>
+                        </div>
+                    </div>
+
+                    <div class="form-group full-width">
+                        <label for="domicilio_consumidor">Domicilio</label>
+                        <input type="text" id="domicilio_consumidor" name="domicilio_consumidor" required>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="telefono_consumidor">Teléfono</label>
+                            <input type="tel" id="telefono_consumidor" name="telefono_consumidor" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="email_consumidor">E-mail</label>
+                            <input type="email" id="email_consumidor" name="email_consumidor" required>
+                        </div>
+                    </div>
+
+                    <div class="form-group full-width">
+                        <label for="nombre_apoderado">Padre o Madre (En caso de ser menor de edad)</label>
+                        <input type="text" id="nombre_apoderado" name="nombre_apoderado" placeholder="Opcional">
+                    </div>
+                </div>
+            </section>
+
+            <!-- SECCIÓN 2: IDENTIFICACIÓN DEL BIEN CONTRATADO -->
+            <section class="form-section glass-panel">
+                <div class="section-header">
+                    <span class="section-number">2</span>
+                    <h3>IDENTIFICACIÓN DEL BIEN CONTRATADO</h3>
+                </div>
+                <div class="section-body">
+                    <div class="form-row">
+                        <div class="form-group radio-group">
+                            <label>Tipo de Bien</label>
+                            <div class="radio-options">
+                                <label class="custom-radio">
+                                    <input type="radio" name="tipo_bien" value="PRODUCTO" required>
+                                    <span class="radio-mark"></span>
+                                    Producto
+                                </label>
+                                <label class="custom-radio">
+                                    <input type="radio" name="tipo_bien" value="SERVICIO">
+                                    <span class="radio-mark"></span>
+                                    Servicio
+                                </label>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="monto_reclamado">Monto Reclamado (S/.)</label>
+                            <input type="number" step="0.01" id="monto_reclamado" name="monto_reclamado" required placeholder="0.00">
+                        </div>
+                    </div>
+                    <div class="form-group full-width">
+                        <label for="descripcion_bien">Descripción del Producto / Servicio</label>
+                        <textarea id="descripcion_bien" name="descripcion_bien" rows="3" required></textarea>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SECCIÓN 3: DETALLE DE LA RECLAMACIÓN -->
+            <section class="form-section glass-panel">
+                <div class="section-header">
+                    <span class="section-number">3</span>
+                    <h3>DETALLE DE LA RECLAMACIÓN Y PEDIDO DEL CONSUMIDOR</h3>
+                </div>
+                <div class="section-body">
+                    <div class="form-group radio-group full-width">
+                        <label>Tipo de Reclamación</label>
+                        <div class="radio-options">
+                            <label class="custom-radio">
+                                <input type="radio" name="tipo_reclamacion" value="RECLAMO" required>
+                                <span class="radio-mark"></span>
+                                Reclamo
+                            </label>
+                            <label class="custom-radio">
+                                <input type="radio" name="tipo_reclamacion" value="QUEJA">
+                                <span class="radio-mark"></span>
+                                Queja
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group full-width">
+                        <label for="detalle_reclamacion">Detalle (Relato de los hechos)</label>
+                        <textarea id="detalle_reclamacion" name="detalle_reclamacion" rows="5" required></textarea>
+                    </div>
+                    
+                    <div class="form-group full-width">
+                        <label for="pedido_consumidor">Pedido (Qué solicita al respecto)</label>
+                        <textarea id="pedido_consumidor" name="pedido_consumidor" rows="4" required></textarea>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SECCIÓN 4: OBSERVACIONES DEL PROVEEDOR -->
+            <section class="form-section glass-panel provider-section">
+                <div class="section-header">
+                    <span class="section-number">4</span>
+                    <h3>OBSERVACIONES Y ACCIONES ADOPTADAS POR EL PROVEEDOR</h3>
+                </div>
+                <div class="section-body">
+                    <p class="provider-notice">Esta sección es de uso exclusivo del proveedor. Se completará una vez analizada su solicitud.</p>
+                    
+                    <div class="form-group full-width disabled-group">
+                        <label>Fecha de Respuesta</label>
+                        <input type="date" disabled>
+                    </div>
+                    <div class="form-group full-width disabled-group">
+                        <label>Observaciones del Proveedor</label>
+                        <textarea rows="3" disabled></textarea>
+                    </div>
+                    
+                    <div class="signatures-area">
+                        <div class="signature-box">
+                            <label class="custom-checkbox disabled">
+                                <input type="checkbox" name="aceptacion_consumidor" disabled>
+                                <span class="checkmark"></span>
+                                Firma del Consumidor
+                            </label>
+                        </div>
+                        <div class="signature-box">
+                            <label class="custom-checkbox disabled">
+                                <input type="checkbox" name="validacion_proveedor" disabled>
+                                <span class="checkmark"></span>
+                                Firma del Proveedor
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Submit Button -->
+            <div class="form-actions">
+                <button type="submit" class="submit-btn" id="submit-btn">
+                    <span>ENVIAR RECLAMACIÓN</span>
+                    <div class="loader" id="submit-loader" style="display: none;"></div>
+                </button>
+            </div>
+
+        </form>
+
+        <!-- TEXTOS LEGALES OBLIGATORIOS -->
+        <div class="legal-footer glass-panel">
+            <ul class="legal-list">
+                <li><strong>RECLAMO:</strong> Disconformidad relacionada a los productos o servicios.</li>
+                <li><strong>QUEJA:</strong> Disconformidad no relacionada a los productos o servicios; o, malestar o descontento respecto a la atención al público.</li>
+                <li>* La formulación del reclamo no impide acudir a otras vías de solución de controversias ni es requisito previo para interponer una denuncia ante el INDECOPI.</li>
+                <li>* El proveedor debe dar respuesta al reclamo o queja en un plazo no mayor a quince (15) días hábiles, el cual es improrrogable.</li>
+            </ul>
+        </div>
+        
+    </div>
+
+    <!-- Supabase configuration is now handled in ../supabase.js -->
+    <script type="module" src="app.js"></script>
+</body>
+</html>
