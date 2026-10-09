@@ -1586,8 +1586,8 @@ try {
                         const parts = item.codigo.replace('COMBO:', '').split(',');
                         for (const part of parts) {
                             if (!part) continue;
-                            const [idStr, qtyStr] = part.split('-');
-                            const subId = parseInt(idStr);
+                            const [idStrCombo, qtyStr] = part.split('-');
+                            const subId = isNaN(idStrCombo) ? idStrCombo : Number(idStrCombo);
                             const subQty = parseInt(qtyStr) * item.qty;
                             stockUpdates[subId] = (stockUpdates[subId] || 0) + subQty;
                         }
@@ -1600,7 +1600,7 @@ try {
 
                 // Ejecutar actualizaciones
                 for (const [idStr, qtyToDeduct] of Object.entries(stockUpdates)) {
-                    const prodId = parseInt(idStr);
+                    const prodId = isNaN(idStr) ? idStr : Number(idStr);
                     const dbProd = globalProducts.find(p => p.id === prodId);
                     if (dbProd) {
                         costoTotalVenta += (parseFloat(dbProd.precio_compra) || 0) * qtyToDeduct;
@@ -1625,8 +1625,11 @@ try {
                                 payloadUpdate.lotes = currentL.length > 0 ? currentL : null;
                                 payloadUpdate.stock = currentL.length > 0 ? currentL.reduce((s, l) => s + l.qty, 0) : newStock;
                             }
-                            
-                            await supabase.from('productos').update(payloadUpdate).eq('id', prodId);
+                            const { error: updateErr } = await supabase.from('productos').update(payloadUpdate).eq('id', prodId);
+                            if (updateErr) {
+                                console.error('Error descontando stock para producto', prodId, updateErr);
+                                await customAlert('Error descontando stock: ' + updateErr.message, 'Error de Stock', '');
+                            }
                         }
                     }
                 }
