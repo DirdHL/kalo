@@ -1132,7 +1132,7 @@ try {
                                   <td>${lote.qty} unidades</td>
                                   <td style="color: ${color}; font-weight: bold;">${lote.vencimiento}</td>
                                   <td style="color: ${color};">${estado}</td>
-                                  <td><button class="secondary-btn" style="padding: 0.2rem 0.5rem; font-size: 0.8rem; background: rgba(239, 68, 68, 0.2); border-color: #ef4444; color: #ef4444;" onclick="depurarLote(${prod.id}, ${index})">Depurado</button></td>
+                                  <td><button class="secondary-btn depurar-btn" data-prodid="${prod.id}" data-loteidx="${index}" style="padding: 0.2rem 0.5rem; font-size: 0.8rem; background: rgba(239, 68, 68, 0.2); border-color: #ef4444; color: #ef4444;">Depurado</button></td>
                               `;
                               alertsList.appendChild(tr);
                           }
@@ -1146,6 +1146,19 @@ try {
             } else {
                 alertsBadge.style.display = 'none';
                 alertsList.innerHTML = '<tr><td colspan="5" style="text-align:center; color: gray;">Todo en orden. No hay productos por vencer.</td></tr>';
+            }
+            
+            if(!window.alertsDelegated) {
+                alertsList.addEventListener('click', async (e) => {
+                    const btn = e.target.closest('.depurar-btn');
+                    if(btn) {
+                        const prodId = btn.getAttribute('data-prodid');
+                        const loteIndex = parseInt(btn.getAttribute('data-loteidx'));
+                        const parsedId = isNaN(prodId) ? prodId : Number(prodId);
+                        await window.depurarLote(parsedId, loteIndex);
+                    }
+                });
+                window.alertsDelegated = true;
             }
         }
         
