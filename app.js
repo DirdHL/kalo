@@ -1249,33 +1249,36 @@ try {
                 productList.appendChild(tr);
             });
 
-            // Listeners para editar
-            document.querySelectorAll("#productList .edit-btn").forEach((btn, index) => {
-                btn.addEventListener("click", () => {
-                    if (currentData[index]) {
-                        abrirModalEdicion(currentData[index]);
+            // EVENT DELEGATION
+            if(!window.inventoryDelegated) {
+                productList.addEventListener('click', async (e) => {
+                    const btnEdit = e.target.closest('.edit-btn');
+                    if(btnEdit) {
+                        const tr = btnEdit.closest('tr');
+                        const idx = Array.from(tr.parentNode.children).indexOf(tr);
+                        if(currentData[idx]) abrirModalEdicion(currentData[idx]);
                     }
-                });
-            });
-
-            // Listeners para eliminar
-            document.querySelectorAll('.delete-btn').forEach(btn => {
-                btn.addEventListener('click', async (e) => {
-                    const col = e.currentTarget.getAttribute('data-col');
-                    const val = e.currentTarget.getAttribute('data-val');
-                    if (await customConfirm('¿Seguro que deseas eliminar este producto?', 'Eliminar', '🗑️')) {
-                        try {
-                            btn.style.opacity = '0.5';
-                            const { error } = await supabase.from('productos').delete().eq(col, val);
-                            if (error) throw error;
-                            await loadProducts();
-                        } catch (error) {
-                            await customAlert('Error: ' + error.message, 'Error', '❌');
-                            await loadProducts();
+                    
+                    const btnDel = e.target.closest('.delete-btn');
+                    if(btnDel) {
+                        const col = btnDel.getAttribute('data-col');
+                        const val = btnDel.getAttribute('data-val');
+                        if (await customConfirm('¿Seguro que deseas eliminar este producto?', 'Eliminar', '🗑️')) {
+                            try {
+                                btnDel.style.opacity = '0.5';
+                                const { error } = await supabase.from('productos').delete().eq(col, val);
+                                if (error) throw error;
+                                await loadProducts();
+                            } catch (error) {
+                                btnDel.style.opacity = '1';
+                                await customAlert('Error: ' + error.message, 'Error', '❌');
+                                await loadProducts();
+                            }
                         }
                     }
                 });
-            });
+                window.inventoryDelegated = true;
+            }
 
             // Actualizar paginación visual
             paginationInfo.textContent = `Mostrando ${startIndex + 1} - ${Math.min(endIndex, invFilteredProducts.length)} de ${invFilteredProducts.length} productos`;
