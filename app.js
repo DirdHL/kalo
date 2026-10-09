@@ -1,13 +1,11 @@
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from "./supabase.js";
+import { setupUI } from "./ui.js";
+import { setupAuth } from "./auth.js";
 console.log(">>> APP.JS EST CARGANDO CORRECTAMENTE (NUEVA VERSIN)");
 
 
 try {
-    const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-    const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-    document.addEventListener('DOMContentLoaded', () => {
-        const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    
 
         // --- MANEJO DE ALERTAS PERSONALIZADAS ---
         window.customAlert = function(msg, title = "Atencin", icon = "") {
