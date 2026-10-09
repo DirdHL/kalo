@@ -307,9 +307,10 @@ try {
 
         // --- MANEJO DEL MODAL DE PRODUCTO NORMAL ---
         openModalBtn.addEventListener('click', () => {
-            productModal.classList.remove('hidden');
-            productCodeInput.focus();
-        });
+              limpiarFormulario();
+              productModal.classList.remove('hidden');
+              productCodeInput.focus();
+          });
 
         closeModalBtn.addEventListener('click', () => {
             productModal.classList.add('hidden');
