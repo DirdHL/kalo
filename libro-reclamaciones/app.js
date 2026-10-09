@@ -1,4 +1,4 @@
-import { supabase } from '../supabase.js';
+// JS del Libro de Reclamaciones
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -55,16 +55,8 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         try {
-            // 1. Insertar en Supabase
-            const { data: responseData, error } = await supabase
-                .from('reclamaciones')
-                .insert([payload])
-                .select();
-
-            if (error) throw error;
-
-            // 2. Enviar correo electrónico mediante FormSubmit (Sin backend)
-            // Reemplaza 'tu_correo@gmail.com' con el correo del negocio.
+            // Enviar correo electrónico mediante FormSubmit (Sin backend)
+            // Ya configuraste el correo: iibr.nuevohorizonte@gmail.com
             const emailDestino = 'iibr.nuevohorizonte@gmail.com';
 
             await fetch(`https://formsubmit.co/ajax/${emailDestino}`, {
