@@ -40,7 +40,7 @@ export function setupPOS({ onSaleCompleted }) {
         paginatedItems.forEach(prod => {
             const div = document.createElement('div');
             div.className = 'product-card';
-            const imgSrc = prod.imagen ? (prod.imagen.startsWith('data:') || prod.imagen.startsWith('http') ? prod.imagen : `./img/${prod.imagen}`) : './img/kalo-logo.png';
+            const imgSrc = prod.imagen ? `./img/${prod.imagen}` : './img/kalo-logo.png';
             const precio = prod.precio_venta ? `S/ ${prod.precio_venta.toFixed(2)}` : 'S/ 0.00';
             
             div.innerHTML = `

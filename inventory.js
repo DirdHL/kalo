@@ -37,50 +37,6 @@ export function setupInventory({ onProductsLoaded }) {
     const openComboModalBtn = document.getElementById('openComboModalBtn');
     const closeComboModalBtn = document.getElementById('closeComboModalBtn');
     const comboModal = document.getElementById('comboModal');
-    const customImageUpload = document.getElementById('customImageUpload');
-    if (customImageUpload) {
-        customImageUpload.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-                const img = new Image();
-                img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    const MAX_WIDTH = 250;
-                    const MAX_HEIGHT = 250;
-                    let width = img.width;
-                    let height = img.height;
-
-                    if (width > height) {
-                        if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
-                    } else {
-                        if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; }
-                    }
-                    canvas.width = width;
-                    canvas.height = height;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, width, height);
-                    
-                    selectedImageName = canvas.toDataURL('image/webp', 0.8);
-                    
-                    if (isComboImagePicker) {
-                        const comboPreviewImg = document.getElementById('comboPreviewImg');
-                        if (comboPreviewImg) comboPreviewImg.src = selectedImageName;
-                    } else {
-                        const previewImg = document.getElementById('previewImg');
-                        if (previewImg) previewImg.src = selectedImageName;
-                    }
-                    if (imagePickerModal) imagePickerModal.classList.add('hidden');
-                    customImageUpload.value = ''; // Reset
-                };
-                img.src = ev.target.result;
-            };
-            reader.readAsDataURL(file);
-        });
-    }
-
     const comboNameInput = document.getElementById('comboNameInput');
     const comboPriceInput = document.getElementById('comboPriceInput');
 
@@ -310,7 +266,7 @@ export function setupInventory({ onProductsLoaded }) {
 
         selectedImageName = prod.imagen || '';
         if (previewImg) {
-            previewImg.src = selectedImageName ? (selectedImageName.startsWith('data:') || selectedImageName.startsWith('http') ? selectedImageName : `./img/${selectedImageName}`) : './kalo-logo.png';
+            previewImg.src = selectedImageName ? `./img/${selectedImageName}` : './kalo-logo.png';
         }
 
         calcularGanancia();
@@ -614,7 +570,7 @@ export function setupInventory({ onProductsLoaded }) {
             const pVenta = prod.precio_venta ? `S/ ${prod.precio_venta.toFixed(2)}` : '';
             const pStock = prod.stock !== null ? prod.stock : '';
             const cat = prod.categoria ? prod.categoria : '';
-            const imgSrc = prod.imagen ? (prod.imagen.startsWith('data:') || prod.imagen.startsWith('http') ? prod.imagen : `./img/${prod.imagen}`) : './img/kalo-logo.png';
+            const imgSrc = prod.imagen ? `./img/${prod.imagen}` : './img/kalo-logo.png';
 
             tr.innerHTML = `
                 <td><img src="${imgSrc}" style="width: 40px; height: 40px; border-radius: 8px; object-fit: cover;" onerror="this.onerror=null; this.src='./kalo-logo.png'"></td>
