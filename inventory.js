@@ -58,8 +58,8 @@ export function setupInventory({ onProductsLoaded }) {
                 if (prod) {
                     const qtyInput = cb.parentElement.nextElementSibling.querySelector('.combo-qty-input');
                     const qty = parseInt(qtyInput.value) || 1;
-                    totalSalePrice += (prod.precioVenta || 0) * qty;
-                    totalCost += (prod.precioCompra || 0) * qty;
+                    totalSalePrice += (prod.precio_venta || 0) * qty;
+                    totalCost += (prod.precio_compra || 0) * qty;
                 }
             });
         }
