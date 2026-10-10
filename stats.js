@@ -79,7 +79,7 @@ export function setupStats({ onProductsChanged }) {
             if (elGananciaBruta) elGananciaBruta.textContent = `S/ ${netas.toFixed(2)}`;
             if (elGananciaNeta) elGananciaNeta.textContent = `S/ ${(netas - costos).toFixed(2)}`;
             
-            renderChart(ventasPorDia);
+            renderChart(ventasPorDia, monthInput);
 
         } catch (err) {
             console.error('Error al obtener estadísticas:', err);
@@ -98,12 +98,32 @@ export function setupStats({ onProductsChanged }) {
         renderChart({});
     }
 
-    function renderChart(dataObj) {
+    function renderChart(dataObj, monthInput) {
         const chartEl = document.getElementById('salesChart');
         if (!chartEl || typeof Chart === 'undefined') return;
         const ctx = chartEl.getContext('2d');
-        const labels = Object.keys(dataObj);
-        const values = Object.values(dataObj);
+        
+        let labels = [];
+        let values = [];
+        let metaValues = [];
+        
+        if (monthInput) {
+            const [y, m] = monthInput.split('-');
+            const year = parseInt(y);
+            const month = parseInt(m);
+            const daysInMonth = new Date(year, month, 0).getDate();
+            
+            for (let i = 1; i <= daysInMonth; i++) {
+                const dateStr = new Date(year, month - 1, i).toLocaleDateString();
+                labels.push(`${i}/${m}`);
+                values.push(dataObj[dateStr] || 0);
+                metaValues.push(300); // Meta de ventas diaria simulada (Mock data)
+            }
+        } else {
+            labels = Object.keys(dataObj);
+            values = Object.values(dataObj);
+            metaValues = values.map(() => 300);
+        }
 
         if (salesChartInstance) {
             salesChartInstance.destroy();
@@ -113,26 +133,75 @@ export function setupStats({ onProductsChanged }) {
             type: 'line',
             data: {
                 labels: labels.length ? labels : ['Sin datos'],
-                datasets: [{
-                    label: 'Ventas Netas (S/)',
-                    data: values.length ? values : [0],
-                    borderColor: '#10b981',
-                    backgroundColor: 'rgba(16, 185, 129, 0.2)',
-                    borderWidth: 2,
-                    tension: 0.3,
-                    fill: true,
-                    pointBackgroundColor: '#10b981'
-                }]
+                datasets: [
+                    {
+                        label: 'Ventas Netas (S/)',
+                        data: values.length ? values : [0],
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.2)',
+                        borderWidth: 2,
+                        tension: 0.3,
+                        fill: true,
+                        pointBackgroundColor: '#10b981',
+                        pointBorderColor: '#fff',
+                        pointRadius: 4,
+                        pointHoverRadius: 6
+                    },
+                    {
+                        label: 'Meta de Ventas Diaria',
+                        data: metaValues.length ? metaValues : [0],
+                        borderColor: 'rgba(255, 255, 255, 0.3)',
+                        borderWidth: 2,
+                        borderDash: [5, 5],
+                        tension: 0.3,
+                        fill: false,
+                        pointRadius: 0,
+                        pointHoverRadius: 0
+                    }
+                ]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
                 scales: {
-                    y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: 'rgba(255,255,255,0.7)' } },
-                    x: { grid: { display: false }, ticks: { color: 'rgba(255,255,255,0.7)' } }
+                    y: { 
+                        beginAtZero: true, 
+                        grid: { color: 'rgba(255,255,255,0.05)' }, 
+                        ticks: { 
+                            color: 'rgba(255,255,255,0.7)',
+                            callback: function(value) {
+                                return 'S/ ' + value;
+                            }
+                        } 
+                    },
+                    x: { 
+                        grid: { display: false }, 
+                        ticks: { color: 'rgba(255,255,255,0.7)' } 
+                    }
                 },
                 plugins: {
-                    legend: { labels: { color: 'rgba(255,255,255,0.9)' } }
+                    legend: { labels: { color: 'rgba(255,255,255,0.9)' } },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        titleColor: '#fff',
+                        bodyColor: '#fff',
+                        borderColor: 'rgba(255,255,255,0.1)',
+                        borderWidth: 1,
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) label += ': ';
+                                if (context.parsed.y !== null) {
+                                    label += 'S/ ' + context.parsed.y.toFixed(2);
+                                }
+                                return label;
+                            }
+                        }
+                    }
                 }
             }
         });
