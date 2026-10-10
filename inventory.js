@@ -39,6 +39,50 @@ export function setupInventory({ onProductsLoaded }) {
     const comboModal = document.getElementById('comboModal');
     const comboNameInput = document.getElementById('comboNameInput');
     const comboPriceInput = document.getElementById('comboPriceInput');
+
+    function updateComboSummary() {
+        const comboRealSalePrice = document.getElementById('comboRealSalePrice');
+        const comboRealCost = document.getElementById('comboRealCost');
+        const comboNetProfit = document.getElementById('comboNetProfit');
+        
+        if (!comboRealSalePrice || !comboRealCost || !comboNetProfit || !comboPriceInput) return;
+
+        let totalSalePrice = 0;
+        let totalCost = 0;
+
+        const comboProductList = document.getElementById('comboProductList');
+        if (comboProductList) {
+            const checkboxes = comboProductList.querySelectorAll('.combo-checkbox:checked');
+            checkboxes.forEach(cb => {
+                const prod = state.globalProducts.find(p => p.id === cb.value);
+                if (prod) {
+                    const qtyInput = cb.parentElement.nextElementSibling.querySelector('.combo-qty-input');
+                    const qty = parseInt(qtyInput.value) || 1;
+                    totalSalePrice += (prod.precioVenta || 0) * qty;
+                    totalCost += (prod.precioCompra || 0) * qty;
+                }
+            });
+        }
+
+        const comboPrice = parseFloat(comboPriceInput.value) || 0;
+        const profit = comboPrice - totalCost;
+
+        comboRealSalePrice.textContent = `S/ ${totalSalePrice.toFixed(2)}`;
+        comboRealCost.textContent = `S/ ${totalCost.toFixed(2)}`;
+        
+        comboNetProfit.textContent = `S/ ${profit.toFixed(2)}`;
+        if (profit < 0) {
+            comboNetProfit.style.color = '#fca5a5';
+        } else if (profit > 0) {
+            comboNetProfit.style.color = '#10b981';
+        } else {
+            comboNetProfit.style.color = 'var(--text-main)';
+        }
+    }
+    
+    if (comboPriceInput) {
+        comboPriceInput.addEventListener('input', updateComboSummary);
+    }
     const comboPreviewImg = document.getElementById('comboPreviewImg');
     const openComboImagePickerBtn = document.getElementById('openComboImagePickerBtn');
     const comboProductList = document.getElementById('comboProductList');
@@ -355,6 +399,7 @@ export function setupInventory({ onProductsLoaded }) {
             comboSelectedImage = '';
             if (comboPreviewImg) comboPreviewImg.src = './kalo-logo.png';
             if (comboStatusMsg) comboStatusMsg.textContent = '';
+            updateComboSummary();
             
             if (comboProductList) {
                 comboProductList.innerHTML = '';
@@ -383,7 +428,10 @@ export function setupInventory({ onProductsLoaded }) {
                     
                     checkbox.addEventListener('change', () => {
                         qtyInput.disabled = !checkbox.checked;
+                        updateComboSummary();
                     });
+                    
+                    qtyInput.addEventListener('input', updateComboSummary);
                     
                     comboProductList.appendChild(div);
                 });
