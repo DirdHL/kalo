@@ -371,6 +371,9 @@ export function setupStats({ onProductsChanged }) {
             `;
 
             window.currentMonthVentas.forEach(v => {
+                const isRefunded = v.estado === 'reembolsada';
+                if (isRefunded) return;
+                
                 const dateObj = new Date(v.fecha);
                 const fechaStr = dateObj.toLocaleDateString();
                 const horaStr = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -380,23 +383,20 @@ export function setupStats({ onProductsChanged }) {
                     productosStr = v.detalles.map(item => `${item.qty}x ${item.nombre}`).join('; ');
                 }
                 const ganancia = Number(v.total) - Number(v.costo_total);
-                const isRefunded = v.estado === 'reembolsada';
-                
-                const rowBg = isRefunded ? 'background-color: #fee2e2;' : '';
-                const strike = isRefunded ? 'text-decoration: line-through; color: #ef4444;' : '';
-                const gananciaStyle = isRefunded ? strike : 'font-weight: bold; color: #047857;';
+                const descuento = Number(v.descuento);
+                const descuentoStyle = descuento > 0 ? 'color: #ef4444; font-weight: bold;' : '';
 
                 html += `
-                <tr style="${rowBg}">
-                    <td style="${strike}">${fechaStr}</td>
-                    <td style="${strike}">${horaStr}</td>
-                    <td style="${strike}">${v.metodo_pago || 'Efectivo'}</td>
-                    <td style="${strike}">${productosStr}</td>
-                    <td style="${strike}">${Number(v.subtotal).toFixed(2)}</td>
-                    <td style="${strike}">${Number(v.descuento).toFixed(2)}</td>
-                    <td style="${strike}">${Number(v.total).toFixed(2)}</td>
-                    <td style="${gananciaStyle}">${ganancia.toFixed(2)}</td>
-                    <td style="${strike}">${v.estado || 'completada'}</td>
+                <tr>
+                    <td>${fechaStr}</td>
+                    <td>${horaStr}</td>
+                    <td>${v.metodo_pago || 'Efectivo'}</td>
+                    <td>${productosStr}</td>
+                    <td>${Number(v.subtotal).toFixed(2)}</td>
+                    <td style="${descuentoStyle}">${descuento.toFixed(2)}</td>
+                    <td>${Number(v.total).toFixed(2)}</td>
+                    <td style="font-weight: bold; color: #047857;">${ganancia.toFixed(2)}</td>
+                    <td>${v.estado || 'completada'}</td>
                 </tr>`;
             });
 
