@@ -425,8 +425,14 @@
     <!-- Modal Seleccionador de Imágenes -->
     <div class="modal-overlay hidden" id="imagePickerModal" style="z-index: 200;">
         <div class="modal" style="max-width: 700px;">
-            <h2 style="margin-bottom: 1.5rem;">Escoger Imagen 📸</h2>
-            <p style="color: var(--text-secondary); margin-bottom: 1rem; font-size: 0.9rem;">Haz clic en la fotografía que corresponda al producto.</p>
+            <h2 style="margin-bottom: 0.5rem;">Escoger Imagen 📸</h2>
+            <div style="margin-bottom: 1rem; text-align: center;">
+                <label for="customImageUpload" class="primary-btn" style="cursor: pointer; display: inline-block; width: auto; padding: 0.6rem 1.5rem; background: #6366f1;">
+                    📁 Subir Imagen (Celular / PC)
+                </label>
+                <input type="file" id="customImageUpload" accept="image/*" style="display: none;">
+            </div>
+            <p style="color: var(--text-secondary); margin-bottom: 1rem; font-size: 0.9rem;">O escoge una imagen predeterminada del sistema:</p>
             
             <div class="image-grid" id="imageGrid">
                 <!-- Se llenará con JS con las fotos reales de tu carpeta -->
