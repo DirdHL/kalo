@@ -632,16 +632,42 @@ export function setupInventory({ onProductsLoaded }) {
         window.inventoryDelegated = true;
     }
 
-    if (invSearch) {
-        invSearch.addEventListener('input', (e) => {
-            const term = e.target.value.toLowerCase();
-            state.invFilteredProducts = state.globalProducts.filter(p => 
+    function filterInventoryProducts() {
+        const term = invSearch ? invSearch.value.toLowerCase() : '';
+        const activeBtn = document.querySelector('.inv-filter-btn.active');
+        const activeCat = activeBtn ? activeBtn.getAttribute('data-cat') : 'Todos';
+
+        let filtered = state.globalProducts;
+
+        if (activeCat !== 'Todos') {
+            filtered = filtered.filter(p => p.categoria === activeCat);
+        }
+
+        if (term) {
+            filtered = filtered.filter(p => 
                 p.nombre.toLowerCase().includes(term) || 
                 (p.codigo && p.codigo.toLowerCase().includes(term)) ||
                 (p.categoria && p.categoria.toLowerCase().includes(term))
             );
-            state.invCurrentPage = 1;
-            renderInventoryTable();
+        }
+
+        state.invFilteredProducts = filtered;
+        state.invCurrentPage = 1;
+        renderInventoryTable();
+    }
+
+    if (invSearch) {
+        invSearch.addEventListener('input', filterInventoryProducts);
+    }
+
+    const invCatBtns = document.querySelectorAll('.inv-filter-btn');
+    if (invCatBtns.length > 0) {
+        invCatBtns.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                invCatBtns.forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                filterInventoryProducts();
+            });
         });
     }
 
