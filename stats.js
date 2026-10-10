@@ -71,15 +71,15 @@ export function setupStats({ onProductsChanged }) {
                 });
             }
 
-            const elBrutas = document.getElementById('statVentasBrutas');
-            const elReembolsos = document.getElementById('statReembolsos');
+            const elInversiones = document.getElementById('statInversiones');
             const elDescuentos = document.getElementById('statDescuentos');
-            const elBeneficio = document.getElementById('statBeneficioBruto');
+            const elGananciaBruta = document.getElementById('statGananciaBruta');
+            const elGananciaNeta = document.getElementById('statGananciaNeta');
 
-            if (elBrutas) elBrutas.textContent = `S/ ${netas.toFixed(2)}`;
-            if (elReembolsos) elReembolsos.textContent = `S/ ${reembolsos.toFixed(2)}`;
+            if (elInversiones) elInversiones.textContent = `S/ ${costos.toFixed(2)}`;
             if (elDescuentos) elDescuentos.textContent = `S/ ${descuentos.toFixed(2)}`;
-            if (elBeneficio) elBeneficio.textContent = `S/ ${(netas - costos).toFixed(2)}`;
+            if (elGananciaBruta) elGananciaBruta.textContent = `S/ ${netas.toFixed(2)}`;
+            if (elGananciaNeta) elGananciaNeta.textContent = `S/ ${(netas - costos).toFixed(2)}`;
             
             renderChart(ventasPorDia);
 
@@ -90,15 +90,15 @@ export function setupStats({ onProductsChanged }) {
     }
 
     function renderEmptyStats() {
-        const elBrutas = document.getElementById('statVentasBrutas');
-        const elReembolsos = document.getElementById('statReembolsos');
+        const elInversiones = document.getElementById('statInversiones');
         const elDescuentos = document.getElementById('statDescuentos');
-        const elBeneficio = document.getElementById('statBeneficioBruto');
+        const elGananciaBruta = document.getElementById('statGananciaBruta');
+        const elGananciaNeta = document.getElementById('statGananciaNeta');
 
-        if (elBrutas) elBrutas.textContent = `S/ 0.00`;
-        if (elReembolsos) elReembolsos.textContent = `S/ 0.00`;
+        if (elInversiones) elInversiones.textContent = `S/ 0.00`;
         if (elDescuentos) elDescuentos.textContent = `S/ 0.00`;
-        if (elBeneficio) elBeneficio.textContent = `S/ 0.00`;
+        if (elGananciaBruta) elGananciaBruta.textContent = `S/ 0.00`;
+        if (elGananciaNeta) elGananciaNeta.textContent = `S/ 0.00`;
         renderChart({});
     }
 
@@ -268,10 +268,10 @@ export function setupStats({ onProductsChanged }) {
                 return;
             }
             
-            const brutasStr = document.getElementById('statVentasBrutas').textContent;
-            const reembolsosStr = document.getElementById('statReembolsos').textContent;
+            const inversionesStr = document.getElementById('statInversiones').textContent;
             const descuentosStr = document.getElementById('statDescuentos').textContent;
-            const gananciaStr = document.getElementById('statBeneficioBruto').textContent;
+            const gananciaBrutaStr = document.getElementById('statGananciaBruta').textContent;
+            const gananciaNetaStr = document.getElementById('statGananciaNeta').textContent;
             const mesInput = statsMonthInput ? statsMonthInput.value : 'Completo';
 
             let html = `
@@ -284,12 +284,12 @@ export function setupStats({ onProductsChanged }) {
                     <tr style="background-color: #10b981; color: white; font-size: 16px;">
                         <th colspan="2">RESUMEN DEL MES</th>
                     </tr>
-                    <tr><td style="font-weight: bold; width: 200px;">Ingresos Totales</td><td style="text-align: right;">${brutasStr}</td></tr>
-                    <tr><td style="font-weight: bold;">Reembolsos</td><td style="color: red; text-align: right;">${reembolsosStr}</td></tr>
+                    <tr><td style="font-weight: bold; width: 200px;">Inversiones</td><td style="text-align: right;">${inversionesStr}</td></tr>
                     <tr><td style="font-weight: bold;">Descuentos</td><td style="text-align: right;">${descuentosStr}</td></tr>
+                    <tr><td style="font-weight: bold;">Ganancia Bruta</td><td style="text-align: right;">${gananciaBrutaStr}</td></tr>
                     <tr style="background-color: #d1fae5;">
                         <td style="font-weight: bold; font-size: 16px;">GANANCIA NETA</td>
-                        <td style="font-weight: bold; font-size: 16px; color: #047857; text-align: right;">${gananciaStr}</td>
+                        <td style="font-weight: bold; font-size: 16px; color: #047857; text-align: right;">${gananciaNetaStr}</td>
                     </tr>
                 </table>
 
