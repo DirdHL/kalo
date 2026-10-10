@@ -325,7 +325,7 @@ body {
     background: rgba(255,255,255,0.2);
     border-radius: 10px;
 }
-.cat-filter-btn {
+.cat-filter-btn, .inv-filter-btn {
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid rgba(255, 255, 255, 0.1);
     color: var(--text-secondary);
@@ -336,11 +336,11 @@ body {
     white-space: nowrap;
     transition: all 0.2s;
 }
-.cat-filter-btn:hover {
+.cat-filter-btn:hover, .inv-filter-btn:hover {
     background: rgba(255, 255, 255, 0.1);
     color: white;
 }
-.cat-filter-btn.active {
+.cat-filter-btn.active, .inv-filter-btn.active {
     background: var(--primary);
     color: white;
     border-color: var(--primary);
