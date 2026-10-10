@@ -71,12 +71,10 @@ export function setupStats({ onProductsChanged }) {
                 });
             }
 
-            const elInversiones = document.getElementById('statInversiones');
             const elDescuentos = document.getElementById('statDescuentos');
             const elGananciaBruta = document.getElementById('statGananciaBruta');
             const elGananciaNeta = document.getElementById('statGananciaNeta');
 
-            if (elInversiones) elInversiones.textContent = `S/ ${costos.toFixed(2)}`;
             if (elDescuentos) elDescuentos.textContent = `S/ ${descuentos.toFixed(2)}`;
             if (elGananciaBruta) elGananciaBruta.textContent = `S/ ${netas.toFixed(2)}`;
             if (elGananciaNeta) elGananciaNeta.textContent = `S/ ${(netas - costos).toFixed(2)}`;
@@ -90,12 +88,10 @@ export function setupStats({ onProductsChanged }) {
     }
 
     function renderEmptyStats() {
-        const elInversiones = document.getElementById('statInversiones');
         const elDescuentos = document.getElementById('statDescuentos');
         const elGananciaBruta = document.getElementById('statGananciaBruta');
         const elGananciaNeta = document.getElementById('statGananciaNeta');
 
-        if (elInversiones) elInversiones.textContent = `S/ 0.00`;
         if (elDescuentos) elDescuentos.textContent = `S/ 0.00`;
         if (elGananciaBruta) elGananciaBruta.textContent = `S/ 0.00`;
         if (elGananciaNeta) elGananciaNeta.textContent = `S/ 0.00`;
@@ -268,7 +264,6 @@ export function setupStats({ onProductsChanged }) {
                 return;
             }
             
-            const inversionesStr = document.getElementById('statInversiones').textContent;
             const descuentosStr = document.getElementById('statDescuentos').textContent;
             const gananciaBrutaStr = document.getElementById('statGananciaBruta').textContent;
             const gananciaNetaStr = document.getElementById('statGananciaNeta').textContent;
@@ -284,7 +279,6 @@ export function setupStats({ onProductsChanged }) {
                     <tr style="background-color: #10b981; color: white; font-size: 16px;">
                         <th colspan="2">RESUMEN DEL MES</th>
                     </tr>
-                    <tr><td style="font-weight: bold; width: 200px;">Inversiones</td><td style="text-align: right;">${inversionesStr}</td></tr>
                     <tr><td style="font-weight: bold;">Descuentos</td><td style="text-align: right;">${descuentosStr}</td></tr>
                     <tr><td style="font-weight: bold;">Ganancia Bruta</td><td style="text-align: right;">${gananciaBrutaStr}</td></tr>
                     <tr style="background-color: #d1fae5;">
