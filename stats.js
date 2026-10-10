@@ -47,7 +47,9 @@ export function setupStats({ onProductsChanged }) {
             let costos = 0;
             let reembolsos = 0;
 
-            const ventasPorDia = {};
+            const gananciaBrutaPorDia = {};
+            const gananciaNetaPorDia = {};
+            const descuentosPorDia = {};
             window.currentMonthVentas = data;
 
             if (data.length === 0) {
@@ -66,7 +68,13 @@ export function setupStats({ onProductsChanged }) {
 
                         const dateObj = new Date(v.fecha);
                         const fechaStr = dateObj.toLocaleDateString();
-                        ventasPorDia[fechaStr] = (ventasPorDia[fechaStr] || 0) + (Number(v.total) || 0);
+                        const gBruta = Number(v.total) || 0;
+                        const gNeta = gBruta - (Number(v.costo_total) || 0);
+                        const desc = Number(v.descuento) || 0;
+
+                        gananciaBrutaPorDia[fechaStr] = (gananciaBrutaPorDia[fechaStr] || 0) + gBruta;
+                        gananciaNetaPorDia[fechaStr] = (gananciaNetaPorDia[fechaStr] || 0) + gNeta;
+                        descuentosPorDia[fechaStr] = (descuentosPorDia[fechaStr] || 0) + desc;
                     }
                 });
             }
@@ -79,7 +87,7 @@ export function setupStats({ onProductsChanged }) {
             if (elGananciaBruta) elGananciaBruta.textContent = `S/ ${netas.toFixed(2)}`;
             if (elGananciaNeta) elGananciaNeta.textContent = `S/ ${(netas - costos).toFixed(2)}`;
             
-            renderChart(ventasPorDia, monthInput);
+            renderChart(gananciaBrutaPorDia, gananciaNetaPorDia, descuentosPorDia, monthInput);
 
         } catch (err) {
             console.error('Error al obtener estadísticas:', err);
@@ -95,16 +103,18 @@ export function setupStats({ onProductsChanged }) {
         if (elDescuentos) elDescuentos.textContent = `S/ 0.00`;
         if (elGananciaBruta) elGananciaBruta.textContent = `S/ 0.00`;
         if (elGananciaNeta) elGananciaNeta.textContent = `S/ 0.00`;
-        renderChart({});
+        renderChart({}, {}, {}, null);
     }
 
-    function renderChart(dataObj, monthInput) {
+    function renderChart(gananciaBrutaPorDia, gananciaNetaPorDia, descuentosPorDia, monthInput) {
         const chartEl = document.getElementById('salesChart');
         if (!chartEl || typeof Chart === 'undefined') return;
         const ctx = chartEl.getContext('2d');
         
         let labels = [];
-        let values = [];
+        let valuesGananciaBruta = [];
+        let valuesGananciaNeta = [];
+        let valuesDescuentos = [];
         
         if (monthInput) {
             const [y, m] = monthInput.split('-');
@@ -114,12 +124,16 @@ export function setupStats({ onProductsChanged }) {
             
             for (let i = 1; i <= daysInMonth; i++) {
                 const dateStr = new Date(year, month - 1, i).toLocaleDateString();
-                labels.push(`${i}/${m}`);
-                values.push(dataObj[dateStr] || 0);
+                labels.push(${i}/);
+                valuesGananciaBruta.push(gananciaBrutaPorDia[dateStr] || 0);
+                valuesGananciaNeta.push(gananciaNetaPorDia[dateStr] || 0);
+                valuesDescuentos.push(descuentosPorDia[dateStr] || 0);
             }
         } else {
-            labels = Object.keys(dataObj);
-            values = Object.values(dataObj);
+            labels = Object.keys(gananciaBrutaPorDia);
+            valuesGananciaBruta = Object.values(gananciaBrutaPorDia);
+            valuesGananciaNeta = Object.values(gananciaNetaPorDia);
+            valuesDescuentos = Object.values(descuentosPorDia);
         }
 
         if (salesChartInstance) {
@@ -132,8 +146,21 @@ export function setupStats({ onProductsChanged }) {
                 labels: labels.length ? labels : ['Sin datos'],
                 datasets: [
                     {
-                        label: 'Ventas Netas (S/)',
-                        data: values.length ? values : [0],
+                        label: 'Ganancia Bruta (S/)',
+                        data: valuesGananciaBruta.length ? valuesGananciaBruta : [0],
+                        borderColor: '#fcd34d',
+                        backgroundColor: 'rgba(252, 211, 77, 0.1)',
+                        borderWidth: 2,
+                        tension: 0.3,
+                        fill: false,
+                        pointBackgroundColor: '#fcd34d',
+                        pointBorderColor: '#fff',
+                        pointRadius: 4,
+                        pointHoverRadius: 6
+                    },
+                    {
+                        label: 'Ganancia Neta (S/)',
+                        data: valuesGananciaNeta.length ? valuesGananciaNeta : [0],
                         borderColor: '#10b981',
                         backgroundColor: 'rgba(16, 185, 129, 0.2)',
                         borderWidth: 2,
@@ -143,9 +170,22 @@ export function setupStats({ onProductsChanged }) {
                         pointBorderColor: '#fff',
                         pointRadius: 4,
                         pointHoverRadius: 6
+                    },
+                    {
+                        label: 'Descuentos (S/)',
+                        data: valuesDescuentos.length ? valuesDescuentos : [0],
+                        borderColor: '#ef4444',
+                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        borderWidth: 2,
+                        tension: 0.3,
+                        fill: false,
+                        pointBackgroundColor: '#ef4444',
+                        pointBorderColor: '#fff',
+                        pointRadius: 4,
+                        pointHoverRadius: 6
                     }
                 ]
-            },
+            },,
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
