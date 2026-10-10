@@ -105,7 +105,6 @@ export function setupStats({ onProductsChanged }) {
         
         let labels = [];
         let values = [];
-        let metaValues = [];
         
         if (monthInput) {
             const [y, m] = monthInput.split('-');
@@ -117,12 +116,10 @@ export function setupStats({ onProductsChanged }) {
                 const dateStr = new Date(year, month - 1, i).toLocaleDateString();
                 labels.push(`${i}/${m}`);
                 values.push(dataObj[dateStr] || 0);
-                metaValues.push(300); // Meta de ventas diaria simulada (Mock data)
             }
         } else {
             labels = Object.keys(dataObj);
             values = Object.values(dataObj);
-            metaValues = values.map(() => 300);
         }
 
         if (salesChartInstance) {
@@ -146,17 +143,6 @@ export function setupStats({ onProductsChanged }) {
                         pointBorderColor: '#fff',
                         pointRadius: 4,
                         pointHoverRadius: 6
-                    },
-                    {
-                        label: 'Meta de Ventas Diaria',
-                        data: metaValues.length ? metaValues : [0],
-                        borderColor: 'rgba(255, 255, 255, 0.3)',
-                        borderWidth: 2,
-                        borderDash: [5, 5],
-                        tension: 0.3,
-                        fill: false,
-                        pointRadius: 0,
-                        pointHoverRadius: 0
                     }
                 ]
             },
