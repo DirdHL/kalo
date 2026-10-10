@@ -54,7 +54,7 @@ export function setupInventory({ onProductsLoaded }) {
         if (comboProductList) {
             const checkboxes = comboProductList.querySelectorAll('.combo-checkbox:checked');
             checkboxes.forEach(cb => {
-                const prod = state.globalProducts.find(p => p.id === cb.value);
+                const prod = state.globalProducts.find(p => p.id.toString() === cb.value);
                 if (prod) {
                     const qtyInput = cb.parentElement.nextElementSibling.querySelector('.combo-qty-input');
                     const qty = parseInt(qtyInput.value) || 1;
