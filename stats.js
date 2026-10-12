@@ -363,17 +363,9 @@ export function setupStats({ onProductsChanged }) {
         });
     }
 
-    // Exportar Excel (.xlsx auténtico)
+    // Exportar Excel (.xlsx auténtico con pestañas por cada mes)
     if (exportStatsBtn) {
         exportStatsBtn.addEventListener('click', async () => {
-            if (!window.currentMonthVentas || window.currentMonthVentas.length === 0) {
-                await customAlert('No hay datos para exportar en este mes.', 'Sin datos', 'ℹ️');
-                return;
-            }
-            
-            const descuentosStr = document.getElementById('statDescuentos').textContent;
-            const gananciaBrutaStr = document.getElementById('statGananciaBruta').textContent;
-            const gananciaNetaStr = document.getElementById('statGananciaNeta').textContent;
             const mesInput = statsMonthInput ? statsMonthInput.value : 'Completo';
 
             let XLSX;
@@ -385,65 +377,194 @@ export function setupStats({ onProductsChanged }) {
                 return;
             }
 
-            const rows = [
-                [`REPORTE FINANCIERO KALO - ${mesInput}`],
-                [],
-                ['RESUMEN DEL MES', ''],
-                ['Descuentos', descuentosStr],
-                ['Ganancia Bruta', gananciaBrutaStr],
-                ['GANANCIA NETA', gananciaNetaStr],
-                [],
-                ['DETALLE DE VENTAS'],
-                ['Fecha', 'Hora', 'Método', 'Productos', 'Subtotal (S/)', 'Descuento (S/)', 'Total Pagado (S/)', 'Ganancia Neta (S/)', 'Estado']
+            // Consultar todas las ventas registradas del local actual
+            let todasVentas = [];
+            try {
+                const { data, error } = await supabase
+                    .from('ventas')
+                    .select('*')
+                    .eq('local', state.currentLocal)
+                    .order('fecha', { ascending: true });
+
+                if (error) throw error;
+                todasVentas = data || [];
+            } catch (err) {
+                console.warn('Error al consultar todas las ventas:', err);
+                todasVentas = window.currentMonthVentas || [];
+            }
+
+            if (!todasVentas || todasVentas.length === 0) {
+                await customAlert('No hay ventas registradas para exportar en este local.', 'Sin datos', 'ℹ️');
+                return;
+            }
+
+            const NOMBRES_MESES = [
+                'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+                'Julio', 'Agosto', 'Setiembre', 'Octubre', 'Noviembre', 'Diciembre'
             ];
 
-            window.currentMonthVentas.forEach(v => {
-                const isRefunded = v.estado === 'reembolsada';
-                if (isRefunded) return;
-                
-                const dateObj = new Date(v.fecha);
-                const fechaStr = dateObj.toLocaleDateString();
-                const horaStr = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                
-                let productosStr = 'Sin detalles';
-                if (v.detalles && Array.isArray(v.detalles)) {
-                    productosStr = v.detalles.map(item => `${item.qty}x ${item.nombre}`).join('; ');
+            // Agrupar ventas por mes (YYYY-MM)
+            const ventasPorMes = {};
+            todasVentas.forEach(v => {
+                if (v.estado === 'reembolsada') return; // Omitir reembolsos según solicitud
+                const d = new Date(v.fecha);
+                if (isNaN(d.getTime())) return;
+                const yyyy = d.getFullYear();
+                const mm = String(d.getMonth() + 1).padStart(2, '0');
+                const key = `${yyyy}-${mm}`;
+                if (!ventasPorMes[key]) {
+                    ventasPorMes[key] = {
+                        year: yyyy,
+                        monthNum: mm,
+                        monthName: NOMBRES_MESES[d.getMonth()] || `Mes ${mm}`,
+                        ventas: []
+                    };
                 }
-                const ganancia = Number(v.total) - Number(v.costo_total);
-                const descuento = Number(v.descuento || 0);
+                ventasPorMes[key].ventas.push(v);
+            });
 
-                rows.push([
-                    fechaStr,
-                    horaStr,
-                    v.metodo_pago || 'Efectivo',
-                    productosStr,
-                    Number(Number(v.subtotal || 0).toFixed(2)),
-                    Number(descuento.toFixed(2)),
-                    Number(Number(v.total || 0).toFixed(2)),
-                    Number(ganancia.toFixed(2)),
-                    v.estado || 'completada'
+            const monthKeys = Object.keys(ventasPorMes).sort();
+            if (monthKeys.length === 0) {
+                await customAlert('No hay ventas válidas para exportar.', 'Sin datos', 'ℹ️');
+                return;
+            }
+
+            const wb = XLSX.utils.book_new();
+
+            // 1. Hoja: Resumen General (Consolidado de todos los meses)
+            const localNombre = state.currentLocal ? state.currentLocal.toUpperCase() : 'LOCAL';
+            const resumenGeneralRows = [
+                [`CONSOLIDADO HISTÓRICO DE VENTAS - KALO (${localNombre})`],
+                [],
+                ['Mes', 'N° Ventas', 'Ventas Totales (S/)', 'Descuentos (S/)', 'Ganancia Neta (S/)']
+            ];
+
+            let globalVentasCount = 0;
+            let globalTotal = 0;
+            let globalDescuentos = 0;
+            let globalGananciaNeta = 0;
+
+            monthKeys.forEach(key => {
+                const group = ventasPorMes[key];
+                let mesTotal = 0;
+                let mesDescuentos = 0;
+                let mesCostos = 0;
+
+                group.ventas.forEach(v => {
+                    mesTotal += Number(v.total) || 0;
+                    mesDescuentos += Number(v.descuento) || 0;
+                    mesCostos += Number(v.costo_total) || 0;
+                });
+
+                const mesGananciaNeta = mesTotal - mesCostos;
+
+                globalVentasCount += group.ventas.length;
+                globalTotal += mesTotal;
+                globalDescuentos += mesDescuentos;
+                globalGananciaNeta += mesGananciaNeta;
+
+                resumenGeneralRows.push([
+                    `${group.monthName} ${group.year}`,
+                    group.ventas.length,
+                    Number(mesTotal.toFixed(2)),
+                    Number(mesDescuentos.toFixed(2)),
+                    Number(mesGananciaNeta.toFixed(2))
                 ]);
             });
 
-            const ws = XLSX.utils.aoa_to_sheet(rows);
+            resumenGeneralRows.push([]);
+            resumenGeneralRows.push([
+                'TOTAL HISTÓRICO',
+                globalVentasCount,
+                Number(globalTotal.toFixed(2)),
+                Number(globalDescuentos.toFixed(2)),
+                Number(globalGananciaNeta.toFixed(2))
+            ]);
 
-            // Ajustar anchos de columnas
-            ws['!cols'] = [
-                { wch: 14 }, // Fecha
-                { wch: 10 }, // Hora
-                { wch: 15 }, // Método
-                { wch: 45 }, // Productos
-                { wch: 14 }, // Subtotal
-                { wch: 14 }, // Descuento
-                { wch: 16 }, // Total Pagado
-                { wch: 18 }, // Ganancia Neta
-                { wch: 14 }  // Estado
+            const wsResumen = XLSX.utils.aoa_to_sheet(resumenGeneralRows);
+            wsResumen['!cols'] = [
+                { wch: 22 }, // Mes
+                { wch: 12 }, // N° Ventas
+                { wch: 20 }, // Ventas Totales
+                { wch: 18 }, // Descuentos
+                { wch: 20 }  // Ganancia Neta
             ];
+            XLSX.utils.book_append_sheet(wb, wsResumen, 'Resumen General');
 
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, 'Reporte Financiero');
+            // 2. Crear una pestaña por cada mes registrado
+            monthKeys.forEach(key => {
+                const group = ventasPorMes[key];
+                let mesTotal = 0;
+                let mesDescuentos = 0;
+                let mesCostos = 0;
 
-            XLSX.writeFile(wb, `Reporte_Kalo_${mesInput}.xlsx`);
+                group.ventas.forEach(v => {
+                    mesTotal += Number(v.total) || 0;
+                    mesDescuentos += Number(v.descuento) || 0;
+                    mesCostos += Number(v.costo_total) || 0;
+                });
+
+                const mesGananciaNeta = mesTotal - mesCostos;
+
+                const monthRows = [
+                    [`REPORTE MENSUAL KALO - ${group.monthName.toUpperCase()} ${group.year}`],
+                    [],
+                    ['RESUMEN DEL MES', ''],
+                    ['Descuentos', Number(mesDescuentos.toFixed(2))],
+                    ['Ganancia Bruta', Number(mesTotal.toFixed(2))],
+                    ['GANANCIA NETA', Number(mesGananciaNeta.toFixed(2))],
+                    ['Transacciones', group.ventas.length],
+                    [],
+                    ['DETALLE DE VENTAS'],
+                    ['Fecha', 'Hora', 'Método', 'Productos', 'Subtotal (S/)', 'Descuento (S/)', 'Total Pagado (S/)', 'Ganancia Neta (S/)', 'Estado']
+                ];
+
+                group.ventas.forEach(v => {
+                    const dateObj = new Date(v.fecha);
+                    const fechaStr = dateObj.toLocaleDateString();
+                    const horaStr = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+                    let productosStr = 'Sin detalles';
+                    if (v.detalles && Array.isArray(v.detalles)) {
+                        productosStr = v.detalles.map(item => `${item.qty}x ${item.nombre}`).join('; ');
+                    }
+                    const ganancia = (Number(v.total) || 0) - (Number(v.costo_total) || 0);
+                    const descuento = Number(v.descuento || 0);
+
+                    monthRows.push([
+                        fechaStr,
+                        horaStr,
+                        v.metodo_pago || 'Efectivo',
+                        productosStr,
+                        Number(Number(v.subtotal || 0).toFixed(2)),
+                        Number(descuento.toFixed(2)),
+                        Number(Number(v.total || 0).toFixed(2)),
+                        Number(ganancia.toFixed(2)),
+                        v.estado || 'completada'
+                    ]);
+                });
+
+                const wsMonth = XLSX.utils.aoa_to_sheet(monthRows);
+                wsMonth['!cols'] = [
+                    { wch: 14 }, // Fecha
+                    { wch: 10 }, // Hora
+                    { wch: 15 }, // Método
+                    { wch: 45 }, // Productos
+                    { wch: 14 }, // Subtotal
+                    { wch: 14 }, // Descuento
+                    { wch: 16 }, // Total Pagado
+                    { wch: 18 }, // Ganancia Neta
+                    { wch: 14 }  // Estado
+                ];
+
+                // Nombre de la pestaña (ej: 'Octubre 2026', 'Setiembre 2026')
+                const tabName = `${group.monthName} ${group.year}`.slice(0, 31);
+                XLSX.utils.book_append_sheet(wb, wsMonth, tabName);
+            });
+
+            // Descargar libro completo con todas las pestañas
+            const fileName = `Reporte_Kalo_Historico_${mesInput}.xlsx`;
+            XLSX.writeFile(wb, fileName);
         });
     }
 
