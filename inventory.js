@@ -31,7 +31,9 @@ export function setupInventory({ onProductsLoaded }) {
     const imagePickerModal = document.getElementById('imagePickerModal');
     const openImagePickerBtn = document.getElementById('openImagePickerBtn');
     const closeImagePickerBtn = document.getElementById('closeImagePickerBtn');
+    const imagePickerSearch = document.getElementById('imagePickerSearch');
     const imageGrid = document.getElementById('imageGrid');
+    let isPickingComboImage = false;
 
     // Modal Combos
     const openComboModalBtn = document.getElementById('openComboModalBtn');
@@ -103,11 +105,29 @@ export function setupInventory({ onProductsLoaded }) {
     const nextPageBtn = document.getElementById('nextPageBtn');
     const paginationInfo = document.getElementById('paginationInfo');
 
-    // --- RENDER GRID DE IMÁGENES ---
-    function renderImageGrid(isCombo = false) {
+    // --- RENDER GRID DE IMÁGENES CON BÚSQUEDA ---
+    function renderImageGrid(isCombo = false, filterText = '') {
         if (!imageGrid) return;
         imageGrid.innerHTML = '';
-        AVAILABLE_IMAGES.forEach(imgName => {
+
+        const term = (filterText || '').toLowerCase().trim();
+        const filtered = AVAILABLE_IMAGES.filter(imgName => {
+            if (!term) return true;
+            const cleanName = imgName.replace('.svg', '').replace(/_/g, ' ').toLowerCase();
+            return cleanName.includes(term);
+        });
+
+        if (filtered.length === 0) {
+            imageGrid.innerHTML = `
+                <div style="grid-column: 1 / -1; text-align: center; color: var(--text-secondary); padding: 2rem;">
+                    <p style="font-size: 1.2rem; margin-bottom: 0.5rem;">🔍 Sin resultados</p>
+                    <p style="font-size: 0.85rem;">No encontramos ninguna imagen que coincida con "${filterText}".</p>
+                </div>
+            `;
+            return;
+        }
+
+        filtered.forEach(imgName => {
             const div = document.createElement('div');
             div.className = 'image-item';
             div.innerHTML = `
@@ -128,10 +148,19 @@ export function setupInventory({ onProductsLoaded }) {
         });
     }
 
+    if (imagePickerSearch) {
+        imagePickerSearch.addEventListener('input', (e) => {
+            renderImageGrid(isPickingComboImage, e.target.value);
+        });
+    }
+
     if (openImagePickerBtn) {
         openImagePickerBtn.addEventListener('click', () => {
+            isPickingComboImage = false;
+            if (imagePickerSearch) imagePickerSearch.value = '';
             if (imagePickerModal) imagePickerModal.classList.remove('hidden');
-            renderImageGrid(false);
+            renderImageGrid(false, '');
+            setTimeout(() => { if (imagePickerSearch) imagePickerSearch.focus(); }, 100);
         });
     }
 
@@ -447,8 +476,11 @@ export function setupInventory({ onProductsLoaded }) {
 
     if (openComboImagePickerBtn) {
         openComboImagePickerBtn.addEventListener('click', () => {
+            isPickingComboImage = true;
+            if (imagePickerSearch) imagePickerSearch.value = '';
             if (imagePickerModal) imagePickerModal.classList.remove('hidden');
-            renderImageGrid(true);
+            renderImageGrid(true, '');
+            setTimeout(() => { if (imagePickerSearch) imagePickerSearch.focus(); }, 100);
         });
     }
 
