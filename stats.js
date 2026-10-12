@@ -351,7 +351,19 @@ export function setupStats({ onProductsChanged }) {
 
     window.refundSale = refundSale;
 
-    // Exportar Excel
+    // Cargar XLSX dinámicamente si aún no está presente
+    function loadXLSX() {
+        if (window.XLSX) return Promise.resolve(window.XLSX);
+        return new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+            script.onload = () => resolve(window.XLSX);
+            script.onerror = () => reject(new Error('No se pudo cargar la librería XLSX'));
+            document.head.appendChild(script);
+        });
+    }
+
+    // Exportar Excel (.xlsx auténtico)
     if (exportStatsBtn) {
         exportStatsBtn.addEventListener('click', async () => {
             if (!window.currentMonthVentas || window.currentMonthVentas.length === 0) {
@@ -364,37 +376,26 @@ export function setupStats({ onProductsChanged }) {
             const gananciaNetaStr = document.getElementById('statGananciaNeta').textContent;
             const mesInput = statsMonthInput ? statsMonthInput.value : 'Completo';
 
-            let html = `
-            <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-            <head><meta charset="utf-8"></head>
-            <body style="font-family: Arial, sans-serif;">
-                <h2 style="color: #4f46e5; text-transform: uppercase;">Reporte Financiero Kalo - ${mesInput}</h2>
-                
-                <table border="1" cellpadding="6" cellspacing="0" style="border-collapse: collapse; margin-bottom: 20px;">
-                    <tr style="background-color: #10b981; color: white; font-size: 16px;">
-                        <th colspan="2">RESUMEN DEL MES</th>
-                    </tr>
-                    <tr><td style="font-weight: bold;">Descuentos</td><td style="text-align: right;">${descuentosStr}</td></tr>
-                    <tr><td style="font-weight: bold;">Ganancia Bruta</td><td style="text-align: right;">${gananciaBrutaStr}</td></tr>
-                    <tr style="background-color: #d1fae5;">
-                        <td style="font-weight: bold; font-size: 16px;">GANANCIA NETA</td>
-                        <td style="font-weight: bold; font-size: 16px; color: #047857; text-align: right;">${gananciaNetaStr}</td>
-                    </tr>
-                </table>
+            let XLSX;
+            try {
+                XLSX = await loadXLSX();
+            } catch (err) {
+                console.error('Error al cargar XLSX:', err);
+                await customAlert('Hubo un error al preparar la exportación de Excel. Verifica tu conexión a internet.', 'Error', '⚠️');
+                return;
+            }
 
-                <table border="1" cellpadding="6" cellspacing="0" style="border-collapse: collapse;">
-                    <tr style="background-color: #1e1b4b; color: white;">
-                        <th>Fecha</th>
-                        <th>Hora</th>
-                        <th>Método</th>
-                        <th>Productos</th>
-                        <th>Subtotal</th>
-                        <th>Descuento</th>
-                        <th>Total Pagado</th>
-                        <th style="background-color: #10b981; color: white;">Ganancia Neta</th>
-                        <th>Estado</th>
-                    </tr>
-            `;
+            const rows = [
+                [`REPORTE FINANCIERO KALO - ${mesInput}`],
+                [],
+                ['RESUMEN DEL MES', ''],
+                ['Descuentos', descuentosStr],
+                ['Ganancia Bruta', gananciaBrutaStr],
+                ['GANANCIA NETA', gananciaNetaStr],
+                [],
+                ['DETALLE DE VENTAS'],
+                ['Fecha', 'Hora', 'Método', 'Productos', 'Subtotal (S/)', 'Descuento (S/)', 'Total Pagado (S/)', 'Ganancia Neta (S/)', 'Estado']
+            ];
 
             window.currentMonthVentas.forEach(v => {
                 const isRefunded = v.estado === 'reembolsada';
@@ -409,30 +410,40 @@ export function setupStats({ onProductsChanged }) {
                     productosStr = v.detalles.map(item => `${item.qty}x ${item.nombre}`).join('; ');
                 }
                 const ganancia = Number(v.total) - Number(v.costo_total);
-                const descuento = Number(v.descuento);
-                const descuentoStyle = descuento > 0 ? 'color: #ef4444; font-weight: bold;' : '';
+                const descuento = Number(v.descuento || 0);
 
-                html += `
-                <tr>
-                    <td>${fechaStr}</td>
-                    <td>${horaStr}</td>
-                    <td>${v.metodo_pago || 'Efectivo'}</td>
-                    <td>${productosStr}</td>
-                    <td>${Number(v.subtotal).toFixed(2)}</td>
-                    <td style="${descuentoStyle}">${descuento.toFixed(2)}</td>
-                    <td>${Number(v.total).toFixed(2)}</td>
-                    <td style="font-weight: bold; color: #047857;">${ganancia.toFixed(2)}</td>
-                    <td>${v.estado || 'completada'}</td>
-                </tr>`;
+                rows.push([
+                    fechaStr,
+                    horaStr,
+                    v.metodo_pago || 'Efectivo',
+                    productosStr,
+                    Number(Number(v.subtotal || 0).toFixed(2)),
+                    Number(descuento.toFixed(2)),
+                    Number(Number(v.total || 0).toFixed(2)),
+                    Number(ganancia.toFixed(2)),
+                    v.estado || 'completada'
+                ]);
             });
 
-            html += `</table></body></html>`;
+            const ws = XLSX.utils.aoa_to_sheet(rows);
 
-            const blob = new Blob(['\ufeff' + html], { type: 'application/vnd.ms-excel' });
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = `Reporte_Kalo_${mesInput}.xls`;
-            link.click();
+            // Ajustar anchos de columnas
+            ws['!cols'] = [
+                { wch: 14 }, // Fecha
+                { wch: 10 }, // Hora
+                { wch: 15 }, // Método
+                { wch: 45 }, // Productos
+                { wch: 14 }, // Subtotal
+                { wch: 14 }, // Descuento
+                { wch: 16 }, // Total Pagado
+                { wch: 18 }, // Ganancia Neta
+                { wch: 14 }  // Estado
+            ];
+
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Reporte Financiero');
+
+            XLSX.writeFile(wb, `Reporte_Kalo_${mesInput}.xlsx`);
         });
     }
 
