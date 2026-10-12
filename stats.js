@@ -124,7 +124,7 @@ export function setupStats({ onProductsChanged }) {
             
             for (let i = 1; i <= daysInMonth; i++) {
                 const dateStr = new Date(year, month - 1, i).toLocaleDateString();
-                labels.push(${i}/);
+                labels.push(`${i}/${m}`);
                 valuesGananciaBruta.push(gananciaBrutaPorDia[dateStr] || 0);
                 valuesGananciaNeta.push(gananciaNetaPorDia[dateStr] || 0);
                 valuesDescuentos.push(descuentosPorDia[dateStr] || 0);
@@ -185,7 +185,7 @@ export function setupStats({ onProductsChanged }) {
                         pointHoverRadius: 6
                     }
                 ]
-            },,
+            },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
