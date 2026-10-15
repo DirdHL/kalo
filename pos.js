@@ -1,6 +1,7 @@
 import { supabase } from "./supabase.js";
 import { state } from "./state.js";
 import { customAlert } from "./ui.js";
+import { resolveImage } from "./constants.js";
 
 export function setupPOS({ onSaleCompleted }) {
     const posGrid = document.getElementById('posGrid');
@@ -40,7 +41,7 @@ export function setupPOS({ onSaleCompleted }) {
         paginatedItems.forEach(prod => {
             const div = document.createElement('div');
             div.className = 'product-card';
-            const imgSrc = prod.imagen ? `./img/${prod.imagen}` : './img/kalo-logo.png';
+            const imgSrc = resolveImage(prod.imagen);
             const precio = prod.precio_venta ? `S/ ${prod.precio_venta.toFixed(2)}` : 'S/ 0.00';
             
             div.innerHTML = `

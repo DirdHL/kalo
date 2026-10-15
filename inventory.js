@@ -1,6 +1,6 @@
 import { supabase } from "./supabase.js";
 import { state } from "./state.js";
-import { AVAILABLE_IMAGES } from "./constants.js";
+import { AVAILABLE_IMAGES, resolveImage } from "./constants.js";
 import { customAlert, customConfirm } from "./ui.js";
 
 let editingProductId = null;
@@ -113,7 +113,7 @@ export function setupInventory({ onProductsLoaded }) {
         const term = (filterText || '').toLowerCase().trim();
         const filtered = AVAILABLE_IMAGES.filter(imgName => {
             if (!term) return true;
-            const cleanName = imgName.replace('.svg', '').replace(/_/g, ' ').toLowerCase();
+            const cleanName = imgName.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ').replace(/\s+/g, ' ').toLowerCase();
             return cleanName.includes(term);
         });
 
@@ -131,16 +131,16 @@ export function setupInventory({ onProductsLoaded }) {
             const div = document.createElement('div');
             div.className = 'image-item';
             div.innerHTML = `
-                <img src="./img/${imgName}" alt="${imgName}" loading="lazy" onerror="this.onerror=null; this.src='./kalo-logo.png'">
-                <span>${imgName.replace('.svg', '').replace(/_/g, ' ')}</span>
+                <img src="./img/${encodeURI(imgName)}" alt="" loading="lazy" onerror="this.onerror=null; this.src='./kalo-logo.png'">
+                <span>${imgName.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ').replace(/\s+/g, ' ').trim()}</span>
             `;
             div.addEventListener('click', () => {
                 if (isCombo) {
                     comboSelectedImage = imgName;
-                    if (comboPreviewImg) comboPreviewImg.src = `./img/${imgName}`;
+                    if (comboPreviewImg) comboPreviewImg.src = `./img/${encodeURI(imgName)}`;
                 } else {
                     selectedImageName = imgName;
-                    if (previewImg) previewImg.src = `./img/${imgName}`;
+                    if (previewImg) previewImg.src = `./img/${encodeURI(imgName)}`;
                 }
                 if (imagePickerModal) imagePickerModal.classList.add('hidden');
             });
@@ -295,7 +295,7 @@ export function setupInventory({ onProductsLoaded }) {
 
         selectedImageName = prod.imagen || '';
         if (previewImg) {
-            previewImg.src = selectedImageName ? `./img/${selectedImageName}` : './kalo-logo.png';
+            previewImg.src = resolveImage(selectedImageName);
         }
 
         calcularGanancia();
@@ -602,7 +602,7 @@ export function setupInventory({ onProductsLoaded }) {
             const pVenta = prod.precio_venta ? `S/ ${prod.precio_venta.toFixed(2)}` : '';
             const pStock = prod.stock !== null ? prod.stock : '';
             const cat = prod.categoria ? prod.categoria : '';
-            const imgSrc = prod.imagen ? `./img/${prod.imagen}` : './img/kalo-logo.png';
+            const imgSrc = resolveImage(prod.imagen);
 
             tr.innerHTML = `
                 <td><img src="${imgSrc}" style="width: 40px; height: 40px; border-radius: 8px; object-fit: cover;" onerror="this.onerror=null; this.src='./kalo-logo.png'"></td>
