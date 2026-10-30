@@ -1,21 +1,23 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Libro de Reclamaciones Virtual - Bungalows de Tomayquichua</title>
-    
+
     <!-- Modern Typography -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
+
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
+
 <body>
     <div class="page-background"></div>
-    
+
     <div class="container">
         <!-- Header -->
         <header class="header-section glass-panel">
@@ -36,14 +38,14 @@
                     </div>
                     <div class="correlative-box">
                         <span class="correlative-label">HOJA DE RECLAMACIÓN N°</span>
-                        <span class="correlative-value">000000000</span>
+                        <span class="correlative-value">Se asignará al registrar</span>
                     </div>
                 </div>
             </div>
         </header>
 
         <form id="reclamacion-form" class="reclamacion-form">
-            
+
             <!-- SECCIÓN 1: IDENTIFICACIÓN DEL CONSUMIDOR -->
             <section class="form-section glass-panel">
                 <div class="section-header">
@@ -55,7 +57,7 @@
                         <label for="nombre_consumidor">Nombre y Apellidos</label>
                         <input type="text" id="nombre_consumidor" name="nombre_consumidor" required>
                     </div>
-                    
+
                     <div class="form-row">
                         <div class="form-group">
                             <label for="documento_identidad_tipo">Tipo Doc.</label>
@@ -67,7 +69,8 @@
                         </div>
                         <div class="form-group">
                             <label for="documento_identidad_numero">N° Documento</label>
-                            <input type="text" id="documento_identidad_numero" name="documento_identidad_numero" required>
+                            <input type="text" id="documento_identidad_numero" name="documento_identidad_numero"
+                                required>
                         </div>
                     </div>
 
@@ -86,6 +89,7 @@
                             <input type="email" id="email_consumidor" name="email_consumidor" required>
                         </div>
                     </div>
+
 
                     <div class="form-group full-width">
                         <label for="nombre_apoderado">Padre o Madre (En caso de ser menor de edad)</label>
@@ -119,7 +123,8 @@
                         </div>
                         <div class="form-group">
                             <label for="monto_reclamado">Monto Reclamado (S/.)</label>
-                            <input type="number" step="0.01" id="monto_reclamado" name="monto_reclamado" required placeholder="0.00">
+                            <input type="number" min="0" step="0.01" id="monto_reclamado" name="monto_reclamado" required
+                                placeholder="0.00">
                         </div>
                     </div>
                     <div class="form-group full-width">
@@ -151,12 +156,12 @@
                             </label>
                         </div>
                     </div>
-                    
+
                     <div class="form-group full-width">
                         <label for="detalle_reclamacion">Detalle (Relato de los hechos)</label>
                         <textarea id="detalle_reclamacion" name="detalle_reclamacion" rows="5" required></textarea>
                     </div>
-                    
+
                     <div class="form-group full-width">
                         <label for="pedido_consumidor">Pedido (Qué solicita al respecto)</label>
                         <textarea id="pedido_consumidor" name="pedido_consumidor" rows="4" required></textarea>
@@ -176,7 +181,8 @@
                             <label class="custom-checkbox">
                                 <input type="checkbox" name="aceptacion_consumidor" required>
                                 <span class="checkmark"></span>
-                                Declaro que los datos consignados son verdaderos y firmo virtualmente esta hoja de reclamación.
+                                Declaro que los datos consignados son verdaderos y firmo virtualmente esta hoja de
+                                reclamación.
                             </label>
                         </div>
                     </div>
@@ -197,15 +203,19 @@
         <div class="legal-footer glass-panel">
             <ul class="legal-list">
                 <li><strong>RECLAMO:</strong> Disconformidad relacionada a los productos o servicios.</li>
-                <li><strong>QUEJA:</strong> Disconformidad no relacionada a los productos o servicios; o, malestar o descontento respecto a la atención al público.</li>
-                <li>* La formulación del reclamo no impide acudir a otras vías de solución de controversias ni es requisito previo para interponer una denuncia ante el INDECOPI.</li>
-                <li>* El proveedor debe dar respuesta al reclamo o queja en un plazo no mayor a quince (15) días hábiles, el cual es improrrogable.</li>
+                <li><strong>QUEJA:</strong> Disconformidad no relacionada a los productos o servicios; o, malestar o
+                    descontento respecto a la atención al público.</li>
+                <li>* La formulación del reclamo no impide acudir a otras vías de solución de controversias ni es
+                    requisito previo para interponer una denuncia ante el INDECOPI.</li>
+                <li>* El proveedor debe dar respuesta al reclamo o queja en un plazo no mayor a quince (15) días
+                    hábiles, el cual es improrrogable.</li>
             </ul>
         </div>
-        
+
     </div>
 
     <!-- Supabase configuration is now handled in ../supabase.js -->
     <script type="module" src="app.js"></script>
 </body>
+
 </html>

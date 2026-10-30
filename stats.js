@@ -8,6 +8,7 @@ export function setupStats({ onProductsChanged }) {
     const statsMonthInput = document.getElementById('statsMonth');
     const exportStatsBtn = document.getElementById('exportStatsBtn');
     const ventasList = document.getElementById('ventasList');
+    let refundInProgress = false;
 
     if (statsMonthInput) {
         const today = new Date();
@@ -23,11 +24,12 @@ export function setupStats({ onProductsChanged }) {
         let query = supabase.from('ventas').select('*').eq('local', state.currentLocal).order('fecha', { ascending: true });
         
         if (monthInput) {
-            const [y, m] = monthInput.split('-');
-            const endOfMonth = new Date(y, m, 0);
-            const lastDay = endOfMonth.getDate();
-            query = query.gte('fecha', `${monthInput}-01T00:00:00.000Z`)
-                         .lte('fecha', `${monthInput}-${lastDay}T23:59:59.999Z`);
+            const [year, month] = monthInput.split('-').map(Number);
+            // Usar los mismos límites locales que el gráfico y la exportación.
+            const startOfMonth = new Date(year, month - 1, 1);
+            const startOfNextMonth = new Date(year, month, 1);
+            query = query.gte('fecha', startOfMonth.toISOString())
+                         .lt('fecha', startOfNextMonth.toISOString());
         }
 
         try {
@@ -298,10 +300,15 @@ export function setupStats({ onProductsChanged }) {
     }
 
     async function refundSale(ventaId) {
-        if (!await customConfirm('¿Seguro que deseas reembolsar esta venta? El stock de los productos será devuelto al inventario.')) return;
-        
+        if (refundInProgress) return;
+        refundInProgress = true;
+        const appliedUpdates = [];
+        let refundRecorded = false;
+
         try {
-            const { data: venta, error: fetchErr } = await supabase.from('ventas').select('*').eq('id', ventaId).single();
+            if (!await customConfirm('¿Seguro que deseas reembolsar esta venta? El stock de los productos será devuelto al inventario.')) return;
+
+            const { data: venta, error: fetchErr } = await supabase.from('ventas').select('*').eq('id', ventaId).eq('local', state.currentLocal).single();
             if (fetchErr) throw fetchErr;
 
             if (venta.estado === 'reembolsada') {
@@ -309,43 +316,102 @@ export function setupStats({ onProductsChanged }) {
                 return;
             }
 
-            // Devolver stock
-            if (venta.detalles && Array.isArray(venta.detalles)) {
-                for (const item of venta.detalles) {
-                    if (item.codigo && item.codigo.startsWith('COMBO:')) {
-                        const parts = item.codigo.replace('COMBO:', '').split(',');
-                        for (const part of parts) {
-                            if (!part) continue;
-                            const [idStr, qtyStr] = part.split('-');
-                            const subId = parseInt(idStr);
-                            const subQty = parseInt(qtyStr) * item.qty;
-                            
-                            const dbProd = state.globalProducts.find(p => p.id === subId);
-                            if (dbProd && dbProd.stock !== null) {
-                                await supabase.from('productos').update({ stock: dbProd.stock + subQty }).eq('id', subId);
-                            }
-                        }
-                    } else {
-                        const dbProd = state.globalProducts.find(p => p.id === item.id);
-                        if (dbProd && dbProd.stock !== null) {
-                            await supabase.from('productos').update({ stock: dbProd.stock + item.qty }).eq('id', item.id);
-                        }
+            if (!Array.isArray(venta.detalles) || venta.detalles.length === 0) {
+                throw new Error('La venta no tiene detalles suficientes para devolver el stock.');
+            }
+
+            // Acumular productos compartidos entre combos e ítems individuales.
+            const quantities = new Map();
+            const addQuantity = (id, quantity) => {
+                if (id == null || String(id).trim() === '' || !Number.isSafeInteger(quantity) || quantity <= 0) {
+                    throw new Error('La venta contiene un producto o una cantidad inválida.');
+                }
+                const key = String(id);
+                const total = (quantities.get(key) || 0) + quantity;
+                if (!Number.isSafeInteger(total)) throw new Error('La cantidad a devolver es inválida.');
+                quantities.set(key, total);
+            };
+            for (const item of venta.detalles) {
+                const quantity = Number(item.qty);
+                if (!Number.isSafeInteger(quantity) || quantity <= 0) {
+                    throw new Error('La venta contiene una cantidad inválida.');
+                }
+                if (typeof item.codigo === 'string' && item.codigo.startsWith('COMBO:')) {
+                    const parts = item.codigo.slice('COMBO:'.length).split(',').filter(Boolean);
+                    if (parts.length === 0) throw new Error('La venta contiene un combo sin productos.');
+                    for (const part of parts) {
+                        const component = /^(.+)-([1-9]\d*)$/.exec(part);
+                        if (!component) throw new Error('La venta contiene un combo inválido.');
+                        addQuantity(component[1], Number(component[2]) * quantity);
                     }
+                } else {
+                    addQuantity(item.id, quantity);
                 }
             }
 
-            const { error: updErr } = await supabase.from('ventas').update({ estado: 'reembolsada' }).eq('id', ventaId);
+            const { data: products, error: productsErr } = await supabase.from('productos').select('id, stock').eq('local', state.currentLocal).in('id', [...quantities.keys()]);
+            if (productsErr) throw productsErr;
+            const productsById = new Map((products || []).map(product => [String(product.id), product]));
+
+            // Leer stock actual, sin depender de la copia cargada al iniciar sesión.
+            const stockChanges = [];
+            for (const [id, quantity] of quantities) {
+                const product = productsById.get(id);
+                if (!product) throw new Error(`No se encontró el producto ${id} para devolver su stock.`);
+                if (product.stock === null) continue;
+                const previousStock = Number(product.stock);
+                const nextStock = previousStock + quantity;
+                if (!Number.isFinite(previousStock) || !Number.isFinite(nextStock)) {
+                    throw new Error(`El stock del producto ${id} es inválido.`);
+                }
+                stockChanges.push({ id: product.id, previousStock, nextStock });
+            }
+
+            for (const change of stockChanges) {
+                const { data: updated, error: stockErr } = await supabase.from('productos')
+                    .update({ stock: change.nextStock }).eq('id', change.id).eq('local', state.currentLocal)
+                    .eq('stock', change.previousStock).select('id');
+                if (stockErr) throw stockErr;
+                if (!updated || updated.length !== 1) throw new Error('El inventario cambió durante el reembolso. Vuelve a intentarlo.');
+                appliedUpdates.push(change);
+            }
+
+            let updateSale = supabase.from('ventas').update({ estado: 'reembolsada' }).eq('id', ventaId).eq('local', state.currentLocal);
+            updateSale = venta.estado == null ? updateSale.is('estado', null) : updateSale.eq('estado', venta.estado);
+            const { data: updatedSale, error: updErr } = await updateSale.select('id');
             if (updErr) throw updErr;
+            if (!updatedSale || updatedSale.length !== 1) throw new Error('La venta cambió durante el reembolso. Actualiza el historial.');
+            refundRecorded = true;
 
             await customAlert('Venta reembolsada con éxito.', '¡Éxito!', '✅');
             if (typeof onProductsChanged === 'function') {
                 await onProductsChanged();
             }
-            loadHistory();
+            await loadHistory();
 
         } catch (err) {
             console.error('Error al reembolsar:', err);
-            await customAlert('No se pudo completar el reembolso. ' + err.message, 'Error', '⚠️');
+            if (refundRecorded) {
+                await customAlert('El reembolso se registró, pero no se pudo actualizar la pantalla. Recarga la página.', 'Aviso', 'ℹ️');
+                return;
+            }
+
+            let rollbackFailed = false;
+            for (const change of appliedUpdates.reverse()) {
+                try {
+                    const { data: restored, error: rollbackErr } = await supabase.from('productos')
+                        .update({ stock: change.previousStock }).eq('id', change.id).eq('local', state.currentLocal)
+                        .eq('stock', change.nextStock).select('id');
+                    if (rollbackErr || !restored || restored.length !== 1) throw rollbackErr || new Error('El stock cambió durante la reversión.');
+                } catch (rollbackErr) {
+                    rollbackFailed = true;
+                    console.error('No se pudo revertir el stock del producto', change.id, rollbackErr);
+                }
+            }
+            const rollbackMessage = rollbackFailed ? ' No se pudo restaurar todo el stock; revisa el inventario antes de reintentar.' : '';
+            await customAlert('No se pudo completar el reembolso. ' + err.message + rollbackMessage, 'Error', '⚠️');
+        } finally {
+            refundInProgress = false;
         }
     }
 

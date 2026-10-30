@@ -59,7 +59,8 @@ export function setupInventory({ onProductsLoaded }) {
                 const prod = state.globalProducts.find(p => p.id.toString() === cb.value);
                 if (prod) {
                     const qtyInput = cb.parentElement.nextElementSibling.querySelector('.combo-qty-input');
-                    const qty = parseInt(qtyInput.value) || 1;
+                    const enteredQty = Number(qtyInput.value);
+                    const qty = Number.isSafeInteger(enteredQty) && enteredQty > 0 ? enteredQty : 0;
                     totalSalePrice += (prod.precio_venta || 0) * qty;
                     totalCost += (prod.precio_compra || 0) * qty;
                 }
@@ -228,9 +229,9 @@ export function setupInventory({ onProductsLoaded }) {
 
     if (addLoteBtn) {
         addLoteBtn.addEventListener('click', () => {
-            const qty = parseInt(loteQtyInput.value);
+            const qty = Number(loteQtyInput.value);
             const exp = loteExpInput.value;
-            if (!qty || qty <= 0 || !exp) {
+            if (!Number.isSafeInteger(qty) || qty <= 0 || !exp) {
                 customAlert('Ingresa cantidad válida y fecha de vencimiento.', 'Datos Inválidos', '⚠️');
                 return;
             }
@@ -286,8 +287,8 @@ export function setupInventory({ onProductsLoaded }) {
         if (productCodeInput) productCodeInput.value = prod.codigo || '';
         if (productNameInput) productNameInput.value = prod.nombre || '';
         if (categoriaInput) categoriaInput.value = prod.categoria || 'Bebidas';
-        if (precioCompraInput) precioCompraInput.value = prod.precio_compra || '';
-        if (precioVentaInput) precioVentaInput.value = prod.precio_venta || '';
+        if (precioCompraInput) precioCompraInput.value = prod.precio_compra ?? '';
+        if (precioVentaInput) precioVentaInput.value = prod.precio_venta ?? '';
         if (stockInput) stockInput.value = prod.stock !== null ? prod.stock : '';
         if (alertaStockInput) alertaStockInput.value = prod.alerta_stock !== null ? prod.alerta_stock : '';
         currentLotes = prod.lotes ? [...prod.lotes] : [];
@@ -319,6 +320,7 @@ export function setupInventory({ onProductsLoaded }) {
 
     if (addProductBtn) {
         addProductBtn.addEventListener('click', async () => {
+            if (addProductBtn.disabled) return;
             // VERIFICACIÓN INTELIGENTE: Lotes sin agregar
             const pendingQty = loteQtyInput ? loteQtyInput.value.trim() : '';
             const pendingExp = loteExpInput ? loteExpInput.value.trim() : '';
@@ -336,7 +338,8 @@ export function setupInventory({ onProductsLoaded }) {
                     
                     // Si el input sigue con texto, significa que la validación falló (ej: faltó fecha)
                     // y la adición del lote fue bloqueada, entonces detenemos el guardado principal.
-                    if (loteQtyInput && loteQtyInput.value.trim() !== '') {
+                    if ((loteQtyInput && loteQtyInput.value.trim() !== '') ||
+                        (loteExpInput && loteExpInput.value.trim() !== '')) {
                         return; 
                     }
                 } else {
@@ -360,10 +363,23 @@ export function setupInventory({ onProductsLoaded }) {
 
             const productCode = productCodeInput ? productCodeInput.value.trim() : '';
             const productName = productNameInput ? productNameInput.value.trim() : '';
-            const pCompra = parseFloat(precioCompraInput.value) || null;
-            const pVenta = parseFloat(precioVentaInput.value) || null;
-            const stock = parseInt(stockInput.value) || null;
-            const alerta = parseInt(alertaStockInput.value) || null;
+            const numericFields = [
+                [precioCompraInput, 'El precio de compra', false],
+                [precioVentaInput, 'El precio de venta', false],
+                [stockInput, 'El stock', true],
+                [alertaStockInput, 'La alerta de stock', true]
+            ];
+            const numericValues = [];
+            for (const [input, label, integerOnly] of numericFields) {
+                const raw = input ? input.value.trim() : '';
+                const value = raw === '' ? null : Number(raw);
+                if (value !== null && (!Number.isFinite(value) || value < 0 || (integerOnly && !Number.isSafeInteger(value)))) {
+                    if (productStatusMsg) productStatusMsg.textContent = `${label} debe ser ${integerOnly ? 'un número entero' : 'un número'} mayor o igual a cero.`;
+                    return;
+                }
+                numericValues.push(value);
+            }
+            const [pCompra, pVenta, stock, alerta] = numericValues;
             const cat = categoriaInput ? categoriaInput.value : 'Bebidas';
 
             if (!productName) {
@@ -372,6 +388,7 @@ export function setupInventory({ onProductsLoaded }) {
             }
 
             try {
+                addProductBtn.disabled = true;
                 addProductBtn.textContent = 'Guardando...';
 
                 const payload = {
@@ -414,6 +431,7 @@ export function setupInventory({ onProductsLoaded }) {
                     productStatusMsg.textContent = 'Error: ' + error.message;
                 }
             } finally {
+                if (addProductBtn) addProductBtn.disabled = false;
                 if (addProductBtn) addProductBtn.textContent = editingProductId ? 'Actualizar Producto' : 'Guardar Producto';
             }
         });
@@ -428,7 +446,6 @@ export function setupInventory({ onProductsLoaded }) {
             comboSelectedImage = '';
             if (comboPreviewImg) comboPreviewImg.src = './kalo-logo.png';
             if (comboStatusMsg) comboStatusMsg.textContent = '';
-            updateComboSummary();
             
             if (comboProductList) {
                 comboProductList.innerHTML = '';
@@ -465,6 +482,7 @@ export function setupInventory({ onProductsLoaded }) {
                     comboProductList.appendChild(div);
                 });
             }
+            updateComboSummary();
         });
     }
 
@@ -486,10 +504,11 @@ export function setupInventory({ onProductsLoaded }) {
 
     if (saveComboBtn) {
         saveComboBtn.addEventListener('click', async () => {
+            if (saveComboBtn.disabled) return;
             const nombre = comboNameInput ? comboNameInput.value.trim() : '';
-            const precio = parseFloat(comboPriceInput.value);
+            const precio = Number(comboPriceInput.value);
             
-            if (!nombre || isNaN(precio) || precio <= 0) {
+            if (!nombre || !Number.isFinite(precio) || precio <= 0) {
                 if (comboStatusMsg) comboStatusMsg.textContent = 'Ingresa un nombre y precio válido.';
                 return;
             }
@@ -501,11 +520,15 @@ export function setupInventory({ onProductsLoaded }) {
             }
 
             let comboCodeParts = [];
-            checkboxes.forEach(cb => {
+            for (const cb of checkboxes) {
                 const qtyInput = cb.parentElement.nextElementSibling.querySelector('.combo-qty-input');
-                const qty = qtyInput.value || 1;
+                const qty = Number(qtyInput.value);
+                if (!Number.isSafeInteger(qty) || qty <= 0) {
+                    if (comboStatusMsg) comboStatusMsg.textContent = 'Las cantidades del combo deben ser números enteros mayores a cero.';
+                    return;
+                }
                 comboCodeParts.push(`${cb.value}-${qty}`);
-            });
+            }
             const codigoEspecial = `COMBO:${comboCodeParts.join(',')}`;
 
             saveComboBtn.disabled = true;

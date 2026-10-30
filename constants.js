@@ -1,6 +1,6 @@
 export const ADMIN_EMAILS = ['zzenisx1234@gmail.com', 'nuevohorizonte@gmail.com'];
 
-// Normaliza un nombre de imagen para comparar (sin extensión, separadores ni mayúsculas)
+// Normaliza un nombre de imagen para comparar
 const normalizeImgKey = (name) => String(name || '')
     .normalize('NFC')
     .replace(/\.[^.]+$/, '')

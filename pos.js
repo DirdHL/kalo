@@ -25,15 +25,24 @@ export function setupPOS({ onSaleCompleted }) {
     const posItemsPerPage = 25;
     let posFilteredProducts = [];
     let posCurrentCategory = 'Todos';
+    let activeDiscountPercent = null;
+    let isProcessingSale = false;
+
+    const roundMoney = value => Math.round((value + Number.EPSILON) * 100) / 100;
 
     // --- RENDER CUADRÍCULA POS ---
     function renderPosGrid(productsToRender, resetPage = false) {
         if (!posGrid) return;
         if (resetPage) posCurrentPage = 1;
-        posFilteredProducts = productsToRender || state.globalProducts;
+        const term = posSearch ? posSearch.value.toLowerCase().trim() : '';
+        posFilteredProducts = (productsToRender || state.globalProducts).filter(product =>
+            (posCurrentCategory === 'Todos' || product.categoria === posCurrentCategory) &&
+            ((product.nombre || '').toLowerCase().includes(term) || (product.codigo || '').toLowerCase().includes(term))
+        );
 
         posGrid.innerHTML = '';
         const totalPages = Math.ceil(posFilteredProducts.length / posItemsPerPage) || 1;
+        posCurrentPage = Math.min(Math.max(1, posCurrentPage), totalPages);
         const startIndex = (posCurrentPage - 1) * posItemsPerPage;
         const endIndex = startIndex + posItemsPerPage;
         const paginatedItems = posFilteredProducts.slice(startIndex, endIndex);
@@ -88,13 +97,7 @@ export function setupPOS({ onSaleCompleted }) {
 
     // --- FILTRADO POR CATEGORÍA Y BÚSQUEDA ---
     function filterPosProducts() {
-        const term = posSearch ? posSearch.value.toLowerCase() : '';
-        const filtered = state.globalProducts.filter(p => {
-            const matchSearch = p.nombre.toLowerCase().includes(term) || (p.codigo && p.codigo.toLowerCase().includes(term));
-            const matchCat = posCurrentCategory === 'Todos' || p.categoria === posCurrentCategory;
-            return matchSearch && matchCat;
-        });
-        renderPosGrid(filtered, true);
+        renderPosGrid(state.globalProducts, true);
     }
 
     if (posSearch) {
@@ -136,6 +139,7 @@ export function setupPOS({ onSaleCompleted }) {
 
     // --- GESTIÓN DEL CARRITO ---
     function addToCart(prod) {
+        if (isProcessingSale) return;
         const existing = state.cart.find(item => item.id === prod.id);
         if (existing) {
             existing.qty++;
@@ -146,6 +150,7 @@ export function setupPOS({ onSaleCompleted }) {
     }
 
     function updateQty(index, delta) {
+        if (isProcessingSale || !state.cart[index]) return;
         state.cart[index].qty += delta;
         if (state.cart[index].qty <= 0) {
             state.cart.splice(index, 1);
@@ -179,13 +184,18 @@ export function setupPOS({ onSaleCompleted }) {
             cartItemsContainer.appendChild(div);
         });
 
-        const discount = parseFloat(cartDiscount ? cartDiscount.value : 0) || 0;
+        subtotal = roundMoney(subtotal);
+        if (activeDiscountPercent !== null && cartDiscount) {
+            cartDiscount.value = roundMoney(subtotal * activeDiscountPercent / 100).toFixed(2);
+        }
+        const discount = Number(cartDiscount ? cartDiscount.value : 0) || 0;
         const total = Math.max(0, subtotal - discount);
         cartTotalValue.textContent = `S/ ${total.toFixed(2)}`;
     }
 
     if (cartDiscount) {
         cartDiscount.addEventListener('input', () => {
+            activeDiscountPercent = null;
             discountBtns.forEach(b => b.classList.remove('active-discount'));
             renderCart();
         });
@@ -197,6 +207,7 @@ export function setupPOS({ onSaleCompleted }) {
             discountBtns.forEach(b => b.classList.remove('active-discount'));
             
             if (isAlreadyActive) {
+                activeDiscountPercent = null;
                 if (cartDiscount) cartDiscount.value = '';
                 renderCart();
                 return;
@@ -208,10 +219,12 @@ export function setupPOS({ onSaleCompleted }) {
             state.cart.forEach(item => subtotal += (item.precio_venta || 0) * item.qty);
             
             if (subtotal > 0 && cartDiscount) {
+                activeDiscountPercent = percent;
                 const discountAmount = (subtotal * (percent / 100)).toFixed(2);
                 cartDiscount.value = discountAmount;
                 renderCart();
             } else if (cartDiscount) {
+                activeDiscountPercent = null;
                 cartDiscount.value = '';
                 e.target.classList.remove('active-discount');
                 renderCart();
@@ -234,83 +247,131 @@ export function setupPOS({ onSaleCompleted }) {
     // --- COBRAR Y GENERAR BOLETA ---
     if (cobrarBtn) {
         cobrarBtn.addEventListener('click', async () => {
+            if (isProcessingSale) return;
             if (state.cart.length === 0) {
                 await customAlert('El ticket está vacío.', 'Aviso', '⚠️');
                 return;
             }
             
-            let subtotal = 0;
-            state.cart.forEach(item => subtotal += (item.precio_venta || 0) * item.qty);
+            const saleItems = state.cart.map(item => ({ ...item }));
+            if (saleItems.some(item => !Number.isSafeInteger(item.qty) || item.qty <= 0 ||
+                !Number.isFinite(Number(item.precio_venta)) || Number(item.precio_venta) < 0)) {
+                await customAlert('Revisa los precios y cantidades del ticket.', 'Datos inválidos', '⚠️');
+                return;
+            }
+            const subtotal = roundMoney(saleItems.reduce((sum, item) => sum + Number(item.precio_venta || 0) * item.qty, 0));
             
-            const discount = parseFloat(cartDiscount ? cartDiscount.value : 0) || 0;
-            const total = Math.max(0, subtotal - discount);
+            const discount = Number(cartDiscount ? cartDiscount.value : 0);
+            if (!Number.isFinite(discount) || discount < 0 || discount > subtotal) {
+                await customAlert('El descuento debe estar entre cero y el subtotal del ticket.', 'Descuento inválido', '⚠️');
+                return;
+            }
+            const total = roundMoney(subtotal - discount);
             const metodo = paymentMethod ? paymentMethod.value : 'Efectivo';
+            let efectivo = metodo === 'Efectivo' ? total : 0;
+            let yape = metodo === 'Yape' ? total : 0;
+
+            if (!['Efectivo', 'Yape', 'Ambos'].includes(metodo)) {
+                await customAlert('Selecciona un método de pago válido.', 'Pago inválido', '⚠️');
+                return;
+            }
 
             if (metodo === 'Ambos') {
-                const ef = parseFloat(splitEfectivo.value) || 0;
-                const yp = parseFloat(splitYape.value) || 0;
+                const ef = Number(splitEfectivo ? splitEfectivo.value : NaN);
+                const yp = Number(splitYape ? splitYape.value : NaN);
+
+                if (!Number.isFinite(ef) || !Number.isFinite(yp) || ef < 0 || yp < 0) {
+                    await customAlert('Los montos de efectivo y Yape deben ser números mayores o iguales a cero.', 'Montos incorrectos', '⚠️');
+                    return;
+                }
                 
-                if (Math.abs((ef + yp) - total) > 0.01) {
+                efectivo = roundMoney(ef);
+                yape = roundMoney(yp);
+                if (roundMoney(efectivo + yape) !== total) {
                     await customAlert(`Los montos divididos (S/ ${(ef + yp).toFixed(2)}) no coinciden con el total a pagar (S/ ${total.toFixed(2)}).`, 'Montos incorrectos', '⚠️');
                     return;
                 }
             }
 
+            const appliedStockUpdates = [];
+            let saleRecorded = false;
             try {
+                isProcessingSale = true;
                 cobrarBtn.disabled = true;
                 cobrarBtn.textContent = 'Procesando...';
 
                 // Agrupar descuentos necesarios
-                const stockUpdates = {};
-                for (const item of state.cart) {
+                const stockUpdates = new Map();
+                const addStockRequirement = (id, quantity) => {
+                    if (!Number.isSafeInteger(quantity) || quantity <= 0) {
+                        throw new Error('El combo contiene una cantidad inválida. Revisa su configuración.');
+                    }
+                    const key = String(id);
+                    stockUpdates.set(key, (stockUpdates.get(key) || 0) + quantity);
+                };
+                for (const item of saleItems) {
                     if (item.codigo && item.codigo.startsWith('COMBO:')) {
-                        const parts = item.codigo.replace('COMBO:', '').split(',');
+                        const parts = item.codigo.slice('COMBO:'.length).split(',');
                         for (const part of parts) {
-                            if (!part) continue;
-                            const [idStrCombo, qtyStr] = part.split('-');
-                            const subId = isNaN(idStrCombo) ? idStrCombo : Number(idStrCombo);
-                            const subQty = parseInt(qtyStr) * item.qty;
-                            stockUpdates[subId] = (stockUpdates[subId] || 0) + subQty;
+                            const component = /^(.+)-([1-9]\d*)$/.exec(part);
+                            if (!component) throw new Error('El combo contiene productos o cantidades inválidos. Revisa su configuración.');
+                            addStockRequirement(component[1], Number(component[2]) * item.qty);
                         }
                     } else {
-                        stockUpdates[item.id] = (stockUpdates[item.id] || 0) + item.qty;
+                        addStockRequirement(item.id, item.qty);
                     }
                 }
 
                 let costoTotalVenta = 0;
 
                 // Descontar únicamente del stock numérico (sin tocar lotes de vencimiento)
-                for (const [idStr, qtyToDeduct] of Object.entries(stockUpdates)) {
-                    const prodId = isNaN(idStr) ? idStr : Number(idStr);
-                    const dbProd = state.globalProducts.find(p => p.id === prodId);
-                    if (dbProd) {
-                        costoTotalVenta += (parseFloat(dbProd.precio_compra) || 0) * qtyToDeduct;
-                        if (dbProd.stock !== null) {
-                            let newStock = Math.max(0, dbProd.stock - qtyToDeduct);
-                            const { error: updateErr } = await supabase.from('productos').update({ stock: newStock }).eq('id', prodId);
-                            if (updateErr) {
-                                console.error('Error descontando stock para producto', prodId, updateErr);
-                            }
+                const pendingStockUpdates = [];
+                for (const [id, qtyToDeduct] of stockUpdates) {
+                    const dbProd = state.globalProducts.find(p => String(p.id) === id);
+                    if (!dbProd) throw new Error('Un producto del ticket ya no está disponible. Actualiza el inventario.');
+                    costoTotalVenta += (Number(dbProd.precio_compra) || 0) * qtyToDeduct;
+                    if (dbProd.stock !== null) {
+                        const previousStock = Number(dbProd.stock);
+                        if (!Number.isSafeInteger(previousStock) || previousStock < qtyToDeduct) {
+                            throw new Error(`Stock insuficiente para ${dbProd.nombre}. Disponible: ${dbProd.stock}.`);
                         }
+                        pendingStockUpdates.push({ id: dbProd.id, previousStock, newStock: previousStock - qtyToDeduct });
                     }
+                }
+
+                for (const update of pendingStockUpdates) {
+                    const { data, error } = await supabase.from('productos').update({ stock: update.newStock })
+                        .eq('id', update.id).eq('local', state.currentLocal).eq('stock', update.previousStock).select('id');
+                    if (error) throw error;
+                    if (!data || data.length !== 1) throw new Error('El stock cambió en otra caja. Actualiza el inventario y vuelve a intentarlo.');
+                    appliedStockUpdates.push(update);
                 }
                 
                 // Guardar la venta en la tabla 'ventas'
-                try {
-                    await supabase.from('ventas').insert([{
+                const { error: saleError } = await supabase.from('ventas').insert([{
                         subtotal: subtotal,
                         descuento: discount,
                         total: total,
                         metodo_pago: metodo,
-                        efectivo: metodo === 'Ambos' ? parseFloat(splitEfectivo.value) || 0 : (metodo === 'Efectivo' ? total : 0),
-                        yape: metodo === 'Ambos' ? parseFloat(splitYape.value) || 0 : (metodo === 'Yape' ? total : 0),
-                        costo_total: costoTotalVenta,
-                        detalles: state.cart,
+                        efectivo,
+                        yape,
+                        costo_total: roundMoney(costoTotalVenta),
+                        detalles: saleItems,
                         local: state.currentLocal
                     }]);
-                } catch(e) {
-                    console.error("Error al registrar venta:", e);
-                }
+                if (saleError) throw saleError;
+                saleRecorded = true;
+
+                // Limpiar al confirmar el registro; el cierre de una boleta anterior no debe borrar otra venta.
+                state.cart = [];
+                activeDiscountPercent = null;
+                if (cartDiscount) cartDiscount.value = '';
+                discountBtns.forEach(b => b.classList.remove('active-discount'));
+                renderCart();
+                if (paymentMethod) paymentMethod.value = 'Efectivo';
+                if (splitEfectivo) splitEfectivo.value = '';
+                if (splitYape) splitYape.value = '';
+                if (splitPaymentSection) splitPaymentSection.classList.add('hidden');
 
                 // Generar Boleta / Ticket
                 const receiptModal = document.getElementById('receiptModal');
@@ -321,7 +382,7 @@ export function setupPOS({ onSaleCompleted }) {
                     
                     const tbody = document.getElementById('receiptItems');
                     tbody.innerHTML = '';
-                    state.cart.forEach(item => {
+                    saleItems.forEach(item => {
                         const tr = document.createElement('tr');
                         tr.innerHTML = `
                             <td style="padding: 0.2rem 0; border-bottom: 1px dashed #ccc;">
@@ -347,9 +408,7 @@ export function setupPOS({ onSaleCompleted }) {
                     document.getElementById('receiptTotal').textContent = 'S/ ' + total.toFixed(2);
                     
                     if (metodo === 'Ambos') {
-                        const ef = parseFloat(splitEfectivo.value) || 0;
-                        const yp = parseFloat(splitYape.value) || 0;
-                        document.getElementById('receiptPaymentMethod').textContent = `S/ ${ef.toFixed(2)} Efvo | S/ ${yp.toFixed(2)} Yape`;
+                        document.getElementById('receiptPaymentMethod').textContent = `S/ ${efectivo.toFixed(2)} Efvo | S/ ${yape.toFixed(2)} Yape`;
                     } else {
                         document.getElementById('receiptPaymentMethod').textContent = 'Pago: ' + metodo;
                     }
@@ -358,28 +417,18 @@ export function setupPOS({ onSaleCompleted }) {
                     
                     const finishSale = () => {
                         receiptModal.classList.add('hidden');
-                        state.cart = [];
-                        if (cartDiscount) cartDiscount.value = '';
-                        discountBtns.forEach(b => b.classList.remove('active-discount'));
-                        renderCart();
-                        if (splitPaymentSection) splitPaymentSection.classList.add('hidden');
+                        clearTimeout(autoPrintTimeout);
                         window.removeEventListener('afterprint', finishSale);
                     };
 
                     document.getElementById('closeReceiptBtn').onclick = finishSale;
                     document.getElementById('printReceiptBtn').onclick = () => window.print();
 
-                    setTimeout(() => {
+                    const autoPrintTimeout = setTimeout(() => {
                         window.addEventListener('afterprint', finishSale);
                         window.print();
                     }, 500);
 
-                } else {
-                    state.cart = [];
-                    if (cartDiscount) cartDiscount.value = '';
-                    discountBtns.forEach(b => b.classList.remove('active-discount'));
-                    renderCart();
-                    if (splitPaymentSection) splitPaymentSection.classList.add('hidden');
                 }
 
                 if (typeof onSaleCompleted === 'function') {
@@ -387,8 +436,25 @@ export function setupPOS({ onSaleCompleted }) {
                 }
 
             } catch (err) {
-                await customAlert('Error al procesar la venta: ' + err.message, 'Error', '⚠️');
+                const rollbackErrors = [];
+                if (!saleRecorded) {
+                    for (const update of appliedStockUpdates.reverse()) {
+                        try {
+                            const { data, error } = await supabase.from('productos').update({ stock: update.previousStock })
+                                .eq('id', update.id).eq('local', state.currentLocal).eq('stock', update.newStock).select('id');
+                            if (error) throw error;
+                            if (!data || data.length !== 1) throw new Error(`El stock del producto ${update.id} cambió durante la restauración.`);
+                        } catch (rollbackError) {
+                            rollbackErrors.push(rollbackError.message);
+                        }
+                    }
+                }
+                let message = saleRecorded ? 'La venta fue registrada, pero no se pudo completar la actualización de pantalla: ' : 'No se pudo registrar la venta: ';
+                message += err.message;
+                if (rollbackErrors.length) message += '\nNo se pudo restaurar todo el stock. Revisa el inventario antes de volver a cobrar.\n' + rollbackErrors.join('\n');
+                await customAlert(message, 'Error', '⚠️');
             } finally {
+                isProcessingSale = false;
                 cobrarBtn.disabled = false;
                 cobrarBtn.textContent = 'Cobrar';
             }

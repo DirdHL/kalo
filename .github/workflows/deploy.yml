@@ -26,7 +26,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           
       - name: Crear archivo .env para seguridad
         run: |
@@ -34,10 +34,13 @@ jobs:
           echo "VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}" >> .env
           
       - name: Instalar paquetes
-        run: npm install
+        run: npm ci
+
+      - name: Comprobar regresiones
+        run: npm test
         
       - name: Construir proyecto
-        run: npx vite build
+        run: npm run build
         
       - name: Configurar GitHub Pages
         uses: actions/configure-pages@v4
