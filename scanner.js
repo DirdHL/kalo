@@ -38,7 +38,7 @@ export function setupScanner({ onBarcodeScanned }) {
                     if (cartTotalValue) {
                         const prevColor = cartTotalValue.style.color;
                         const prevText = cartTotalValue.textContent;
-                        cartTotalValue.style.color = 'var(--danger)';
+                        cartTotalValue.style.color = 'var(--ticket-warning, var(--danger))';
                         cartTotalValue.textContent = 'Código no encontrado';
                         setTimeout(() => {
                             cartTotalValue.style.color = prevColor;
