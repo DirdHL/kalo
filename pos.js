@@ -8,12 +8,16 @@ export function setupPOS({ onSaleCompleted }) {
     const posSearch = document.getElementById('posSearch');
     const cartItemsContainer = document.getElementById('cartItems');
     const cartTotalValue = document.getElementById('cartTotalValue');
+    const cartItemCount = document.getElementById('cartItemCount');
+    const mobileCartTotal = document.getElementById('mobileCartTotal');
+    const catalogCount = document.getElementById('catalogCount');
     const paymentMethod = document.getElementById('paymentMethod');
     const splitPaymentSection = document.getElementById('splitPaymentSection');
     const splitEfectivo = document.getElementById('splitEfectivo');
     const splitYape = document.getElementById('splitYape');
     const cobrarBtn = document.getElementById('cobrarBtn');
     const cartDiscount = document.getElementById('cartDiscount');
+    const discountSummaryAmount = document.getElementById('discountSummaryAmount');
     const discountBtns = document.querySelectorAll('.discount-btn');
     const catBtns = document.querySelectorAll('.cat-filter-btn');
 
@@ -29,6 +33,9 @@ export function setupPOS({ onSaleCompleted }) {
     let isProcessingSale = false;
 
     const roundMoney = value => Math.round((value + Number.EPSILON) * 100) / 100;
+    const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, character => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[character]));
 
     // --- RENDER CUADRÍCULA POS ---
     function renderPosGrid(productsToRender, resetPage = false) {
@@ -46,17 +53,39 @@ export function setupPOS({ onSaleCompleted }) {
         const startIndex = (posCurrentPage - 1) * posItemsPerPage;
         const endIndex = startIndex + posItemsPerPage;
         const paginatedItems = posFilteredProducts.slice(startIndex, endIndex);
+        if (catalogCount) {
+            const count = posFilteredProducts.length;
+            catalogCount.textContent = `${count} ${count === 1 ? 'producto' : 'productos'}`;
+        }
+
+        if (paginatedItems.length === 0) {
+            posGrid.innerHTML = `
+                <div class="catalog-empty">
+                    <span class="empty-state-icon" aria-hidden="true">⌕</span>
+                    <h3>No encontramos productos</h3>
+                    <p>Prueba con otro nombre, código o categoría.</p>
+                </div>
+            `;
+        }
 
         paginatedItems.forEach(prod => {
-            const div = document.createElement('div');
+            const div = document.createElement('button');
+            div.type = 'button';
             div.className = 'product-card';
+            div.title = prod.nombre;
             const imgSrc = resolveImage(prod.imagen);
             const precio = prod.precio_venta ? `S/ ${prod.precio_venta.toFixed(2)}` : 'S/ 0.00';
+            div.ariaLabel = `Agregar ${prod.nombre} al ticket, ${precio}`;
+            const stock = prod.stock == null ? null : Number(prod.stock);
+            const stockLabel = stock !== null && Number.isFinite(stock)
+                ? `<span class="product-stock${stock === 0 ? ' is-empty' : ''}">${stock === 0 ? 'Sin stock' : `${stock} disponibles`}</span>`
+                : '';
             
             div.innerHTML = `
-                <img src="${imgSrc}" onerror="this.onerror=null; this.src='./kalo-logo.png'">
-                <h3>${prod.nombre}</h3>
-                <p>${precio}</p>
+                <img class="product-image" src="${escapeHtml(imgSrc)}" alt="${escapeHtml(prod.nombre)}" loading="lazy" onerror="this.onerror=null; this.src='./kalo-logo.png'">
+                <h3>${escapeHtml(prod.nombre)}</h3>
+                <p class="product-price">${precio}</p>
+                ${stockLabel}
             `;
             
             div.addEventListener('click', () => addToCart(prod));
@@ -164,6 +193,16 @@ export function setupPOS({ onSaleCompleted }) {
         cartItemsContainer.innerHTML = '';
         let subtotal = 0;
 
+        if (state.cart.length === 0) {
+            cartItemsContainer.innerHTML = `
+                <div class="cart-empty">
+                    <span class="empty-state-icon" aria-hidden="true">＋</span>
+                    <h3>Tu ticket está vacío</h3>
+                    <p>Selecciona un producto para comenzar.</p>
+                </div>
+            `;
+        }
+
         state.cart.forEach((item, index) => {
             const itemTotal = (item.precio_venta || 0) * item.qty;
             subtotal += itemTotal;
@@ -172,13 +211,13 @@ export function setupPOS({ onSaleCompleted }) {
             div.className = 'cart-item';
             div.innerHTML = `
                 <div class="cart-item-info">
-                    <p class="cart-item-title">${item.nombre}</p>
+                    <p class="cart-item-title">${escapeHtml(item.nombre)}</p>
                     <p class="cart-item-price">S/ ${(item.precio_venta || 0).toFixed(2)} x ${item.qty}</p>
                 </div>
                 <div class="cart-item-qty">
-                    <button class="qty-btn" onclick="updateQty(${index}, -1)">-</button>
+                    <button type="button" class="qty-btn" aria-label="Quitar una unidad de ${escapeHtml(item.nombre)}" onclick="updateQty(${index}, -1)">−</button>
                     <span>${item.qty}</span>
-                    <button class="qty-btn" onclick="updateQty(${index}, 1)">+</button>
+                    <button type="button" class="qty-btn" aria-label="Añadir una unidad de ${escapeHtml(item.nombre)}" onclick="updateQty(${index}, 1)">+</button>
                 </div>
             `;
             cartItemsContainer.appendChild(div);
@@ -189,8 +228,16 @@ export function setupPOS({ onSaleCompleted }) {
             cartDiscount.value = roundMoney(subtotal * activeDiscountPercent / 100).toFixed(2);
         }
         const discount = Number(cartDiscount ? cartDiscount.value : 0) || 0;
+        if (discountSummaryAmount) {
+            discountSummaryAmount.textContent = Number.isFinite(discount) && discount > 0 ? `- S/ ${discount.toFixed(2)}` : 'Opcional';
+        }
         const total = Math.max(0, subtotal - discount);
         cartTotalValue.textContent = `S/ ${total.toFixed(2)}`;
+        if (mobileCartTotal) mobileCartTotal.textContent = cartTotalValue.textContent;
+        if (cartItemCount) {
+            const count = state.cart.reduce((sum, item) => sum + item.qty, 0);
+            cartItemCount.textContent = `${count} ${count === 1 ? 'producto' : 'productos'}`;
+        }
     }
 
     if (cartDiscount) {
@@ -460,6 +507,8 @@ export function setupPOS({ onSaleCompleted }) {
             }
         });
     }
+
+    renderCart();
 
     return {
         renderPosGrid,

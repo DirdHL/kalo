@@ -3,21 +3,67 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kalo | Elige tu Local</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;800&display=swap" rel="stylesheet">
+    <meta name="description" content="Selecciona tu local Kalo para acceder al punto de venta y al inventario.">
+    <meta name="theme-color" content="#f4f7f8">
+    <title>Kalo | Elige tu local</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="icon" type="image/png" href="./kalo-logo.png">
-    <style>
-        body { margin: 0; background: #0f172a; color: white; font-family: 'Inter', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; }
-        .btn { background: linear-gradient(135deg, #60a5fa, #a78bfa); padding: 1.5rem 3rem; border-radius: 12px; font-size: 1.5rem; color: white; text-decoration: none; font-weight: bold; margin: 1rem; width: 300px; text-align: center; box-shadow: 0 4px 15px rgba(96,165,250,0.3); transition: transform 0.2s; display: block; cursor: pointer; }
-        .btn:hover { transform: translateY(-5px); }
-        img { height: 120px; margin-bottom: 2rem; filter: drop-shadow(0 0 20px rgba(96,165,250,0.5)); }
-    </style>
+    <link rel="stylesheet" href="./landing.css">
 </head>
 <body>
-    <img src="./kalo-logo.png" alt="Kalo Logo">
-    <h1 style="margin-bottom: 2rem;">¿A qué local vas a ingresar?</h1>
-    <a href="./brisas.html" class="btn">📍 Las Brisas</a>
-    <a href="./pinos.html" class="btn">📍 Los Pinos</a>
-    <a href="./polideportivo.html" class="btn">📍 El Polideportivo</a>
+    <div class="landing-shell">
+        <header class="landing-header">
+            <div class="brand">
+                <img src="./kalo-logo.png" alt="" width="42" height="46">
+                <div>
+                    <span class="brand-name">Kalo</span>
+                    <span class="brand-description">Punto de venta</span>
+                </div>
+            </div>
+            <span class="header-label">Ventas e inventario</span>
+        </header>
+
+        <main class="local-selection">
+            <div class="welcome-copy">
+                <p class="eyebrow">TU ESPACIO DE TRABAJO</p>
+                <h1>¿En qué local estás hoy?</h1>
+                <p class="welcome-description">Selecciona tu sucursal para iniciar sesión.</p>
+            </div>
+
+            <nav class="local-grid" aria-label="Locales disponibles">
+                <a href="./brisas.html" class="local-card">
+                    <span class="local-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10h18l-2-6H5l-2 6Z"/><path d="M4 10v10h16V10M9 20v-6h6v6M3 10a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0"/></svg>
+                    </span>
+                    <span class="local-name">Las Brisas</span>
+                    <span class="local-action">Ingresar al local <span aria-hidden="true">↗</span></span>
+                </a>
+                <a href="./pinos.html" class="local-card">
+                    <span class="local-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10h18l-2-6H5l-2 6Z"/><path d="M4 10v10h16V10M9 20v-6h6v6M3 10a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0"/></svg>
+                    </span>
+                    <span class="local-name">Los Pinos</span>
+                    <span class="local-action">Ingresar al local <span aria-hidden="true">↗</span></span>
+                </a>
+                <a href="./polideportivo.html" class="local-card">
+                    <span class="local-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10h18l-2-6H5l-2 6Z"/><path d="M4 10v10h16V10M9 20v-6h6v6M3 10a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0"/></svg>
+                    </span>
+                    <span class="local-name">El Polideportivo</span>
+                    <span class="local-action">Ingresar al local <span aria-hidden="true">↗</span></span>
+                </a>
+
+
+
+
+                
+            </nav>
+
+        </main>
+ 
+        <footer class="landing-footer">Kalo <span aria-hidden="true">·</span> Todo listo para tu jornada.</footer>
+    </div>
 </body>
 </html>

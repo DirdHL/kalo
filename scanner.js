@@ -22,8 +22,8 @@ export function setupScanner({ onBarcodeScanned }) {
         }, 50);
 
         if (e.key === 'Enter') {
-            e.preventDefault();
             if (barcodeBuffer.trim().length > 0) {
+                e.preventDefault();
                 const scannedCode = barcodeBuffer.trim().toLowerCase();
                 const match = state.globalProducts.find(p => p.codigo && p.codigo.toLowerCase() === scannedCode);
                 
@@ -38,8 +38,8 @@ export function setupScanner({ onBarcodeScanned }) {
                     if (cartTotalValue) {
                         const prevColor = cartTotalValue.style.color;
                         const prevText = cartTotalValue.textContent;
-                        cartTotalValue.style.color = '#fca5a5';
-                        cartTotalValue.textContent = '❌ No found';
+                        cartTotalValue.style.color = 'var(--danger)';
+                        cartTotalValue.textContent = 'Código no encontrado';
                         setTimeout(() => {
                             cartTotalValue.style.color = prevColor;
                             cartTotalValue.textContent = prevText;

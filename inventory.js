@@ -75,11 +75,11 @@ export function setupInventory({ onProductsLoaded }) {
         
         comboNetProfit.textContent = `S/ ${profit.toFixed(2)}`;
         if (profit < 0) {
-            comboNetProfit.style.color = '#fca5a5';
+            comboNetProfit.style.color = '#b42318';
         } else if (profit > 0) {
-            comboNetProfit.style.color = '#10b981';
+            comboNetProfit.style.color = '#147556';
         } else {
-            comboNetProfit.style.color = 'var(--text-main)';
+            comboNetProfit.style.color = 'var(--text-primary)';
         }
     }
     
@@ -177,7 +177,7 @@ export function setupInventory({ onProductsLoaded }) {
         lotesList.innerHTML = '';
         
         if (currentLotes.length === 0) {
-            lotesList.innerHTML = '<span style="color: gray;">Sin lotes (informativo).</span>';
+            lotesList.innerHTML = '<span style="color: var(--text-secondary);">Sin lotes (informativo).</span>';
             return;
         }
 
@@ -187,7 +187,7 @@ export function setupInventory({ onProductsLoaded }) {
             const div = document.createElement('div');
             div.style.display = 'flex';
             div.style.justifyContent = 'space-between';
-            div.style.borderBottom = '1px solid rgba(255,255,255,0.1)';
+            div.style.borderBottom = '1px solid var(--card-border)';
             div.style.padding = '0.2rem 0';
             
             const expDate = new Date(lote.vencimiento);
@@ -200,12 +200,12 @@ export function setupInventory({ onProductsLoaded }) {
             const isNear = !isExpired && expDate <= thirtyDaysLater;
             
             let color = 'var(--text-primary)';
-            if (isExpired) color = '#ef4444';
-            else if (isNear) color = '#f59e0b';
+            if (isExpired) color = '#b42318';
+            else if (isNear) color = '#9a5908';
 
             div.innerHTML = `
                 <span style="color: ${color}">Cant: ${lote.qty} | Vence: ${lote.vencimiento}</span>
-                <button type="button" class="secondary-btn btn-remove-lote" data-index="${index}" style="padding: 0 0.5rem; border-color: #ef4444; color: #ef4444;">x</button>
+                <button type="button" class="secondary-btn btn-remove-lote" data-index="${index}" style="padding: 0 0.5rem; border-color: #f2c8c4; color: #b42318;">x</button>
             `;
             lotesList.appendChild(div);
         });
@@ -414,7 +414,7 @@ export function setupInventory({ onProductsLoaded }) {
                 if (res.error) throw res.error;
 
                 if (productStatusMsg) {
-                    productStatusMsg.style.color = '#86efac';
+                    productStatusMsg.style.color = '#147556';
                     productStatusMsg.textContent = editingProductId ? '¡Producto actualizado exitosamente!' : '¡Producto guardado exitosamente!';
                 }
 
@@ -427,7 +427,7 @@ export function setupInventory({ onProductsLoaded }) {
 
             } catch (error) {
                 if (productStatusMsg) {
-                    productStatusMsg.style.color = '#fca5a5';
+                    productStatusMsg.style.color = '#b42318';
                     productStatusMsg.textContent = 'Error: ' + error.message;
                 }
             } finally {
@@ -456,7 +456,7 @@ export function setupInventory({ onProductsLoaded }) {
                     div.style.justifyContent = 'space-between';
                     div.style.alignItems = 'center';
                     div.style.padding = '0.5rem';
-                    div.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
+                    div.style.borderBottom = '1px solid var(--card-border)';
                     
                     div.innerHTML = `
                         <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer; flex: 1;">
@@ -583,7 +583,7 @@ export function setupInventory({ onProductsLoaded }) {
             }
         } catch (error) {
             if (productList) {
-                productList.innerHTML = `<tr><td colspan="8" style="color:#fca5a5; text-align:center">Error al cargar: ${error.message}</td></tr>`;
+                productList.innerHTML = `<tr><td colspan="8" style="color:#b42318; text-align:center">Error al cargar: ${error.message}</td></tr>`;
             }
         }
     }
@@ -594,7 +594,7 @@ export function setupInventory({ onProductsLoaded }) {
         productList.innerHTML = '';
         
         if (state.invFilteredProducts.length === 0) {
-            productList.innerHTML = '<tr><td colspan="8" style="text-align:center; color:gray">No hay productos registrados.</td></tr>';
+            productList.innerHTML = '<tr><td colspan="8" style="text-align:center; color:var(--text-secondary)">No hay productos registrados.</td></tr>';
             if (paginationInfo) paginationInfo.textContent = 'Mostrando 0 productos';
             if (prevPageBtn) prevPageBtn.disabled = true;
             if (nextPageBtn) nextPageBtn.disabled = true;
@@ -615,7 +615,7 @@ export function setupInventory({ onProductsLoaded }) {
             let stockWarning = '';
             if (prod.stock !== null && prod.alerta_stock !== null && prod.stock <= prod.alerta_stock) {
                 tr.classList.add('warning-row');
-                stockWarning = ' <span title="¡Inventario Bajo!" style="color: #f59e0b;">⚠️</span>';
+                stockWarning = ' <span title="¡Inventario Bajo!" style="color: #9a5908;">⚠️</span>';
             }
 
             const delCol = prod.id !== undefined ? 'id' : 'nombre';
@@ -633,11 +633,11 @@ export function setupInventory({ onProductsLoaded }) {
                 <td>${prod.nombre}</td>
                 <td>${cat}</td>
                 <td>${pCompra}</td>
-                <td><strong style="color: #a7f3d0">${pVenta}</strong></td>
+                <td><strong style="color: var(--primary)">${pVenta}</strong></td>
                 <td>${pStock}${stockWarning}</td>
                 <td style="display: flex; gap: 0.5rem; justify-content: center;">
-                    <button class="edit-btn" data-prodid="${prod.id}" style="background: transparent; border: none; cursor: pointer; font-size: 1.2rem; color: #60a5fa; transition: transform 0.2s;" title="Editar">✏️</button>
-                    <button class="delete-btn" data-prodid="${prod.id}" data-col="${delCol}" data-val="${delVal}" style="background: transparent; border: none; cursor: pointer; font-size: 1.2rem; color: #fca5a5; transition: transform 0.2s;" title="Eliminar">🗑️</button>
+                    <button class="edit-btn" data-prodid="${prod.id}" style="background: transparent; border: none; cursor: pointer; font-size: 1.2rem; color: var(--primary); transition: transform 0.2s;" title="Editar">✏️</button>
+                    <button class="delete-btn" data-prodid="${prod.id}" data-col="${delCol}" data-val="${delVal}" style="background: transparent; border: none; cursor: pointer; font-size: 1.2rem; color: #b42318; transition: transform 0.2s;" title="Eliminar">🗑️</button>
                 </td>
             `;
             productList.appendChild(tr);
@@ -769,14 +769,14 @@ export function setupInventory({ onProductsLoaded }) {
                     if (isExpired || isNear) {
                         alertCount++;
                         const tr = document.createElement('tr');
-                        const color = isExpired ? '#fca5a5' : '#fcd34d';
+                        const color = isExpired ? '#b42318' : '#9a5908';
                         const estado = isExpired ? 'Vencido' : 'Próximo a Vencer';
                         tr.innerHTML = `
                             <td>${prod.nombre}</td>
                             <td>${lote.qty} unidades</td>
                             <td style="color: ${color}; font-weight: bold;">${lote.vencimiento}</td>
                             <td style="color: ${color};">${estado}</td>
-                            <td><button class="secondary-btn depurar-btn" data-prodid="${prod.id}" data-loteidx="${index}" style="padding: 0.2rem 0.5rem; font-size: 0.8rem; background: rgba(239, 68, 68, 0.2); border-color: #ef4444; color: #ef4444;">Depurado</button></td>
+                            <td><button class="secondary-btn depurar-btn" data-prodid="${prod.id}" data-loteidx="${index}" style="padding: 0.2rem 0.5rem; font-size: 0.8rem; background: #fff1ef; border-color: #f2c8c4; color: #b42318;">Depurado</button></td>
                         `;
                         alertsList.appendChild(tr);
                     }
@@ -789,7 +789,7 @@ export function setupInventory({ onProductsLoaded }) {
             alertsBadge.style.display = 'block';
         } else {
             alertsBadge.style.display = 'none';
-            alertsList.innerHTML = '<tr><td colspan="5" style="text-align:center; color: gray;">Todo en orden. No hay productos por vencer.</td></tr>';
+            alertsList.innerHTML = '<tr><td colspan="5" style="text-align:center; color: var(--text-secondary);">Todo en orden. No hay productos por vencer.</td></tr>';
         }
         
         if (!window.alertsDelegated) {

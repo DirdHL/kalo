@@ -150,12 +150,12 @@ export function setupStats({ onProductsChanged }) {
                     {
                         label: 'Ganancia Bruta (S/)',
                         data: valuesGananciaBruta.length ? valuesGananciaBruta : [0],
-                        borderColor: '#fcd34d',
-                        backgroundColor: 'rgba(252, 211, 77, 0.1)',
+                        borderColor: '#b56a21',
+                        backgroundColor: 'rgba(181, 106, 33, 0.1)',
                         borderWidth: 2,
                         tension: 0.3,
                         fill: false,
-                        pointBackgroundColor: '#fcd34d',
+                        pointBackgroundColor: '#b56a21',
                         pointBorderColor: '#fff',
                         pointRadius: 4,
                         pointHoverRadius: 6
@@ -163,12 +163,12 @@ export function setupStats({ onProductsChanged }) {
                     {
                         label: 'Ganancia Neta (S/)',
                         data: valuesGananciaNeta.length ? valuesGananciaNeta : [0],
-                        borderColor: '#10b981',
-                        backgroundColor: 'rgba(16, 185, 129, 0.2)',
+                        borderColor: '#087f87',
+                        backgroundColor: 'rgba(8, 127, 135, 0.1)',
                         borderWidth: 2,
                         tension: 0.3,
                         fill: true,
-                        pointBackgroundColor: '#10b981',
+                        pointBackgroundColor: '#087f87',
                         pointBorderColor: '#fff',
                         pointRadius: 4,
                         pointHoverRadius: 6
@@ -176,12 +176,12 @@ export function setupStats({ onProductsChanged }) {
                     {
                         label: 'Descuentos (S/)',
                         data: valuesDescuentos.length ? valuesDescuentos : [0],
-                        borderColor: '#ef4444',
-                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        borderColor: '#c1473c',
+                        backgroundColor: 'rgba(193, 71, 60, 0.1)',
                         borderWidth: 2,
                         tension: 0.3,
                         fill: false,
-                        pointBackgroundColor: '#ef4444',
+                        pointBackgroundColor: '#c1473c',
                         pointBorderColor: '#fff',
                         pointRadius: 4,
                         pointHoverRadius: 6
@@ -198,9 +198,9 @@ export function setupStats({ onProductsChanged }) {
                 scales: {
                     y: { 
                         beginAtZero: true, 
-                        grid: { color: 'rgba(255,255,255,0.05)' }, 
+                        grid: { color: '#e1e8eb' },
                         ticks: { 
-                            color: 'rgba(255,255,255,0.7)',
+                            color: '#647782',
                             callback: function(value) {
                                 return 'S/ ' + value;
                             }
@@ -208,16 +208,16 @@ export function setupStats({ onProductsChanged }) {
                     },
                     x: { 
                         grid: { display: false }, 
-                        ticks: { color: 'rgba(255,255,255,0.7)' } 
+                        ticks: { color: '#647782' }
                     }
                 },
                 plugins: {
-                    legend: { labels: { color: 'rgba(255,255,255,0.9)' } },
+                    legend: { labels: { color: '#344b57' } },
                     tooltip: {
-                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        backgroundColor: '#172c36',
                         titleColor: '#fff',
                         bodyColor: '#fff',
-                        borderColor: 'rgba(255,255,255,0.1)',
+                        borderColor: '#344b57',
                         borderWidth: 1,
                         callbacks: {
                             label: function(context) {
@@ -246,7 +246,7 @@ export function setupStats({ onProductsChanged }) {
             ventasList.innerHTML = '';
             
             if (data.length === 0) {
-                ventasList.innerHTML = `<tr><td colspan="8" style="text-align:center; color: gray;">No hay ventas registradas.</td></tr>`;
+                ventasList.innerHTML = `<tr><td colspan="8" style="text-align:center; color: var(--text-secondary);">No hay ventas registradas.</td></tr>`;
                 return;
             }
             
@@ -263,20 +263,20 @@ export function setupStats({ onProductsChanged }) {
 
                 const isRefunded = v.estado === 'reembolsada';
                 const estadoHtml = isRefunded 
-                    ? `<span style="background: rgba(239, 68, 68, 0.2); color: #fca5a5; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.8rem;">Reembolsada</span>`
-                    : `<span style="background: rgba(16, 185, 129, 0.2); color: #a7f3d0; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.8rem;">Completada</span>`;
+                    ? `<span style="background: #fff1ef; color: #b42318; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.8rem;">Reembolsada</span>`
+                    : `<span style="background: #e9f6f1; color: #147556; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.8rem;">Completada</span>`;
                 
                 const accionHtml = isRefunded
                     ? `-`
-                    : `<button class="secondary-btn btn-refund" data-id="${v.id}" style="padding: 0.2rem 0.5rem; font-size: 0.8rem; border-color: #ef4444; color: #fca5a5;">Reembolsar</button>`;
+                    : `<button class="secondary-btn btn-refund" data-id="${v.id}" style="padding: 0.2rem 0.5rem; font-size: 0.8rem; border-color: #f2c8c4; color: #b42318;">Reembolsar</button>`;
 
                 tr.innerHTML = `
                     <td>${fechaStr}</td>
                     <td>${horaStr}</td>
                     <td>${v.metodo_pago || 'Efectivo'}</td>
-                    <td style="font-size: 0.8rem; color: #cbd5e1; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${productosStr}">${productosStr}</td>
+                    <td style="font-size: 0.8rem; color: var(--text-secondary); max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${productosStr}">${productosStr}</td>
                     <td style="font-weight:bold; ${isRefunded ? 'text-decoration: line-through; opacity: 0.5;' : ''}">S/ ${Number(v.total).toFixed(2)}</td>
-                    <td style="color:#fca5a5; ${isRefunded ? 'text-decoration: line-through; opacity: 0.5;' : ''}">S/ ${Number(v.descuento).toFixed(2)}</td>
+                    <td style="color:#b42318; ${isRefunded ? 'text-decoration: line-through; opacity: 0.5;' : ''}">S/ ${Number(v.descuento).toFixed(2)}</td>
                     <td>${estadoHtml}</td>
                     <td>${accionHtml}</td>
                 `;
@@ -284,7 +284,7 @@ export function setupStats({ onProductsChanged }) {
             });
         } catch (err) {
             console.error(err);
-            ventasList.innerHTML = `<tr><td colspan="8" style="text-align:center; color: #fca5a5;">Error al cargar historial.</td></tr>`;
+            ventasList.innerHTML = `<tr><td colspan="8" style="text-align:center; color: #b42318;">Error al cargar historial.</td></tr>`;
         }
     }
 
