@@ -1,8 +1,7 @@
 {
   "name": "kalo",
   "version": "1.0.0",
-  "description": "",
-  "main": "app.js",
+  "description": "Kalo: punto de venta e inventario para los locales Las Brisas, Los Pinos y El Polideportivo",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -19,13 +18,17 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
+  "type": "module",
   "bugs": {
     "url": "https://github.com/DirdHL/kalo/issues"
   },
   "homepage": "https://github.com/DirdHL/kalo#readme",
   "dependencies": {
     "@supabase/supabase-js": "^2.117.2",
-    "vite": "^8.3.2"
+    "chart.js": "4.6.1",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+  },
+  "devDependencies": {
+    "vite": "8.3.5"
   }
 }

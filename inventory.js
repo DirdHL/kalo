@@ -1,22 +1,26 @@
 import { supabase } from "./supabase.js";
 import { state } from "./state.js";
-import { AVAILABLE_IMAGES, resolveImage } from "./constants.js";
+import { AVAILABLE_IMAGES, resolveImage, CATEGORIA_COMBOS } from "./constants.js";
 import { customAlert, customConfirm } from "./ui.js";
+import { escapeHtml, formatMoney, describeError, fetchAll, estadoVencimiento, parseLocalDate } from "./utils.js";
 
 let editingProductId = null;
 let selectedImageName = '';
 let currentLotes = [];
 let comboSelectedImage = '';
 
-export function setupInventory({ onProductsLoaded }) {
-    // Nodos Modal Producto
+const COLOR_VENCIMIENTO = { vencido: '#b42318', 'por-vencer': '#9a5908' };
+
+export function setupInventory({ onProductsLoaded } = {}) {
+    // Modal de producto
     const productModal = document.getElementById('productModal');
+    const productModalTitle = document.getElementById('productModalTitle');
     const openModalBtn = document.getElementById('openModalBtn');
     const closeModalBtn = document.getElementById('closeModalBtn');
     const productStatusMsg = document.getElementById('productStatusMsg');
     const addProductBtn = document.getElementById('addProductBtn');
+    const comboEditNote = document.getElementById('comboEditNote');
 
-    // Inputs Formulario Producto
     const productCodeInput = document.getElementById('productCode');
     const productNameInput = document.getElementById('productName');
     const categoriaInput = document.getElementById('categoria');
@@ -27,7 +31,7 @@ export function setupInventory({ onProductsLoaded }) {
     const stockInput = document.getElementById('stock');
     const alertaStockInput = document.getElementById('alertaStock');
 
-    // Modal Imagen
+    // Selector de imagen
     const imagePickerModal = document.getElementById('imagePickerModal');
     const openImagePickerBtn = document.getElementById('openImagePickerBtn');
     const closeImagePickerBtn = document.getElementById('closeImagePickerBtn');
@@ -35,566 +39,467 @@ export function setupInventory({ onProductsLoaded }) {
     const imageGrid = document.getElementById('imageGrid');
     let isPickingComboImage = false;
 
-    // Modal Combos
+    // Combos
     const openComboModalBtn = document.getElementById('openComboModalBtn');
     const closeComboModalBtn = document.getElementById('closeComboModalBtn');
     const comboModal = document.getElementById('comboModal');
     const comboNameInput = document.getElementById('comboNameInput');
     const comboPriceInput = document.getElementById('comboPriceInput');
-
-    function updateComboSummary() {
-        const comboRealSalePrice = document.getElementById('comboRealSalePrice');
-        const comboRealCost = document.getElementById('comboRealCost');
-        const comboNetProfit = document.getElementById('comboNetProfit');
-        
-        if (!comboRealSalePrice || !comboRealCost || !comboNetProfit || !comboPriceInput) return;
-
-        let totalSalePrice = 0;
-        let totalCost = 0;
-
-        const comboProductList = document.getElementById('comboProductList');
-        if (comboProductList) {
-            const checkboxes = comboProductList.querySelectorAll('.combo-checkbox:checked');
-            checkboxes.forEach(cb => {
-                const prod = state.globalProducts.find(p => p.id.toString() === cb.value);
-                if (prod) {
-                    const qtyInput = cb.parentElement.nextElementSibling.querySelector('.combo-qty-input');
-                    const enteredQty = Number(qtyInput.value);
-                    const qty = Number.isSafeInteger(enteredQty) && enteredQty > 0 ? enteredQty : 0;
-                    totalSalePrice += (prod.precio_venta || 0) * qty;
-                    totalCost += (prod.precio_compra || 0) * qty;
-                }
-            });
-        }
-
-        const comboPrice = parseFloat(comboPriceInput.value) || 0;
-        const profit = comboPrice - totalCost;
-
-        comboRealSalePrice.textContent = `S/ ${totalSalePrice.toFixed(2)}`;
-        comboRealCost.textContent = `S/ ${totalCost.toFixed(2)}`;
-        
-        comboNetProfit.textContent = `S/ ${profit.toFixed(2)}`;
-        if (profit < 0) {
-            comboNetProfit.style.color = '#b42318';
-        } else if (profit > 0) {
-            comboNetProfit.style.color = '#147556';
-        } else {
-            comboNetProfit.style.color = 'var(--text-primary)';
-        }
-    }
-    
-    if (comboPriceInput) {
-        comboPriceInput.addEventListener('input', updateComboSummary);
-    }
     const comboPreviewImg = document.getElementById('comboPreviewImg');
     const openComboImagePickerBtn = document.getElementById('openComboImagePickerBtn');
     const comboProductList = document.getElementById('comboProductList');
     const saveComboBtn = document.getElementById('saveComboBtn');
     const comboStatusMsg = document.getElementById('comboStatusMsg');
 
-    // Lotes y Vencimientos
+    // Lotes
     const lotesList = document.getElementById('lotesList');
     const loteQtyInput = document.getElementById('loteQtyInput');
     const loteExpInput = document.getElementById('loteExpInput');
     const addLoteBtn = document.getElementById('addLoteBtn');
-    const calculatedStockText = document.getElementById('calculatedStock');
+    const loteFields = [loteQtyInput, loteExpInput, addLoteBtn];
 
-    // Tabla y Paginación
+    // Tabla
     const productList = document.getElementById('productList');
     const invSearch = document.getElementById('invSearch');
     const prevPageBtn = document.getElementById('prevPageBtn');
     const nextPageBtn = document.getElementById('nextPageBtn');
     const paginationInfo = document.getElementById('paginationInfo');
 
-    // --- RENDER GRID DE IMÁGENES CON BÚSQUEDA ---
-    function renderImageGrid(isCombo = false, filterText = '') {
+    const isCombo = product => state.combos.has(String(product?.id));
+    const productById = id => state.globalProducts.find(p => String(p.id) === String(id));
+
+    function describirCombo(product) {
+        return (state.combos.get(String(product.id)) || [])
+            .map(c => `${c.cantidad}x ${productById(c.producto_id)?.nombre || 'producto eliminado'}`)
+            .join(' + ');
+    }
+
+    // --- IMÁGENES ---
+    function renderImageGrid(isComboPicker = false, filterText = '') {
         if (!imageGrid) return;
         imageGrid.innerHTML = '';
-
         const term = (filterText || '').toLowerCase().trim();
-        const filtered = AVAILABLE_IMAGES.filter(imgName => {
-            if (!term) return true;
-            const cleanName = imgName.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ').replace(/\s+/g, ' ').toLowerCase();
-            return cleanName.includes(term);
-        });
+        const label = name => name.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ').replace(/\s+/g, ' ').trim();
+        const filtered = AVAILABLE_IMAGES.filter(name => !term || label(name).toLowerCase().includes(term));
 
         if (filtered.length === 0) {
             imageGrid.innerHTML = `
-                <div style="grid-column: 1 / -1; text-align: center; color: var(--text-secondary); padding: 2rem;">
-                    <p style="font-size: 1.2rem; margin-bottom: 0.5rem;">🔍 Sin resultados</p>
-                    <p style="font-size: 0.85rem;">No encontramos ninguna imagen que coincida con "${filterText}".</p>
+                <div class="image-grid-empty">
+                    <p>🔍 Sin resultados</p>
+                    <p>No encontramos ninguna imagen que coincida con "${escapeHtml(filterText)}".</p>
                 </div>
             `;
             return;
         }
 
-        filtered.forEach(imgName => {
-            const div = document.createElement('div');
-            div.className = 'image-item';
-            div.innerHTML = `
-                <img src="./img/${encodeURI(imgName)}" alt="" loading="lazy" onerror="this.onerror=null; this.src='./kalo-logo.png'">
-                <span>${imgName.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ').replace(/\s+/g, ' ').trim()}</span>
+        filtered.forEach(name => {
+            const item = document.createElement('button');
+            item.type = 'button';
+            item.className = 'image-item';
+            item.innerHTML = `
+                <img src="./img/${escapeHtml(encodeURI(name))}" alt="" loading="lazy">
+                <span>${escapeHtml(label(name))}</span>
             `;
-            div.addEventListener('click', () => {
-                if (isCombo) {
-                    comboSelectedImage = imgName;
-                    if (comboPreviewImg) comboPreviewImg.src = `./img/${encodeURI(imgName)}`;
+            item.addEventListener('click', () => {
+                const src = `./img/${encodeURI(name)}`;
+                if (isComboPicker) {
+                    comboSelectedImage = name;
+                    if (comboPreviewImg) comboPreviewImg.src = src;
                 } else {
-                    selectedImageName = imgName;
-                    if (previewImg) previewImg.src = `./img/${encodeURI(imgName)}`;
+                    selectedImageName = name;
+                    if (previewImg) previewImg.src = src;
                 }
-                if (imagePickerModal) imagePickerModal.classList.add('hidden');
+                imagePickerModal?.classList.add('hidden');
             });
-            imageGrid.appendChild(div);
+            imageGrid.appendChild(item);
         });
     }
 
-    if (imagePickerSearch) {
-        imagePickerSearch.addEventListener('input', (e) => {
-            renderImageGrid(isPickingComboImage, e.target.value);
-        });
+    function openImagePicker(forCombo) {
+        isPickingComboImage = forCombo;
+        if (imagePickerSearch) imagePickerSearch.value = '';
+        imagePickerModal?.classList.remove('hidden');
+        renderImageGrid(forCombo, '');
+        setTimeout(() => imagePickerSearch?.focus(), 100);
     }
 
-    if (openImagePickerBtn) {
-        openImagePickerBtn.addEventListener('click', () => {
-            isPickingComboImage = false;
-            if (imagePickerSearch) imagePickerSearch.value = '';
-            if (imagePickerModal) imagePickerModal.classList.remove('hidden');
-            renderImageGrid(false, '');
-            setTimeout(() => { if (imagePickerSearch) imagePickerSearch.focus(); }, 100);
-        });
-    }
+    imagePickerSearch?.addEventListener('input', event => renderImageGrid(isPickingComboImage, event.target.value));
+    openImagePickerBtn?.addEventListener('click', () => openImagePicker(false));
+    openComboImagePickerBtn?.addEventListener('click', () => openImagePicker(true));
+    closeImagePickerBtn?.addEventListener('click', () => imagePickerModal?.classList.add('hidden'));
 
-    if (closeImagePickerBtn) {
-        closeImagePickerBtn.addEventListener('click', () => {
-            if (imagePickerModal) imagePickerModal.classList.add('hidden');
-        });
-    }
-
-    // --- MANEJO DE LOTES ---
+    // --- LOTES ---
     function renderLotes() {
         if (!lotesList) return;
         lotesList.innerHTML = '';
-        
         if (currentLotes.length === 0) {
-            lotesList.innerHTML = '<span style="color: var(--text-secondary);">Sin lotes (informativo).</span>';
+            lotesList.innerHTML = '<span class="muted">Sin lotes (informativo).</span>';
             return;
         }
-
-        currentLotes.sort((a, b) => new Date(a.vencimiento) - new Date(b.vencimiento));
-
+        currentLotes.sort((a, b) => (parseLocalDate(a.vencimiento) || 0) - (parseLocalDate(b.vencimiento) || 0));
         currentLotes.forEach((lote, index) => {
-            const div = document.createElement('div');
-            div.style.display = 'flex';
-            div.style.justifyContent = 'space-between';
-            div.style.borderBottom = '1px solid var(--card-border)';
-            div.style.padding = '0.2rem 0';
-            
-            const expDate = new Date(lote.vencimiento);
-            const today = new Date();
-            today.setHours(0,0,0,0);
-            
-            const isExpired = expDate < today;
-            const thirtyDaysLater = new Date(today);
-            thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30);
-            const isNear = !isExpired && expDate <= thirtyDaysLater;
-            
-            let color = 'var(--text-primary)';
-            if (isExpired) color = '#b42318';
-            else if (isNear) color = '#9a5908';
-
-            div.innerHTML = `
-                <span style="color: ${color}">Cant: ${lote.qty} | Vence: ${lote.vencimiento}</span>
-                <button type="button" class="secondary-btn btn-remove-lote" data-index="${index}" style="padding: 0 0.5rem; border-color: #f2c8c4; color: #b42318;">x</button>
+            const row = document.createElement('div');
+            row.className = 'lote-row';
+            const color = COLOR_VENCIMIENTO[estadoVencimiento(lote.vencimiento)] || 'var(--text-primary)';
+            row.innerHTML = `
+                <span style="color: ${color}">Cant: ${escapeHtml(lote.qty)} | Vence: ${escapeHtml(lote.vencimiento)}</span>
+                <button type="button" class="secondary-btn btn-remove-lote" data-index="${index}" aria-label="Quitar lote">x</button>
             `;
-            lotesList.appendChild(div);
+            lotesList.appendChild(row);
         });
     }
 
-    if (lotesList) {
-        lotesList.addEventListener('click', (e) => {
-            const btn = e.target.closest('.btn-remove-lote');
-            if (btn) {
-                const idx = parseInt(btn.getAttribute('data-index'));
-                currentLotes.splice(idx, 1);
-                renderLotes();
-            }
-        });
-    }
-
-    window.removeLote = (index) => {
-        currentLotes.splice(index, 1);
+    lotesList?.addEventListener('click', event => {
+        const button = event.target.closest?.('.btn-remove-lote');
+        if (!button) return;
+        currentLotes.splice(parseInt(button.getAttribute('data-index'), 10), 1);
         renderLotes();
-    };
+    });
 
-    if (addLoteBtn) {
-        addLoteBtn.addEventListener('click', () => {
-            const qty = Number(loteQtyInput.value);
-            const exp = loteExpInput.value;
-            if (!Number.isSafeInteger(qty) || qty <= 0 || !exp) {
-                customAlert('Ingresa cantidad válida y fecha de vencimiento.', 'Datos Inválidos', '⚠️');
-                return;
-            }
-            
-            currentLotes.push({ qty, vencimiento: exp });
-            loteQtyInput.value = '';
-            loteExpInput.value = '';
-            renderLotes();
-        });
-    }
+    addLoteBtn?.addEventListener('click', () => {
+        const qty = Number(loteQtyInput.value);
+        const exp = loteExpInput.value;
+        if (!Number.isSafeInteger(qty) || qty <= 0 || !parseLocalDate(exp)) {
+            customAlert('Ingresa cantidad válida y fecha de vencimiento.', 'Datos inválidos', '⚠️');
+            return;
+        }
+        currentLotes.push({ qty, vencimiento: exp });
+        loteQtyInput.value = '';
+        loteExpInput.value = '';
+        renderLotes();
+    });
 
-    // --- FORMULARIO PRODUCTO NORMAL ---
+    // --- FORMULARIO DE PRODUCTO ---
     function calcularGanancia() {
         if (!precioCompraInput || !precioVentaInput || !gananciaInput) return;
-        const compra = parseFloat(precioCompraInput.value) || 0;
-        const venta = parseFloat(precioVentaInput.value) || 0;
-        const ganancia = venta - compra;
-        gananciaInput.value = ganancia > 0 ? `+ S/ ${ganancia.toFixed(2)}` : `S/ ${ganancia.toFixed(2)}`;
+        const ganancia = (parseFloat(precioVentaInput.value) || 0) - (parseFloat(precioCompraInput.value) || 0);
+        gananciaInput.value = ganancia > 0 ? `+ ${formatMoney(ganancia)}` : formatMoney(ganancia);
     }
+    precioCompraInput?.addEventListener('input', calcularGanancia);
+    precioVentaInput?.addEventListener('input', calcularGanancia);
 
-    if (precioCompraInput) precioCompraInput.addEventListener('input', calcularGanancia);
-    if (precioVentaInput) precioVentaInput.addEventListener('input', calcularGanancia);
+    function setComboMode(enabled) {
+        for (const input of [precioCompraInput, stockInput, alertaStockInput, ...loteFields]) {
+            if (input) input.disabled = enabled;
+        }
+        comboEditNote?.classList.toggle('hidden', !enabled);
+    }
 
     function limpiarFormulario() {
         editingProductId = null;
-        const mh2 = document.querySelector('#productModal h2');
-        if (mh2) mh2.textContent = 'Registrar Producto';
-        if (addProductBtn) addProductBtn.textContent = 'Guardar Producto';
-        if (productCodeInput) productCodeInput.value = '';
-        if (productNameInput) productNameInput.value = '';
+        if (productModalTitle) productModalTitle.textContent = 'Registrar producto';
+        if (addProductBtn) addProductBtn.textContent = 'Guardar producto';
+        for (const input of [productCodeInput, productNameInput, precioCompraInput, precioVentaInput, gananciaInput, stockInput, alertaStockInput, loteQtyInput, loteExpInput]) {
+            if (input) input.value = '';
+        }
         if (categoriaInput) categoriaInput.value = 'Bebidas';
-        if (precioCompraInput) precioCompraInput.value = '';
-        if (precioVentaInput) precioVentaInput.value = '';
-        if (gananciaInput) gananciaInput.value = '';
-        if (stockInput) stockInput.value = '';
-        if (alertaStockInput) alertaStockInput.value = '';
-        if (productStatusMsg) productStatusMsg.textContent = '';
+        if (productStatusMsg) {
+            productStatusMsg.textContent = '';
+            productStatusMsg.style.color = '';
+        }
         selectedImageName = '';
         if (previewImg) previewImg.src = './kalo-logo.png';
         currentLotes = [];
-        if (loteQtyInput) loteQtyInput.value = '';
-        if (loteExpInput) loteExpInput.value = '';
+        setComboMode(false);
         renderLotes();
     }
 
     function abrirModalEdicion(prod) {
         limpiarFormulario();
         editingProductId = prod.id;
-        const mh2 = document.querySelector('#productModal h2');
-        if (mh2) mh2.textContent = 'Editar Producto';
-        if (addProductBtn) addProductBtn.textContent = 'Actualizar Producto';
-
+        if (productModalTitle) productModalTitle.textContent = 'Editar producto';
+        if (addProductBtn) addProductBtn.textContent = 'Actualizar producto';
         if (productCodeInput) productCodeInput.value = prod.codigo || '';
         if (productNameInput) productNameInput.value = prod.nombre || '';
         if (categoriaInput) categoriaInput.value = prod.categoria || 'Bebidas';
         if (precioCompraInput) precioCompraInput.value = prod.precio_compra ?? '';
         if (precioVentaInput) precioVentaInput.value = prod.precio_venta ?? '';
-        if (stockInput) stockInput.value = prod.stock !== null ? prod.stock : '';
-        if (alertaStockInput) alertaStockInput.value = prod.alerta_stock !== null ? prod.alerta_stock : '';
-        currentLotes = prod.lotes ? [...prod.lotes] : [];
+        if (stockInput) stockInput.value = prod.stock ?? '';
+        if (alertaStockInput) alertaStockInput.value = prod.alerta_stock ?? '';
+        currentLotes = Array.isArray(prod.lotes) ? prod.lotes.map(lote => ({ ...lote })) : [];
+        setComboMode(isCombo(prod));
         renderLotes();
-
         selectedImageName = prod.imagen || '';
-        if (previewImg) {
-            previewImg.src = resolveImage(selectedImageName);
+        if (previewImg) previewImg.src = resolveImage(selectedImageName);
+        calcularGanancia();
+        productModal?.classList.remove('hidden');
+    }
+
+    openModalBtn?.addEventListener('click', () => {
+        limpiarFormulario();
+        productModal?.classList.remove('hidden');
+        productCodeInput?.focus();
+    });
+
+    closeModalBtn?.addEventListener('click', () => {
+        productModal?.classList.add('hidden');
+        limpiarFormulario();
+    });
+
+    function setProductStatus(text, ok = false) {
+        if (!productStatusMsg) return;
+        productStatusMsg.style.color = ok ? '#147556' : '#b42318';
+        productStatusMsg.textContent = text;
+    }
+
+    async function guardarProducto() {
+        if (!addProductBtn || addProductBtn.disabled) return;
+        const editing = editingProductId !== null ? productById(editingProductId) : null;
+        const comboEnEdicion = editing && isCombo(editing);
+
+        // Lote escrito pero sin presionar "+ Lote"
+        const pendingQty = loteQtyInput ? loteQtyInput.value.trim() : '';
+        const pendingExp = loteExpInput ? loteExpInput.value.trim() : '';
+        if (!comboEnEdicion && (pendingQty || pendingExp)) {
+            const addPending = await customConfirm(
+                'Escribiste datos en un lote pero olvidaste presionar "+ Lote".\n\n¿Quieres que lo agreguemos automáticamente y luego guardemos el producto?',
+                'Lote sin agregar detectado', '💡');
+            if (addPending) {
+                addLoteBtn?.click();
+                if ((loteQtyInput && loteQtyInput.value.trim() !== '') || (loteExpInput && loteExpInput.value.trim() !== '')) return;
+            } else {
+                const forceSave = await customConfirm('Entonces, ¿deseas guardar el producto ignorando y borrando los datos de ese lote incompleto?', 'Guardar sin lote', '❓');
+                if (!forceSave) return;
+                if (loteQtyInput) loteQtyInput.value = '';
+                if (loteExpInput) loteExpInput.value = '';
+            }
         }
 
-        calcularGanancia();
-        if (productModal) productModal.classList.remove('hidden');
-    }
-
-    if (openModalBtn) {
-        openModalBtn.addEventListener('click', () => {
-            limpiarFormulario();
-            if (productModal) productModal.classList.remove('hidden');
-            if (productCodeInput) productCodeInput.focus();
-        });
-    }
-
-    if (closeModalBtn) {
-        closeModalBtn.addEventListener('click', () => {
-            if (productModal) productModal.classList.add('hidden');
-            limpiarFormulario();
-        });
-    }
-
-    if (addProductBtn) {
-        addProductBtn.addEventListener('click', async () => {
-            if (addProductBtn.disabled) return;
-            // VERIFICACIÓN INTELIGENTE: Lotes sin agregar
-            const pendingQty = loteQtyInput ? loteQtyInput.value.trim() : '';
-            const pendingExp = loteExpInput ? loteExpInput.value.trim() : '';
-            
-            if (pendingQty || pendingExp) {
-                const addPending = await customConfirm(
-                    'Escribiste datos en un lote pero olvidaste presionar "+ Lote".\n\n¿Quieres que lo agreguemos automáticamente y luego guardemos el producto?', 
-                    'Lote sin agregar detectado', 
-                    '💡'
-                );
-                
-                if (addPending) {
-                    // Forzar click en el botón de agregar
-                    if (addLoteBtn) addLoteBtn.click();
-                    
-                    // Si el input sigue con texto, significa que la validación falló (ej: faltó fecha)
-                    // y la adición del lote fue bloqueada, entonces detenemos el guardado principal.
-                    if ((loteQtyInput && loteQtyInput.value.trim() !== '') ||
-                        (loteExpInput && loteExpInput.value.trim() !== '')) {
-                        return; 
-                    }
-                } else {
-                    // Si dijo que NO quiere agregarlo automáticamente
-                    const forceSave = await customConfirm(
-                        'Entonces, ¿deseas guardar el producto ignorando y borrando los datos de ese lote incompleto?', 
-                        'Guardar sin lote', 
-                        '❓'
-                    );
-                    
-                    if (forceSave) {
-                        // Limpiamos los campos para ignorarlos y continuamos
-                        if (loteQtyInput) loteQtyInput.value = '';
-                        if (loteExpInput) loteExpInput.value = '';
-                    } else {
-                        // Detenemos el proceso de guardado para que el usuario arregle todo a mano
-                        return;
-                    }
-                }
-            }
-
-            const productCode = productCodeInput ? productCodeInput.value.trim() : '';
-            const productName = productNameInput ? productNameInput.value.trim() : '';
-            const numericFields = [
-                [precioCompraInput, 'El precio de compra', false],
-                [precioVentaInput, 'El precio de venta', false],
-                [stockInput, 'El stock', true],
-                [alertaStockInput, 'La alerta de stock', true]
-            ];
-            const numericValues = [];
-            for (const [input, label, integerOnly] of numericFields) {
-                const raw = input ? input.value.trim() : '';
-                const value = raw === '' ? null : Number(raw);
-                if (value !== null && (!Number.isFinite(value) || value < 0 || (integerOnly && !Number.isSafeInteger(value)))) {
-                    if (productStatusMsg) productStatusMsg.textContent = `${label} debe ser ${integerOnly ? 'un número entero' : 'un número'} mayor o igual a cero.`;
-                    return;
-                }
-                numericValues.push(value);
-            }
-            const [pCompra, pVenta, stock, alerta] = numericValues;
-            const cat = categoriaInput ? categoriaInput.value : 'Bebidas';
-
-            if (!productName) {
-                if (productStatusMsg) productStatusMsg.textContent = 'El nombre del producto es obligatorio.';
+        const productCode = productCodeInput ? productCodeInput.value.trim() : '';
+        const productName = productNameInput ? productNameInput.value.trim() : '';
+        const numericFields = [
+            [precioCompraInput, 'El precio de compra', false],
+            [precioVentaInput, 'El precio de venta', false],
+            [stockInput, 'El stock', true],
+            [alertaStockInput, 'La alerta de stock', true]
+        ];
+        const numericValues = [];
+        for (const [input, label, integerOnly] of numericFields) {
+            const raw = input ? String(input.value).trim() : '';
+            const value = raw === '' ? null : Number(raw);
+            if (value !== null && (!Number.isFinite(value) || value < 0 || (integerOnly && !Number.isSafeInteger(value)))) {
+                setProductStatus(`${label} debe ser ${integerOnly ? 'un número entero' : 'un número'} mayor o igual a cero.`);
                 return;
             }
+            numericValues.push(value);
+        }
+        const [pCompra, pVenta, stock, alerta] = numericValues;
+        if (!productName) {
+            setProductStatus('El nombre del producto es obligatorio.');
+            return;
+        }
+        if (productName.length > 120) {
+            setProductStatus('El nombre es demasiado largo (máximo 120 caracteres).');
+            return;
+        }
 
-            try {
-                addProductBtn.disabled = true;
-                addProductBtn.textContent = 'Guardando...';
+        const payload = {
+            codigo: productCode || null,
+            nombre: productName,
+            categoria: categoriaInput ? categoriaInput.value : 'Bebidas',
+            imagen: selectedImageName || null,
+            precio_venta: pVenta
+        };
+        if (!comboEnEdicion) {
+            Object.assign(payload, {
+                precio_compra: pCompra,
+                stock,
+                alerta_stock: alerta,
+                lotes: currentLotes.length > 0 ? currentLotes : null
+            });
+        }
 
-                const payload = {
-                    codigo: productCode || null,
-                    nombre: productName,
-                    categoria: cat,
-                    imagen: selectedImageName || null,
-                    precio_compra: pCompra,
-                    precio_venta: pVenta,
-                    stock: stock,
-                    alerta_stock: alerta,
-                    lotes: currentLotes.length > 0 ? currentLotes : null,
-                    local: state.currentLocal
-                };
-
-                let res;
-                if (editingProductId) {
-                    res = await supabase.from('productos').update(payload).eq('id', editingProductId);
-                } else {
-                    res = await supabase.from('productos').insert([payload]);
-                }
-
-                if (res.error) throw res.error;
-
-                if (productStatusMsg) {
-                    productStatusMsg.style.color = '#147556';
-                    productStatusMsg.textContent = editingProductId ? '¡Producto actualizado exitosamente!' : '¡Producto guardado exitosamente!';
-                }
-
-                await loadProducts();
-
-                setTimeout(() => {
-                    if (productModal) productModal.classList.add('hidden');
-                    limpiarFormulario();
-                }, 1000);
-
-            } catch (error) {
-                if (productStatusMsg) {
-                    productStatusMsg.style.color = '#b42318';
-                    productStatusMsg.textContent = 'Error: ' + error.message;
-                }
-            } finally {
-                if (addProductBtn) addProductBtn.disabled = false;
-                if (addProductBtn) addProductBtn.textContent = editingProductId ? 'Actualizar Producto' : 'Guardar Producto';
-            }
-        });
-    }
-
-    // --- MODAL DE COMBOS ---
-    if (openComboModalBtn) {
-        openComboModalBtn.addEventListener('click', () => {
-            if (comboModal) comboModal.classList.remove('hidden');
-            if (comboNameInput) comboNameInput.value = '';
-            if (comboPriceInput) comboPriceInput.value = '';
-            comboSelectedImage = '';
-            if (comboPreviewImg) comboPreviewImg.src = './kalo-logo.png';
-            if (comboStatusMsg) comboStatusMsg.textContent = '';
-            
-            if (comboProductList) {
-                comboProductList.innerHTML = '';
-                const normalProducts = state.globalProducts.filter(p => p.categoria !== 'Combos');
-                normalProducts.forEach(prod => {
-                    const div = document.createElement('div');
-                    div.style.display = 'flex';
-                    div.style.justifyContent = 'space-between';
-                    div.style.alignItems = 'center';
-                    div.style.padding = '0.5rem';
-                    div.style.borderBottom = '1px solid var(--card-border)';
-                    
-                    div.innerHTML = `
-                        <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer; flex: 1;">
-                            <input type="checkbox" class="combo-checkbox" value="${prod.id}" style="width:16px; height:16px;">
-                            ${prod.nombre} (Stock: ${prod.stock !== null ? prod.stock : ''})
-                        </label>
-                        <div style="display: flex; align-items: center; gap: 0.5rem;">
-                            <span style="font-size: 0.8rem; color: var(--text-secondary);">Cant:</span>
-                            <input type="number" class="combo-qty-input styled-input" min="1" value="1" style="width:60px; padding:0.2rem; text-align: center;" disabled>
-                        </div>
-                    `;
-                    
-                    const checkbox = div.querySelector('.combo-checkbox');
-                    const qtyInput = div.querySelector('.combo-qty-input');
-                    
-                    checkbox.addEventListener('change', () => {
-                        qtyInput.disabled = !checkbox.checked;
-                        updateComboSummary();
-                    });
-                    
-                    qtyInput.addEventListener('input', updateComboSummary);
-                    
-                    comboProductList.appendChild(div);
-                });
-            }
-            updateComboSummary();
-        });
-    }
-
-    if (closeComboModalBtn) {
-        closeComboModalBtn.addEventListener('click', () => {
-            if (comboModal) comboModal.classList.add('hidden');
-        });
-    }
-
-    if (openComboImagePickerBtn) {
-        openComboImagePickerBtn.addEventListener('click', () => {
-            isPickingComboImage = true;
-            if (imagePickerSearch) imagePickerSearch.value = '';
-            if (imagePickerModal) imagePickerModal.classList.remove('hidden');
-            renderImageGrid(true, '');
-            setTimeout(() => { if (imagePickerSearch) imagePickerSearch.focus(); }, 100);
-        });
-    }
-
-    if (saveComboBtn) {
-        saveComboBtn.addEventListener('click', async () => {
-            if (saveComboBtn.disabled) return;
-            const nombre = comboNameInput ? comboNameInput.value.trim() : '';
-            const precio = Number(comboPriceInput.value);
-            
-            if (!nombre || !Number.isFinite(precio) || precio <= 0) {
-                if (comboStatusMsg) comboStatusMsg.textContent = 'Ingresa un nombre y precio válido.';
-                return;
-            }
-
-            const checkboxes = comboProductList.querySelectorAll('.combo-checkbox:checked');
-            if (checkboxes.length < 2) {
-                if (comboStatusMsg) comboStatusMsg.textContent = 'Selecciona al menos 2 productos para armar el combo.';
-                return;
-            }
-
-            let comboCodeParts = [];
-            for (const cb of checkboxes) {
-                const qtyInput = cb.parentElement.nextElementSibling.querySelector('.combo-qty-input');
-                const qty = Number(qtyInput.value);
-                if (!Number.isSafeInteger(qty) || qty <= 0) {
-                    if (comboStatusMsg) comboStatusMsg.textContent = 'Las cantidades del combo deben ser números enteros mayores a cero.';
-                    return;
-                }
-                comboCodeParts.push(`${cb.value}-${qty}`);
-            }
-            const codigoEspecial = `COMBO:${comboCodeParts.join(',')}`;
-
-            saveComboBtn.disabled = true;
-            saveComboBtn.textContent = 'Guardando...';
-
-            try {
-                const { error } = await supabase.from('productos').insert([{
-                    nombre: nombre,
-                    categoria: 'Combos',
-                    precio_compra: 0,
-                    precio_venta: precio,
-                    stock: null,
-                    alerta_stock: null,
-                    codigo: codigoEspecial,
-                    imagen: comboSelectedImage || null,
-                    local: state.currentLocal
-                }]);
-                
-                if (error) throw error;
-                
-                if (comboModal) comboModal.classList.add('hidden');
-                await loadProducts();
-            } catch (err) {
-                if (comboStatusMsg) comboStatusMsg.textContent = 'Error: ' + err.message;
-            } finally {
-                saveComboBtn.disabled = false;
-                saveComboBtn.textContent = 'Guardar Combo';
-            }
-        });
-    }
-
-    // --- CARGAR PRODUCTOS ---
-    async function loadProducts() {
         try {
-            const { data, error } = await supabase.from('productos').select('*').eq('local', state.currentLocal).order('id', { ascending: false });
-            if (error) throw error;
-
-            const cleanedData = data.map(p => ({
-                ...p,
-                nombre: p.nombre ? p.nombre.replace(/_/g, ' ') : p.nombre
-            }));
-
-            state.globalProducts = cleanedData;
-            state.invFilteredProducts = cleanedData;
-            state.invCurrentPage = 1;
-
-            renderInventoryTable();
-            checkAlerts();
-
-            if (typeof onProductsLoaded === 'function') {
-                onProductsLoaded(cleanedData);
+            addProductBtn.disabled = true;
+            addProductBtn.textContent = 'Guardando...';
+            let result;
+            if (editing) {
+                result = await supabase.from('productos').update(payload)
+                    .eq('id', editing.id).eq('local', state.currentLocal).select('id');
+                if (!result.error && (!result.data || result.data.length !== 1)) {
+                    throw new Error('No se encontró el producto en este local. Actualiza la pantalla.');
+                }
+            } else {
+                result = await supabase.from('productos').insert([{ ...payload, local: state.currentLocal }]);
             }
+            if (result.error) throw result.error;
+            setProductStatus(editing ? '¡Producto actualizado!' : '¡Producto guardado!', true);
+            await loadProducts();
+            setTimeout(() => {
+                productModal?.classList.add('hidden');
+                limpiarFormulario();
+            }, 800);
+        } catch (error) {
+            setProductStatus('Error: ' + describeError(error));
+        } finally {
+            addProductBtn.disabled = false;
+            addProductBtn.textContent = editingProductId !== null ? 'Actualizar producto' : 'Guardar producto';
+        }
+    }
+
+    addProductBtn?.addEventListener('click', guardarProducto);
+
+    // --- COMBOS ---
+    function updateComboSummary() {
+        const comboRealSalePrice = document.getElementById('comboRealSalePrice');
+        const comboRealCost = document.getElementById('comboRealCost');
+        const comboNetProfit = document.getElementById('comboNetProfit');
+        if (!comboRealSalePrice || !comboRealCost || !comboNetProfit || !comboPriceInput || !comboProductList) return;
+
+        let totalSalePrice = 0;
+        let totalCost = 0;
+        comboProductList.querySelectorAll('.combo-checkbox:checked').forEach(checkbox => {
+            const prod = productById(checkbox.value);
+            if (!prod) return;
+            const qtyInput = checkbox.parentElement.nextElementSibling.querySelector('.combo-qty-input');
+            const enteredQty = Number(qtyInput.value);
+            const qty = Number.isSafeInteger(enteredQty) && enteredQty > 0 ? enteredQty : 0;
+            totalSalePrice += (Number(prod.precio_venta) || 0) * qty;
+            totalCost += (Number(prod.precio_compra) || 0) * qty;
+        });
+        const profit = (parseFloat(comboPriceInput.value) || 0) - totalCost;
+        comboRealSalePrice.textContent = formatMoney(totalSalePrice);
+        comboRealCost.textContent = formatMoney(totalCost);
+        comboNetProfit.textContent = formatMoney(profit);
+        comboNetProfit.style.color = profit < 0 ? '#b42318' : profit > 0 ? '#147556' : 'var(--text-primary)';
+    }
+
+    comboPriceInput?.addEventListener('input', updateComboSummary);
+
+    openComboModalBtn?.addEventListener('click', () => {
+        comboModal?.classList.remove('hidden');
+        if (comboNameInput) comboNameInput.value = '';
+        if (comboPriceInput) comboPriceInput.value = '';
+        comboSelectedImage = '';
+        if (comboPreviewImg) comboPreviewImg.src = './kalo-logo.png';
+        if (comboStatusMsg) comboStatusMsg.textContent = '';
+        if (comboProductList) {
+            comboProductList.innerHTML = '';
+            state.globalProducts.filter(p => !isCombo(p) && p.categoria !== CATEGORIA_COMBOS).forEach(prod => {
+                const row = document.createElement('div');
+                row.className = 'combo-row';
+                row.innerHTML = `
+                    <label class="combo-row-label">
+                        <input type="checkbox" class="combo-checkbox" value="${escapeHtml(prod.id)}">
+                        ${escapeHtml(prod.nombre)} (Stock: ${escapeHtml(prod.stock ?? '—')})
+                    </label>
+                    <div class="combo-row-qty">
+                        <span>Cant:</span>
+                        <input type="number" class="combo-qty-input styled-input" min="1" value="1" disabled aria-label="Cantidad de ${escapeHtml(prod.nombre)}">
+                    </div>
+                `;
+                const checkbox = row.querySelector('.combo-checkbox');
+                const qtyInput = row.querySelector('.combo-qty-input');
+                checkbox.addEventListener('change', () => {
+                    qtyInput.disabled = !checkbox.checked;
+                    updateComboSummary();
+                });
+                qtyInput.addEventListener('input', updateComboSummary);
+                comboProductList.appendChild(row);
+            });
+        }
+        updateComboSummary();
+    });
+
+    closeComboModalBtn?.addEventListener('click', () => comboModal?.classList.add('hidden'));
+
+    async function guardarCombo() {
+        if (!saveComboBtn || saveComboBtn.disabled) return;
+        const nombre = comboNameInput ? comboNameInput.value.trim() : '';
+        const precio = Number(comboPriceInput ? comboPriceInput.value : NaN);
+        const setStatus = text => { if (comboStatusMsg) comboStatusMsg.textContent = text; };
+        if (!nombre || !Number.isFinite(precio) || precio <= 0) {
+            setStatus('Ingresa un nombre y precio válido.');
+            return;
+        }
+        const checkboxes = comboProductList ? [...comboProductList.querySelectorAll('.combo-checkbox:checked')] : [];
+        if (checkboxes.length < 2) {
+            setStatus('Selecciona al menos 2 productos para armar el combo.');
+            return;
+        }
+        const items = [];
+        for (const checkbox of checkboxes) {
+            const qtyInput = checkbox.parentElement.nextElementSibling.querySelector('.combo-qty-input');
+            const cantidad = Number(qtyInput.value);
+            if (!Number.isSafeInteger(cantidad) || cantidad <= 0) {
+                setStatus('Las cantidades del combo deben ser números enteros mayores a cero.');
+                return;
+            }
+            items.push({ id: productById(checkbox.value)?.id ?? checkbox.value, cantidad });
+        }
+
+        saveComboBtn.disabled = true;
+        saveComboBtn.textContent = 'Guardando...';
+        try {
+            const { error } = await supabase.rpc('crear_combo', {
+                p_local: state.currentLocal,
+                p_nombre: nombre,
+                p_precio: precio,
+                p_imagen: comboSelectedImage || null,
+                p_items: items
+            });
+            if (error) throw error;
+            comboModal?.classList.add('hidden');
+            await loadProducts();
+        } catch (error) {
+            setStatus('Error: ' + describeError(error));
+        } finally {
+            saveComboBtn.disabled = false;
+            saveComboBtn.textContent = 'Guardar combo';
+        }
+    }
+
+    saveComboBtn?.addEventListener('click', guardarCombo);
+
+    // --- CARGA DE PRODUCTOS ---
+    async function loadProducts() {
+        const local = state.currentLocal;
+        if (!local) return;
+        try {
+            const [rows, comboRows] = await Promise.all([
+                fetchAll(() => supabase.from('productos').select('*')
+                    .eq('local', local).eq('activo', true).order('id', { ascending: false })),
+                fetchAll(() => supabase.from('combo_items').select('combo_id, producto_id, cantidad')
+                    .order('combo_id').order('producto_id'))
+            ]);
+            if (local !== state.currentLocal) return; // se cambió de local mientras cargaba
+
+            const products = rows.map(p => ({ ...p, nombre: p.nombre ? p.nombre.replace(/_/g, ' ') : p.nombre }));
+            const ids = new Set(products.map(p => String(p.id)));
+            const combos = new Map();
+            for (const row of comboRows) {
+                const comboId = String(row.combo_id);
+                if (!ids.has(comboId)) continue;
+                if (!combos.has(comboId)) combos.set(comboId, []);
+                combos.get(comboId).push({ producto_id: String(row.producto_id), cantidad: Number(row.cantidad) });
+            }
+
+            state.globalProducts = products;
+            state.combos = combos;
+            filterInventoryProducts();
+            checkAlerts();
+            if (typeof onProductsLoaded === 'function') onProductsLoaded(products);
         } catch (error) {
             if (productList) {
-                productList.innerHTML = `<tr><td colspan="8" style="color:#b42318; text-align:center">Error al cargar: ${error.message}</td></tr>`;
+                productList.innerHTML = `<tr><td colspan="8" class="table-message is-error">Error al cargar: ${escapeHtml(describeError(error))}</td></tr>`;
             }
         }
+    }
+
+    function clear() {
+        if (productList) productList.innerHTML = '';
+        const alertsList = document.getElementById('alertsList');
+        if (alertsList) alertsList.innerHTML = '';
+        const alertsBadge = document.getElementById('alertsBadge');
+        if (alertsBadge) alertsBadge.style.display = 'none';
     }
 
     // --- TABLA DE INVENTARIO ---
     function renderInventoryTable() {
         if (!productList) return;
         productList.innerHTML = '';
-        
         if (state.invFilteredProducts.length === 0) {
-            productList.innerHTML = '<tr><td colspan="8" style="text-align:center; color:var(--text-secondary)">No hay productos registrados.</td></tr>';
+            productList.innerHTML = '<tr><td colspan="8" class="table-message">No hay productos registrados.</td></tr>';
             if (paginationInfo) paginationInfo.textContent = 'Mostrando 0 productos';
             if (prevPageBtn) prevPageBtn.disabled = true;
             if (nextPageBtn) nextPageBtn.disabled = true;
@@ -602,244 +507,191 @@ export function setupInventory({ onProductsLoaded }) {
         }
 
         const totalPages = Math.ceil(state.invFilteredProducts.length / state.invItemsPerPage) || 1;
-        if (state.invCurrentPage > totalPages) state.invCurrentPage = totalPages;
-        if (state.invCurrentPage < 1) state.invCurrentPage = 1;
-
+        state.invCurrentPage = Math.min(Math.max(1, state.invCurrentPage), totalPages);
         const startIndex = (state.invCurrentPage - 1) * state.invItemsPerPage;
         const endIndex = startIndex + state.invItemsPerPage;
-        const currentData = state.invFilteredProducts.slice(startIndex, endIndex);
 
-        currentData.forEach((prod) => {
-            const tr = document.createElement('tr');
-
+        state.invFilteredProducts.slice(startIndex, endIndex).forEach(prod => {
+            const row = document.createElement('tr');
+            const combo = isCombo(prod);
             let stockWarning = '';
-            if (prod.stock !== null && prod.alerta_stock !== null && prod.stock <= prod.alerta_stock) {
-                tr.classList.add('warning-row');
-                stockWarning = ' <span title="¡Inventario Bajo!" style="color: #9a5908;">⚠️</span>';
+            if (!combo && prod.stock != null && prod.alerta_stock != null && Number(prod.stock) <= Number(prod.alerta_stock)) {
+                row.classList.add('warning-row');
+                stockWarning = ' <span title="¡Inventario bajo!" class="stock-warning">⚠️</span>';
             }
-
-            const delCol = prod.id !== undefined ? 'id' : 'nombre';
-            const delVal = prod.id !== undefined ? prod.id : prod.nombre;
-            const codigo = prod.codigo ? prod.codigo : '';
-            const pCompra = prod.precio_compra ? `S/ ${prod.precio_compra.toFixed(2)}` : '';
-            const pVenta = prod.precio_venta ? `S/ ${prod.precio_venta.toFixed(2)}` : '';
-            const pStock = prod.stock !== null ? prod.stock : '';
-            const cat = prod.categoria ? prod.categoria : '';
-            const imgSrc = resolveImage(prod.imagen);
-
-            tr.innerHTML = `
-                <td><img src="${imgSrc}" style="width: 40px; height: 40px; border-radius: 8px; object-fit: cover;" onerror="this.onerror=null; this.src='./kalo-logo.png'"></td>
-                <td><code>${codigo}</code></td>
-                <td>${prod.nombre}</td>
-                <td>${cat}</td>
-                <td>${pCompra}</td>
-                <td><strong style="color: var(--primary)">${pVenta}</strong></td>
-                <td>${pStock}${stockWarning}</td>
-                <td style="display: flex; gap: 0.5rem; justify-content: center;">
-                    <button class="edit-btn" data-prodid="${prod.id}" style="background: transparent; border: none; cursor: pointer; font-size: 1.2rem; color: var(--primary); transition: transform 0.2s;" title="Editar">✏️</button>
-                    <button class="delete-btn" data-prodid="${prod.id}" data-col="${delCol}" data-val="${delVal}" style="background: transparent; border: none; cursor: pointer; font-size: 1.2rem; color: #b42318; transition: transform 0.2s;" title="Eliminar">🗑️</button>
+            const codigo = combo
+                ? `<span class="combo-badge" title="${escapeHtml(describirCombo(prod))}">Combo</span>`
+                : `<code>${escapeHtml(prod.codigo || '')}</code>`;
+            const stock = combo ? '<span class="muted" title="Se descuenta de sus componentes">—</span>' : escapeHtml(prod.stock ?? '');
+            row.innerHTML = `
+                <td><img src="${escapeHtml(resolveImage(prod.imagen))}" class="inventory-thumb" alt=""></td>
+                <td>${codigo}</td>
+                <td>${escapeHtml(prod.nombre)}</td>
+                <td>${escapeHtml(prod.categoria || '')}</td>
+                <td>${prod.precio_compra ? escapeHtml(formatMoney(prod.precio_compra)) : ''}</td>
+                <td><strong class="price-cell">${prod.precio_venta ? escapeHtml(formatMoney(prod.precio_venta)) : ''}</strong></td>
+                <td>${stock}${stockWarning}</td>
+                <td class="row-actions">
+                    <button type="button" class="edit-btn" data-prodid="${escapeHtml(prod.id)}" title="Editar" aria-label="Editar ${escapeHtml(prod.nombre)}">✏️</button>
+                    <button type="button" class="delete-btn" data-prodid="${escapeHtml(prod.id)}" title="Eliminar" aria-label="Eliminar ${escapeHtml(prod.nombre)}">🗑️</button>
                 </td>
             `;
-            productList.appendChild(tr);
+            productList.appendChild(row);
         });
 
         if (paginationInfo) {
             paginationInfo.textContent = `Mostrando ${startIndex + 1} - ${Math.min(endIndex, state.invFilteredProducts.length)} de ${state.invFilteredProducts.length} productos`;
         }
-        if (prevPageBtn) {
-            prevPageBtn.disabled = state.invCurrentPage === 1;
-            prevPageBtn.style.opacity = prevPageBtn.disabled ? '0.5' : '1';
+        if (prevPageBtn) prevPageBtn.disabled = state.invCurrentPage === 1;
+        if (nextPageBtn) nextPageBtn.disabled = state.invCurrentPage === totalPages;
+    }
+
+    async function eliminarProducto(prod, button) {
+        const usadoEn = [...state.combos]
+            .filter(([, componentes]) => componentes.some(c => c.producto_id === String(prod.id)))
+            .map(([comboId]) => productById(comboId)?.nombre || 'un combo');
+        if (usadoEn.length) {
+            await customAlert(`"${prod.nombre}" es parte de: ${usadoEn.join(', ')}. Elimina primero esos combos.`, 'No se puede eliminar', '🍔');
+            return;
         }
-        if (nextPageBtn) {
-            nextPageBtn.disabled = state.invCurrentPage === totalPages;
-            nextPageBtn.style.opacity = nextPageBtn.disabled ? '0.5' : '1';
+        if (!await customConfirm(`¿Seguro que deseas eliminar "${prod.nombre}"? Dejará de aparecer en la caja; el historial de ventas se conserva.`, 'Eliminar', '🗑️')) return;
+        try {
+            if (button) button.disabled = true;
+            const { data, error } = await supabase.from('productos').update({ activo: false })
+                .eq('id', prod.id).eq('local', state.currentLocal).select('id');
+            if (error) throw error;
+            if (!data || data.length !== 1) throw new Error('No se encontró el producto en este local.');
+            await loadProducts();
+        } catch (error) {
+            if (button) button.disabled = false;
+            await customAlert('Error: ' + describeError(error), 'Error', '⚠️');
         }
     }
 
-    if (productList && !window.inventoryDelegated) {
-        productList.addEventListener('click', async (e) => {
-            const btnEdit = e.target.closest('.edit-btn');
-            if (btnEdit) {
-                const prodId = btnEdit.getAttribute('data-prodid');
-                const pId = isNaN(prodId) ? prodId : Number(prodId);
-                const prod = state.globalProducts.find(p => p.id === pId);
-                if (prod) abrirModalEdicion(prod);
-            }
-            
-            const btnDel = e.target.closest('.delete-btn');
-            if (btnDel) {
-                const col = btnDel.getAttribute('data-col');
-                const val = btnDel.getAttribute('data-val');
-                if (await customConfirm('¿Seguro que deseas eliminar este producto?', 'Eliminar', '🗑️')) {
-                    try {
-                        btnDel.style.opacity = '0.5';
-                        const { error } = await supabase.from('productos').delete().eq(col, val);
-                        if (error) throw error;
-                        await loadProducts();
-                    } catch (error) {
-                        btnDel.style.opacity = '1';
-                        await customAlert('Error: ' + error.message, 'Error', '⚠️');
-                        await loadProducts();
-                    }
-                }
-            }
-        });
-        window.inventoryDelegated = true;
-    }
+    productList?.addEventListener('click', event => {
+        const editBtn = event.target.closest?.('.edit-btn');
+        if (editBtn) {
+            const prod = productById(editBtn.getAttribute('data-prodid'));
+            if (prod) abrirModalEdicion(prod);
+            return;
+        }
+        const deleteBtn = event.target.closest?.('.delete-btn');
+        if (deleteBtn) {
+            const prod = productById(deleteBtn.getAttribute('data-prodid'));
+            if (prod) return eliminarProducto(prod, deleteBtn);
+        }
+        return undefined;
+    });
 
     function filterInventoryProducts() {
         const term = invSearch ? invSearch.value.toLowerCase() : '';
         const activeBtn = document.querySelector('.inv-filter-btn.active');
         const activeCat = activeBtn ? activeBtn.getAttribute('data-cat') : 'Todos';
-
         let filtered = state.globalProducts;
-
-        if (activeCat !== 'Todos') {
-            filtered = filtered.filter(p => p.categoria === activeCat);
-        }
-
+        if (activeCat && activeCat !== 'Todos') filtered = filtered.filter(p => p.categoria === activeCat);
         if (term) {
-            filtered = filtered.filter(p => 
-                p.nombre.toLowerCase().includes(term) || 
+            filtered = filtered.filter(p =>
+                (p.nombre || '').toLowerCase().includes(term) ||
                 (p.codigo && p.codigo.toLowerCase().includes(term)) ||
-                (p.categoria && p.categoria.toLowerCase().includes(term))
-            );
+                (p.categoria && p.categoria.toLowerCase().includes(term)));
         }
-
         state.invFilteredProducts = filtered;
         state.invCurrentPage = 1;
         renderInventoryTable();
     }
 
-    if (invSearch) {
-        invSearch.addEventListener('input', filterInventoryProducts);
-    }
+    invSearch?.addEventListener('input', filterInventoryProducts);
 
     const invCatBtns = document.querySelectorAll('.inv-filter-btn');
-    if (invCatBtns.length > 0) {
-        invCatBtns.forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                invCatBtns.forEach(b => b.classList.remove('active'));
-                e.target.classList.add('active');
-                filterInventoryProducts();
-            });
+    invCatBtns.forEach(btn => {
+        btn.addEventListener('click', event => {
+            invCatBtns.forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+            filterInventoryProducts();
         });
-    }
+    });
 
-    if (prevPageBtn) {
-        prevPageBtn.addEventListener('click', () => {
-            if (state.invCurrentPage > 1) {
-                state.invCurrentPage--;
-                renderInventoryTable();
-            }
-        });
-    }
+    prevPageBtn?.addEventListener('click', () => {
+        if (state.invCurrentPage > 1) {
+            state.invCurrentPage--;
+            renderInventoryTable();
+        }
+    });
 
-    if (nextPageBtn) {
-        nextPageBtn.addEventListener('click', () => {
-            const totalPages = Math.ceil(state.invFilteredProducts.length / state.invItemsPerPage);
-            if (state.invCurrentPage < totalPages) {
-                state.invCurrentPage++;
-                renderInventoryTable();
-            }
-        });
-    }
+    nextPageBtn?.addEventListener('click', () => {
+        const totalPages = Math.ceil(state.invFilteredProducts.length / state.invItemsPerPage);
+        if (state.invCurrentPage < totalPages) {
+            state.invCurrentPage++;
+            renderInventoryTable();
+        }
+    });
 
-    // --- ALERTAS DE VENCIMIENTO Y DEPURACIÓN ---
+    // --- ALERTAS DE VENCIMIENTO ---
+    const alertsList = document.getElementById('alertsList');
+
     function checkAlerts() {
         const alertsBadge = document.getElementById('alertsBadge');
-        const alertsList = document.getElementById('alertsList');
         if (!alertsBadge || !alertsList) return;
-        
         alertsList.innerHTML = '';
         let alertCount = 0;
-        const today = new Date();
-        today.setHours(0,0,0,0);
-        
-        const thirtyDaysLater = new Date(today);
-        thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30);
-        
+
         state.globalProducts.forEach(prod => {
-            if (prod.lotes && Array.isArray(prod.lotes)) {
-                prod.lotes.forEach((lote, index) => {
-                    const expDate = new Date(lote.vencimiento);
-                    const isExpired = expDate < today;
-                    const isNear = !isExpired && expDate <= thirtyDaysLater;
-                    
-                    if (isExpired || isNear) {
-                        alertCount++;
-                        const tr = document.createElement('tr');
-                        const color = isExpired ? '#b42318' : '#9a5908';
-                        const estado = isExpired ? 'Vencido' : 'Próximo a Vencer';
-                        tr.innerHTML = `
-                            <td>${prod.nombre}</td>
-                            <td>${lote.qty} unidades</td>
-                            <td style="color: ${color}; font-weight: bold;">${lote.vencimiento}</td>
-                            <td style="color: ${color};">${estado}</td>
-                            <td><button class="secondary-btn depurar-btn" data-prodid="${prod.id}" data-loteidx="${index}" style="padding: 0.2rem 0.5rem; font-size: 0.8rem; background: #fff1ef; border-color: #f2c8c4; color: #b42318;">Depurado</button></td>
-                        `;
-                        alertsList.appendChild(tr);
-                    }
-                });
-            }
+            if (!Array.isArray(prod.lotes)) return;
+            prod.lotes.forEach((lote, index) => {
+                const estado = estadoVencimiento(lote?.vencimiento);
+                if (estado !== 'vencido' && estado !== 'por-vencer') return;
+                alertCount++;
+                const color = COLOR_VENCIMIENTO[estado];
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${escapeHtml(prod.nombre)}</td>
+                    <td>${escapeHtml(lote.qty)} unidades</td>
+                    <td style="color: ${color}; font-weight: bold;">${escapeHtml(lote.vencimiento)}</td>
+                    <td style="color: ${color};">${estado === 'vencido' ? 'Vencido' : 'Próximo a vencer'}</td>
+                    <td><button type="button" class="secondary-btn depurar-btn" data-prodid="${escapeHtml(prod.id)}" data-loteidx="${index}">Depurado</button></td>
+                `;
+                alertsList.appendChild(row);
+            });
         });
-        
+
         if (alertCount > 0) {
             alertsBadge.textContent = alertCount;
             alertsBadge.style.display = 'block';
         } else {
             alertsBadge.style.display = 'none';
-            alertsList.innerHTML = '<tr><td colspan="5" style="text-align:center; color: var(--text-secondary);">Todo en orden. No hay productos por vencer.</td></tr>';
-        }
-        
-        if (!window.alertsDelegated) {
-            alertsList.addEventListener('click', async (e) => {
-                const btn = e.target.closest('.depurar-btn');
-                if (btn) {
-                    const prodId = btn.getAttribute('data-prodid');
-                    const loteIndex = parseInt(btn.getAttribute('data-loteidx'));
-                    const parsedId = isNaN(prodId) ? prodId : Number(prodId);
-                    await depurarLote(parsedId, loteIndex);
-                }
-            });
-            window.alertsDelegated = true;
+            alertsList.innerHTML = '<tr><td colspan="5" class="table-message">Todo en orden. No hay productos por vencer.</td></tr>';
         }
     }
 
+    alertsList?.addEventListener('click', async event => {
+        const button = event.target.closest?.('.depurar-btn');
+        if (!button) return;
+        await depurarLote(button.getAttribute('data-prodid'), parseInt(button.getAttribute('data-loteidx'), 10));
+    });
+
     async function depurarLote(prodId, loteIndex) {
-        const isConfirmed = await customConfirm('¿Confirmas que ya retiraste este lote de los estantes? Esta acción lo eliminará del sistema y de las alertas.', 'Confirmar Depuración', '⚠️');
-        if (!isConfirmed) return;
-        
-        const prod = state.globalProducts.find(p => p.id === prodId);
-        if (!prod) return;
-        
+        const prod = productById(prodId);
+        if (!prod || !Array.isArray(prod.lotes)) return;
+        if (!await customConfirm('¿Confirmas que ya retiraste este lote de los estantes? Se quitará del sistema y de las alertas.', 'Confirmar depuración', '⚠️')) return;
         const updatedLotes = prod.lotes.filter((_, i) => i !== loteIndex);
-        
         try {
-            const { error } = await supabase.from('productos').update({ lotes: updatedLotes }).eq('id', prodId);
+            const { data, error } = await supabase.from('productos')
+                .update({ lotes: updatedLotes.length ? updatedLotes : null })
+                .eq('id', prod.id).eq('local', state.currentLocal).select('id');
             if (error) throw error;
-            
+            if (!data || data.length !== 1) throw new Error('No se encontró el producto en este local.');
             await loadProducts();
             await customAlert('Lote depurado con éxito.', 'Depurado', '✅');
         } catch (error) {
-            await customAlert('Error al depurar lote: ' + error.message, 'Error', '⚠️');
+            await customAlert('Error al depurar lote: ' + describeError(error), 'Error', '⚠️');
         }
     }
-
-    window.depurarLote = depurarLote;
-    window.abrirModalEdicionById = (id) => {
-        const prod = state.globalProducts.find(p => p.id === id);
-        if (prod) {
-            const navInvBtn = document.getElementById('navInvBtn');
-            if (navInvBtn) navInvBtn.click();
-            abrirModalEdicion(prod);
-        }
-    };
 
     return {
         loadProducts,
         renderInventoryTable,
         checkAlerts,
-        abrirModalEdicion
+        abrirModalEdicion,
+        clear
     };
 }

@@ -1,20 +1,23 @@
-// Estado global centralizado de la aplicación
-
-function detectLocal() {
-    let local = 'LAS BRISAS';
-    const pathURL = window.location.pathname.toLowerCase();
-    if (pathURL.includes('brisas')) local = 'LAS BRISAS';
-    else if (pathURL.includes('pinos')) local = 'LOS PINOS';
-    else if (pathURL.includes('polideportivo')) local = 'EL POLIDEPORTIVO';
-    return local;
-}
-
+// Estado compartido de la aplicación. Se llena al iniciar sesión.
 export const state = {
-    currentLocal: detectLocal(),
-    currentUserEmail: null,
+    perfil: null,            // { email, rol: 'admin' | 'cajero', local, esAdmin, aal }
+    mfaPendiente: false,     // admin que todavía no activó la verificación en dos pasos
+    currentLocal: null,      // 'LAS BRISAS' | 'LOS PINOS' | 'EL POLIDEPORTIVO'
     globalProducts: [],
+    combos: new Map(),       // id del combo (texto) → [{ producto_id, cantidad }]
     invFilteredProducts: [],
     invCurrentPage: 1,
-    invItemsPerPage: 999999,
+    invItemsPerPage: 999999, // el inventario muestra todos los productos (preferencia del negocio)
     cart: []
 };
+
+export function resetSessionState() {
+    state.perfil = null;
+    state.mfaPendiente = false;
+    state.currentLocal = null;
+    state.globalProducts = [];
+    state.combos = new Map();
+    state.invFilteredProducts = [];
+    state.invCurrentPage = 1;
+    state.cart = [];
+}

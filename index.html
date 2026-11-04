@@ -3,67 +3,598 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Selecciona tu local Kalo para acceder al punto de venta y al inventario.">
-    <meta name="theme-color" content="#cdd5ce">
-    <title>Kalo | Elige tu local</title>
+    <meta name="description" content="Kalo - Punto de venta e inventario">
+    <meta name="theme-color" content="#233e3a">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+    <title>Kalo | Punto de venta</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="icon" type="image/png" href="./kalo-logo.png">
-    <link rel="stylesheet" href="./landing.css">
+    <link rel="stylesheet" href="./index.css">
 </head>
 <body>
-    <div class="landing-shell">
-        <header class="landing-header">
-            <div class="brand">
-                <img src="./kalo-logo.png" alt="" width="42" height="46">
-                <div>
-                    <span class="brand-name">Kalo</span>
-                    <span class="brand-description">Punto de venta</span>
+    <svg class="icon-sprite" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+        <symbol id="icon-cart" viewBox="0 0 24 24"><path d="M3 3h2l2.5 12h11l2-8H6"/><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/></symbol>
+        <symbol id="icon-history" viewBox="0 0 24 24"><path d="M3 11a9 9 0 1 1 2.7 7.4M3 4v7h7M12 7v5l3 2"/></symbol>
+        <symbol id="icon-box" viewBox="0 0 24 24"><path d="m3 7 9-5 9 5v10l-9 5-9-5V7Zm0 0 9 5 9-5M12 12v10M7.5 4.5l9 5"/></symbol>
+        <symbol id="icon-chart" viewBox="0 0 24 24"><path d="M4 3v17h17M9 16v-5M14 16V6M19 16V9"/></symbol>
+        <symbol id="icon-bell" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></symbol>
+        <symbol id="icon-exit" viewBox="0 0 24 24"><path d="M9 4H4v16h5M13 7l5 5-5 5M8 12h13"/></symbol>
+        <symbol id="icon-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></symbol>
+        <symbol id="icon-ticket" viewBox="0 0 24 24"><path d="M5 3h14v18l-3-2-4 2-4-2-3 2V3ZM9 8h6M9 12h6"/></symbol>
+        <symbol id="icon-arrow" viewBox="0 0 24 24"><path d="M4 12h16m-6-6 6 6-6 6"/></symbol>
+        <symbol id="icon-shield" viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 4.5 3.4 8.3 8 9 4.6-.7 8-4.5 8-9V6l-8-3Z"/><path d="m9 12 2 2 4-4"/></symbol>
+        <symbol id="icon-store" viewBox="0 0 24 24"><path d="M3 10h18l-2-6H5l-2 6Z"/><path d="M4 10v10h16V10M9 20v-6h6v6M3 10a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0"/></symbol>
+        <symbol id="icon-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></symbol>
+    </svg>
+    <main class="container">
+
+        <!-- Arranque -->
+        <section class="glass-card login-card" id="bootCard" aria-live="polite">
+            <div class="login-brand"><img src="./kalo-logo.png" alt=""><span>kalo<span class="brand-dot">.</span></span></div>
+            <p class="login-intro">Cargando Kalo…</p>
+        </section>
+
+        <!-- Ingreso -->
+        <section class="glass-card login-card hidden" id="loginCard" aria-labelledby="loginTitle">
+            <div class="login-brand"><img src="./kalo-logo.png" alt=""><span>kalo<span class="brand-dot">.</span></span></div>
+            <span class="eyebrow">Punto de venta</span>
+            <h1 id="loginTitle">Inicia tu jornada</h1>
+            <p class="login-intro">Ingresa con tu cuenta y Kalo abrirá la caja de tu local.</p>
+            <form id="loginForm" novalidate>
+                <div class="input-group">
+                    <label for="emailInput">Correo electrónico</label>
+                    <input type="email" id="emailInput" placeholder="tu@correo.com" class="styled-input" autocomplete="username" required>
                 </div>
-            </div>
-            <span class="header-label">Ventas e inventario</span>
-        </header>
+                <div class="input-group">
+                    <label for="passwordInput">Contraseña</label>
+                    <input type="password" id="passwordInput" placeholder="Ingresa tu contraseña" class="styled-input" autocomplete="current-password" required>
+                </div>
+                <button type="submit" id="loginBtn" class="primary-btn">Entrar</button>
+                <p id="loginStatusMsg" class="form-status" role="status"></p>
+            </form>
+        </section>
 
-        <main class="local-selection">
+        <!-- Verificación en dos pasos -->
+        <section class="glass-card login-card hidden" id="mfaCard" aria-labelledby="mfaTitle">
+            <div class="login-brand"><img src="./kalo-logo.png" alt=""><span>kalo<span class="brand-dot">.</span></span></div>
+            <span class="eyebrow">Verificación en dos pasos</span>
+            <h1 id="mfaTitle">Ingresa tu código</h1>
+            <p class="login-intro">Abre tu app de autenticación y escribe el código de 6 dígitos de Kalo.</p>
+            <form id="mfaForm" novalidate>
+                <div class="input-group">
+                    <label for="mfaCodeInput">Código de 6 dígitos</label>
+                    <input type="text" id="mfaCodeInput" class="styled-input code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="000000">
+                </div>
+                <button type="submit" id="mfaVerifyBtn" class="primary-btn">Verificar</button>
+                <p id="mfaStatusMsg" class="form-status" role="status"></p>
+            </form>
+            <div class="gate-actions">
+                <button type="button" class="link-btn" data-action="logout-gate">Cerrar sesión</button>
+            </div>
+        </section>
+
+        <!-- Activar verificación en dos pasos -->
+        <section class="glass-card login-card enroll-card hidden" id="mfaEnrollCard" aria-labelledby="mfaEnrollTitle">
+            <span class="eyebrow">Seguridad de la cuenta</span>
+            <h1 id="mfaEnrollTitle">Activa la verificación en dos pasos</h1>
+            <p id="mfaEnrollIntro" class="login-intro"></p>
+            <ol class="enroll-steps">
+                <li>En tu app de autenticación, elige “Agregar cuenta” o “Escanear código QR”.</li>
+                <li>Escanea este código, o escribe la clave manual.</li>
+                <li>Escribe el código de 6 dígitos que aparece en la app.</li>
+            </ol>
+            <div class="qr-box"><img id="mfaQrImg" alt="Código QR para la app de autenticación" width="184" height="184"></div>
+            <p class="secret-line">Clave manual: <code id="mfaSecret"></code></p>
+            <form id="mfaEnrollForm" novalidate>
+                <div class="input-group">
+                    <label for="mfaEnrollCodeInput">Código de 6 dígitos</label>
+                    <input type="text" id="mfaEnrollCodeInput" class="styled-input code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="000000">
+                </div>
+                <button type="submit" id="mfaEnrollBtn" class="primary-btn">Activar</button>
+                <p id="mfaEnrollStatusMsg" class="form-status" role="status"></p>
+            </form>
+            <div class="gate-actions">
+                <button type="button" id="mfaEnrollLaterBtn" class="link-btn">Ahora no</button>
+                <button type="button" class="link-btn" data-action="logout-gate">Cerrar sesión</button>
+            </div>
+        </section>
+
+        <!-- Elegir local (solo administradores) -->
+        <section class="local-picker hidden" id="localPicker" aria-labelledby="localPickerTitle">
             <div class="welcome-copy">
-                <p class="eyebrow">TU ESPACIO DE TRABAJO</p>
-                <h1>¿En qué local estás hoy?</h1>
-                <p class="welcome-description">Selecciona tu sucursal para iniciar sesión.</p>
+                <p class="eyebrow">Administración</p>
+                <h1 id="localPickerTitle">¿Qué local quieres abrir?</h1>
+                <p class="welcome-description">Puedes cambiar de local cuando quieras desde la barra superior.</p>
             </div>
-
-            <nav class="local-grid" aria-label="Locales disponibles">
-                <a href="./brisas.html" class="local-card">
-                    <span class="local-icon" aria-hidden="true">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10h18l-2-6H5l-2 6Z"/><path d="M4 10v10h16V10M9 20v-6h6v6M3 10a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0"/></svg>
-                    </span>
+            <div class="local-grid" id="localPickerGrid">
+                <button type="button" class="local-card" data-local="LAS BRISAS">
+                    <span class="local-icon" aria-hidden="true"><svg class="icon"><use href="#icon-store"></use></svg></span>
                     <span class="local-name">Las Brisas</span>
                     <span class="local-action">Ingresar al local <span aria-hidden="true">↗</span></span>
-                </a>
-                <a href="./pinos.html" class="local-card">
-                    <span class="local-icon" aria-hidden="true">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10h18l-2-6H5l-2 6Z"/><path d="M4 10v10h16V10M9 20v-6h6v6M3 10a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0"/></svg>
-                    </span>
+                </button>
+                <button type="button" class="local-card" data-local="LOS PINOS">
+                    <span class="local-icon" aria-hidden="true"><svg class="icon"><use href="#icon-store"></use></svg></span>
                     <span class="local-name">Los Pinos</span>
                     <span class="local-action">Ingresar al local <span aria-hidden="true">↗</span></span>
-                </a>
-                <a href="./polideportivo.html" class="local-card">
-                    <span class="local-icon" aria-hidden="true">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10h18l-2-6H5l-2 6Z"/><path d="M4 10v10h16V10M9 20v-6h6v6M3 10a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0"/></svg>
-                    </span>
+                </button>
+                <button type="button" class="local-card" data-local="EL POLIDEPORTIVO">
+                    <span class="local-icon" aria-hidden="true"><svg class="icon"><use href="#icon-store"></use></svg></span>
                     <span class="local-name">El Polideportivo</span>
                     <span class="local-action">Ingresar al local <span aria-hidden="true">↗</span></span>
-                </a>
+                </button>
+            </div>
+            <div class="gate-actions">
+                <button type="button" id="localPickerBackBtn" class="link-btn hidden">← Volver</button>
+                <button type="button" class="link-btn" data-action="logout-gate">Cerrar sesión</button>
+            </div>
+        </section>
 
+        <div id="appView" class="hidden app-layout">
+            <header class="glass-card top-nav">
+                <div class="brand">
+                    <img src="./kalo-logo.png" alt="">
+                    <span class="brand-copy">
+                        <span class="brand-name">kalo<span class="brand-dot">.</span></span>
+                        <span class="local-line"><span id="localLabel">Local</span><button type="button" id="changeLocalBtn" class="local-switch hidden">Cambiar</button></span>
+                    </span>
+                </div>
+                <nav class="nav-links" aria-label="Secciones del sistema">
+                    <button type="button" id="navPosBtn" class="nav-btn active" data-view="pos"><svg class="icon" aria-hidden="true"><use href="#icon-cart"></use></svg> Vender</button>
+                    <button type="button" id="navHistoryBtn" class="nav-btn" data-view="historial"><svg class="icon" aria-hidden="true"><use href="#icon-history"></use></svg> Historial</button>
+                    <button type="button" id="navInvBtn" class="nav-btn" data-view="inventario"><svg class="icon" aria-hidden="true"><use href="#icon-box"></use></svg> Inventario</button>
+                    <button type="button" id="navStatsBtn" class="nav-btn hidden" data-view="estadisticas"><svg class="icon" aria-hidden="true"><use href="#icon-chart"></use></svg> Estadísticas</button>
+                    <button type="button" id="navAlertsBtn" class="nav-btn" data-view="alertas"><svg class="icon" aria-hidden="true"><use href="#icon-bell"></use></svg> Alertas <span id="alertsBadge" style="display:none">0</span></button>
+                </nav>
+                <div class="nav-actions">
+                    <button type="button" id="mfaSetupBtn" class="secondary-btn mfa-btn hidden" title="Activar verificación en dos pasos"><svg class="icon" aria-hidden="true"><use href="#icon-shield"></use></svg> Activar 2FA</button>
+                    <button type="button" id="logoutBtn" class="secondary-btn logout-btn"><svg class="icon" aria-hidden="true"><use href="#icon-exit"></use></svg> Salir</button>
+                </div>
+            </header>
 
+            <!-- Venta: catálogo y ticket se desplazan por separado. -->
+            <section id="posView" class="pos-layout" aria-label="Punto de venta">
+                <div class="pos-products-section">
+                    <div class="catalog-heading">
+                        <div><span class="eyebrow">Punto de venta</span><h1>Nueva venta</h1></div>
+                        <span id="catalogCount" class="catalog-count"></span>
+                        <a href="#saleTicket" class="mobile-ticket-link">Ver ticket <span id="mobileCartTotal">S/ 0.00</span></a>
+                    </div>
+                    <label class="search-field">
+                        <svg class="icon" aria-hidden="true"><use href="#icon-search"></use></svg>
+                        <input type="search" id="posSearch" class="pos-search" placeholder="Buscar producto o escanear código" aria-label="Buscar producto por nombre o código" autocomplete="off">
+                    </label>
+                    <div class="category-filters" id="posCategoryFilters" aria-label="Categorías de productos">
+                        <button type="button" class="cat-filter-btn active" data-cat="Todos">Todos</button>
+                        <button type="button" class="cat-filter-btn" data-cat="Bebidas">🥤 Bebidas</button>
+                        <button type="button" class="cat-filter-btn" data-cat="Snacks">🍿 Snacks</button>
+                        <button type="button" class="cat-filter-btn" data-cat="Lácteos">🥛 Lácteos</button>
+                        <button type="button" class="cat-filter-btn" data-cat="Limpieza">🧼 Limpieza</button>
+                        <button type="button" class="cat-filter-btn" data-cat="Dulces">🍬 Dulces</button>
+                        <button type="button" class="cat-filter-btn" data-cat="Abarrotes">🥫 Abarrotes</button>
+                        <button type="button" class="cat-filter-btn combo-filter" data-cat="Combos">🍔 Combos</button>
+                    </div>
+                    <div class="pos-grid" id="posGrid" aria-label="Productos disponibles"></div>
+                    <div class="catalog-pagination">
+                        <button type="button" id="posPrevPageBtn" class="secondary-btn">← Anterior</button>
+                        <span id="posPaginationInfo">Página 1</span>
+                        <button type="button" id="posNextPageBtn" class="secondary-btn">Siguiente →</button>
+                    </div>
+                </div>
+                <aside class="pos-cart-section" id="saleTicket" aria-labelledby="ticketTitle">
+                    <div class="ticket-heading">
+                        <h2 id="ticketTitle"><svg class="icon" aria-hidden="true"><use href="#icon-ticket"></use></svg> Tu ticket</h2>
+                        <span id="cartItemCount" class="cart-count" aria-live="polite">0 productos</span>
+                    </div>
+                    <div class="cart-items" id="cartItems"></div>
+                    <div class="cart-controls">
+                        <details class="discount-settings">
+                            <summary>Aplicar descuento <span id="discountSummaryAmount">Opcional</span></summary>
+                            <div class="discount-content">
+                                <span class="control-label">Descuento rápido</span>
+                                <div class="discount-options" aria-label="Descuentos porcentuales">
+                                    <button type="button" class="discount-btn secondary-btn" data-percent="25">25%</button>
+                                    <button type="button" class="discount-btn secondary-btn" data-percent="50">50%</button>
+                                    <button type="button" class="discount-btn secondary-btn" data-percent="75">75%</button>
+                                    <button type="button" class="discount-btn secondary-btn" data-percent="100">100%</button>
+                                </div>
+                                <div class="discount-field">
+                                    <label for="cartDiscount">Descuento en soles</label>
+                                    <input type="number" id="cartDiscount" class="styled-input" placeholder="0.00" step="0.01" min="0" inputmode="decimal">
+                                </div>
+                            </div>
+                        </details>
+                        <div class="payment-field">
+                            <label class="control-label" for="paymentMethod">Método de pago</label>
+                            <select id="paymentMethod" class="styled-input">
+                                <option value="Efectivo">Efectivo</option>
+                                <option value="Yape">Yape / Plin</option>
+                                <option value="Ambos">Efectivo + Yape / Plin</option>
+                            </select>
+                        </div>
+                        <div id="splitPaymentSection" class="split-payment hidden">
+                            <label for="splitEfectivo">Efectivo (S/)
+                                <input type="number" id="splitEfectivo" class="styled-input" placeholder="0.00" step="0.01" min="0" inputmode="decimal">
+                            </label>
+                            <label for="splitYape">Yape / Plin (S/)
+                                <input type="number" id="splitYape" class="styled-input" placeholder="0.00" step="0.01" min="0" inputmode="decimal">
+                            </label>
+                        </div>
+                    </div>
+                    <div class="cart-footer">
+                        <div class="cart-total"><span>Total a pagar</span><span id="cartTotalValue" aria-live="polite">S/ 0.00</span></div>
+                        <button type="button" id="cobrarBtn" class="primary-btn">Cobrar <svg class="icon" aria-hidden="true"><use href="#icon-arrow"></use></svg></button>
+                        <a href="#posSearch" class="back-to-products">↑ Volver a productos</a>
+                    </div>
+                </aside>
+            </section>
 
+            <!-- Inventario -->
+            <div class="glass-card hidden view-panel" id="dashboardCard">
+                <div class="dashboard-header">
+                    <div>
+                        <h1>Inventario 📦</h1>
+                        <p class="muted">Gestiona tus productos y stock</p>
+                    </div>
+                    <div class="header-tools">
+                        <input type="search" id="invSearch" class="pos-search" placeholder="🔍 Buscar producto..." aria-label="Buscar en el inventario">
+                        <button type="button" id="openComboModalBtn" class="primary-btn combo-create-btn">🍔 Crear combo</button>
+                        <button type="button" id="openModalBtn" class="primary-btn">➕ Nuevo producto</button>
+                    </div>
+                </div>
 
-                
-            </nav>
+                <div class="category-filters" id="invCategoryFilters">
+                    <button type="button" class="inv-filter-btn active" data-cat="Todos">Todos</button>
+                    <button type="button" class="inv-filter-btn" data-cat="Bebidas">🥤 Bebidas</button>
+                    <button type="button" class="inv-filter-btn" data-cat="Snacks">🍿 Snacks</button>
+                    <button type="button" class="inv-filter-btn" data-cat="Lácteos">🥛 Lácteos</button>
+                    <button type="button" class="inv-filter-btn" data-cat="Limpieza">🧼 Limpieza</button>
+                    <button type="button" class="inv-filter-btn" data-cat="Dulces">🍬 Dulces</button>
+                    <button type="button" class="inv-filter-btn" data-cat="Abarrotes">🥫 Abarrotes</button>
+                    <button type="button" class="inv-filter-btn combo-filter" data-cat="Combos">🍔 Combos</button>
+                </div>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Img</th>
+                                <th>Código</th>
+                                <th>Nombre</th>
+                                <th>Categoría</th>
+                                <th>Compra</th>
+                                <th>Venta</th>
+                                <th>Stock</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="productList"></tbody>
+                    </table>
+                </div>
 
-        </main>
- 
-        <footer class="landing-footer">Kalo <span aria-hidden="true">·</span> Todo listo para tu jornada.</footer>
+                <!-- Paginación oculta: el negocio prefiere ver todos los productos -->
+                <div class="inventory-pagination hidden">
+                    <div class="muted" id="paginationInfo">Mostrando 0 productos</div>
+                    <div>
+                        <button type="button" id="prevPageBtn" class="secondary-btn">Anterior</button>
+                        <button type="button" id="nextPageBtn" class="secondary-btn">Siguiente</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Estadísticas (solo administradores) -->
+            <div class="glass-card hidden view-panel" id="statsView">
+                <div class="dashboard-header">
+                    <div>
+                        <h1>Estadísticas 📊</h1>
+                        <p class="muted">Rendimiento del local en el mes</p>
+                    </div>
+                    <div class="stats-tools">
+                        <button type="button" id="exportStatsBtn" class="secondary-btn export-btn">📥 Exportar Excel</button>
+                        <span class="tools-divider" aria-hidden="true"></span>
+                        <input type="month" id="statsMonth" aria-label="Mes de las estadísticas">
+                    </div>
+                </div>
+
+                <div class="kpi-grid">
+                    <div class="stat-card">
+                        <h3 class="stat-title">Ventas</h3>
+                        <p class="stat-value" id="statVentas">S/ 0.00</p>
+                        <p class="stat-detail" id="statVentasDetalle">0 ventas</p>
+                    </div>
+                    <div class="stat-card stat-card-margin">
+                        <h3 class="stat-title">Margen</h3>
+                        <p class="stat-value" id="statMargen">S/ 0.00</p>
+                        <p class="stat-detail">Ventas − costo de mercadería</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3 class="stat-title">Descuentos</h3>
+                        <p class="stat-value" id="statDescuentos">S/ 0.00</p>
+                    </div>
+                    <div class="stat-card stat-card-refunds">
+                        <h3 class="stat-title">Reembolsos</h3>
+                        <p class="stat-value" id="statReembolsos">S/ 0.00</p>
+                        <p class="stat-detail" id="statReembolsosDetalle">0 ventas</p>
+                    </div>
+                </div>
+
+                <div class="chart-box">
+                    <canvas id="salesChart" aria-label="Ventas, margen y descuentos por día"></canvas>
+                </div>
+
+                <h2 class="section-title">Productos más vendidos del mes</h2>
+                <div class="table-container">
+                    <table class="data-table compact-table">
+                        <thead>
+                            <tr>
+                                <th>Producto</th>
+                                <th>Unidades</th>
+                                <th>Vendido (antes de descuentos)</th>
+                                <th>Margen</th>
+                            </tr>
+                        </thead>
+                        <tbody id="topProductsList"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Historial de ventas -->
+            <div class="glass-card hidden view-panel" id="historyView">
+                <div class="dashboard-header">
+                    <div>
+                        <h1>Historial de ventas 🧾</h1>
+                        <p class="muted" id="historySubtitle">Cierre de caja y últimas 100 ventas del local</p>
+                    </div>
+                    <button type="button" id="refreshHistoryBtn" class="secondary-btn refresh-btn"><svg class="icon" aria-hidden="true"><use href="#icon-refresh"></use></svg> Actualizar</button>
+                </div>
+
+                <section class="cash-close" aria-labelledby="cierreTitle">
+                    <div class="cash-close-heading">
+                        <h2 id="cierreTitle" class="section-title">Cierre de caja</h2>
+                        <label class="cash-close-date" id="cierreFechaWrap">Día <input type="date" id="cierreFecha" class="styled-input"></label>
+                    </div>
+                    <div class="cash-grid" id="cierreResumen"></div>
+                </section>
+
+                <div class="table-container">
+                    <table class="data-table history-table">
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Método</th>
+                                <th>Productos</th>
+                                <th>Total pagado</th>
+                                <th>Descuento</th>
+                                <th>Atendió</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ventasList">
+                            <tr><td colspan="8" class="table-message">No hay ventas para mostrar.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Alertas de vencimiento -->
+            <div class="glass-card hidden view-panel" id="alertsView">
+                <div class="dashboard-header">
+                    <div>
+                        <h1>Alertas de vencimiento 🔔</h1>
+                        <p class="muted">Productos vencidos o que vencen en los próximos 30 días.</p>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Producto</th>
+                                <th>Cantidad</th>
+                                <th>Fecha de vencimiento</th>
+                                <th>Estado</th>
+                                <th>Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="alertsList">
+                            <tr><td colspan="5" class="table-message">Todo en orden. No hay productos por vencer.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal de producto -->
+    <div class="modal-overlay hidden" id="productModal" role="dialog" aria-modal="true" aria-labelledby="productModalTitle">
+        <div class="modal">
+            <h2 id="productModalTitle" class="modal-title">Registrar producto</h2>
+            <p id="comboEditNote" class="form-note hidden">Este producto es un combo: su stock y su costo se calculan con los productos que lo forman.</p>
+
+            <div class="input-group">
+                <label for="productCode">Código de barras</label>
+                <input type="text" id="productCode" placeholder="Escanea o escribe el código" class="styled-input">
+            </div>
+            <div class="input-group">
+                <label for="productName">Nombre del producto</label>
+                <input type="text" id="productName" placeholder="Ej. Galletas de chocolate" class="styled-input" maxlength="120">
+            </div>
+
+            <div class="form-grid">
+                <div class="input-group">
+                    <label for="categoria">Categoría</label>
+                    <select id="categoria" class="styled-input">
+                        <option value="Bebidas">🥤 Bebidas</option>
+                        <option value="Snacks">🍿 Snacks</option>
+                        <option value="Lácteos">🥛 Lácteos</option>
+                        <option value="Limpieza">🧼 Limpieza</option>
+                        <option value="Dulces">🍬 Dulces</option>
+                        <option value="Abarrotes">🥫 Abarrotes</option>
+                        <option value="Combos">🍔 Combos</option>
+                        <option value="Otros">📦 Otros</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <span class="field-label">Imagen del producto</span>
+                    <div class="image-field">
+                        <img id="previewImg" src="./kalo-logo.png" alt="Sin foto" class="image-preview">
+                        <button type="button" id="openImagePickerBtn" class="secondary-btn">Escoger imagen</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-grid">
+                <div class="input-group">
+                    <label for="precioCompra">Precio de compra (S/)</label>
+                    <input type="number" id="precioCompra" placeholder="0.00" step="0.01" min="0" class="styled-input">
+                </div>
+                <div class="input-group">
+                    <label for="precioVenta">Precio de venta (S/)</label>
+                    <input type="number" id="precioVenta" placeholder="0.00" step="0.01" min="0" class="styled-input">
+                </div>
+                <div class="input-group span-2">
+                    <label for="ganancia">Ganancia calculada (S/)</label>
+                    <input type="text" id="ganancia" placeholder="0.00" class="styled-input" readonly>
+                </div>
+            </div>
+
+            <div class="form-grid">
+                <div class="input-group span-2">
+                    <span class="field-label">Lotes (solo para alertas de vencimiento)</span>
+                    <div class="lotes-box">
+                        <div id="lotesList" class="lotes-list"></div>
+                        <div class="lot-entry-row">
+                            <input type="number" id="loteQtyInput" class="styled-input" placeholder="Cant." min="1" aria-label="Cantidad del lote">
+                            <input type="date" id="loteExpInput" class="styled-input" aria-label="Fecha de vencimiento del lote">
+                            <button type="button" id="addLoteBtn" class="secondary-btn">+ Lote</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="input-group">
+                    <label for="stock">Stock total</label>
+                    <input type="number" id="stock" placeholder="0" min="0" step="1" class="styled-input">
+                </div>
+                <div class="input-group">
+                    <label for="alertaStock">Alerta de inventario bajo</label>
+                    <input type="number" id="alertaStock" placeholder="Ej. 2" min="0" step="1" class="styled-input">
+                </div>
+            </div>
+
+            <p id="productStatusMsg" class="form-status" role="status"></p>
+
+            <div class="modal-actions">
+                <button type="button" id="closeModalBtn" class="secondary-btn">Cancelar</button>
+                <button type="button" id="addProductBtn" class="primary-btn">Guardar producto</button>
+            </div>
+        </div>
     </div>
+
+    <!-- Modal para crear combo -->
+    <div class="modal-overlay hidden" id="comboModal" role="dialog" aria-modal="true" aria-labelledby="comboModalTitle">
+        <div class="modal">
+            <h2 id="comboModalTitle" class="modal-title">Crear combo 🍔</h2>
+            <div class="input-group">
+                <label for="comboNameInput">Nombre del combo</label>
+                <input type="text" id="comboNameInput" placeholder="Ej. Combo familiar" class="styled-input" maxlength="120">
+            </div>
+            <div class="form-grid">
+                <div class="input-group">
+                    <label for="comboPriceInput">Precio de venta total (S/)</label>
+                    <input type="number" id="comboPriceInput" placeholder="0.00" step="0.01" min="0" class="styled-input">
+                </div>
+                <div class="input-group">
+                    <span class="field-label">Imagen del combo</span>
+                    <div class="image-field">
+                        <img id="comboPreviewImg" src="./kalo-logo.png" alt="Sin foto" class="image-preview">
+                        <button type="button" id="openComboImagePickerBtn" class="secondary-btn">Escoger imagen</button>
+                    </div>
+                </div>
+            </div>
+            <div class="input-group">
+                <span class="field-label">Productos del combo</span>
+                <div id="comboProductList" class="combo-product-list"></div>
+            </div>
+            <div id="comboSummary" class="combo-summary">
+                <div><span>Suma de precios individuales:</span><strong id="comboRealSalePrice">S/ 0.00</strong></div>
+                <div><span>Costo total (compra):</span><strong id="comboRealCost">S/ 0.00</strong></div>
+                <div class="combo-summary-total"><span>Ganancia / pérdida del combo:</span><strong id="comboNetProfit">S/ 0.00</strong></div>
+            </div>
+            <p id="comboStatusMsg" class="form-status" role="status"></p>
+            <div class="modal-actions">
+                <button type="button" id="closeComboModalBtn" class="secondary-btn">Cancelar</button>
+                <button type="button" id="saveComboBtn" class="primary-btn">Guardar combo</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Selector de imágenes -->
+    <div class="modal-overlay hidden image-picker-overlay" id="imagePickerModal" role="dialog" aria-modal="true" aria-labelledby="imagePickerTitle">
+        <div class="modal modal-wide">
+            <h2 id="imagePickerTitle" class="modal-title">Escoger imagen 📸</h2>
+            <p class="muted">Haz clic en la imagen que corresponda al producto.</p>
+            <input type="search" id="imagePickerSearch" class="styled-input image-search" placeholder="🔍 Buscar imagen (ej: agua, galleta, gatorade)..." aria-label="Buscar imagen">
+            <div class="image-grid" id="imageGrid"></div>
+            <div class="modal-actions">
+                <button type="button" id="closeImagePickerBtn" class="secondary-btn">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Diálogos de alerta, confirmación y texto -->
+    <div id="customDialogOverlay" class="modal-overlay hidden dialog-overlay" role="alertdialog" aria-modal="true" aria-labelledby="customDialogTitle" aria-describedby="customDialogMessage">
+        <div class="modal dialog-box">
+            <div id="customDialogIcon" class="dialog-icon" aria-hidden="true">⚠️</div>
+            <h2 id="customDialogTitle">Atención</h2>
+            <p id="customDialogMessage"></p>
+            <div id="customDialogInputWrap" class="dialog-input hidden">
+                <input type="text" id="customDialogInput" class="styled-input" maxlength="300" aria-labelledby="customDialogTitle">
+            </div>
+            <div class="dialog-actions">
+                <button type="button" id="customDialogCancel" class="secondary-btn hidden">Cancelar</button>
+                <button type="button" id="customDialogOk" class="primary-btn">Aceptar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ticket de venta -->
+    <div id="receiptModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-label="Ticket de venta">
+        <div class="modal-content receipt">
+            <div id="receiptPrintArea">
+                <div class="receipt-header">
+                    <h2>KALO</h2>
+                    <p id="receiptLocalName"></p>
+                    <p id="receiptSaleNumber"></p>
+                    <p id="receiptDate" class="receipt-small"></p>
+                    <p class="receipt-small">--------------------------------</p>
+                </div>
+                <table class="receipt-table">
+                    <thead>
+                        <tr>
+                            <th>CANT. DESCRIPCIÓN</th>
+                            <th class="receipt-amount">IMPORTE</th>
+                        </tr>
+                    </thead>
+                    <tbody id="receiptItems"></tbody>
+                </table>
+                <div class="receipt-totals">
+                    <div><span>SUBTOTAL:</span><span id="receiptSubtotal"></span></div>
+                    <div id="receiptDiscountRow"><span>DESCUENTO:</span><span id="receiptDiscount"></span></div>
+                    <div class="receipt-total"><span>TOTAL:</span><span id="receiptTotal"></span></div>
+                </div>
+                <div class="receipt-footer">
+                    <p id="receiptPaymentMethod"></p>
+                    <p class="receipt-thanks">¡Gracias por su compra!</p>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button type="button" id="closeReceiptBtn" class="secondary-btn receipt-close">Cerrar</button>
+                <button type="button" id="printReceiptBtn" class="primary-btn">🖨️ Imprimir</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toastHost" class="toast-host" aria-live="polite"></div>
+
+    <script type="module" src="./app.js"></script>
 </body>
 </html>
