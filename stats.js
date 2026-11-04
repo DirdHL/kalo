@@ -1,641 +1,283 @@
 import { supabase } from "./supabase.js";
 import { state } from "./state.js";
-import { customAlert, customConfirm } from "./ui.js";
+import { customAlert } from "./ui.js";
+import { localPorId } from "./constants.js";
+import { escapeHtml, formatMoney, describeError, fetchAll, resumirVentas, ventasPorDia, monthRange, toMonthInputValue, toDateInputValue, resumenProductos, nombreCorto, roundMoney } from "./utils.js";
 
-let salesChartInstance = null;
+const NOMBRES_MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Setiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+const TOP_PRODUCTOS = 15;
 
-export function setupStats({ onProductsChanged }) {
+// Las librerías pesadas se cargan solo al abrir Estadísticas o al exportar.
+const cargarChart = () => import('chart.js/auto');
+const cargarXLSX = () => import('xlsx');
+
+export function setupStats({ loadChart = cargarChart, loadXLSX = cargarXLSX } = {}) {
     const statsMonthInput = document.getElementById('statsMonth');
     const exportStatsBtn = document.getElementById('exportStatsBtn');
-    const ventasList = document.getElementById('ventasList');
-    let refundInProgress = false;
+    const topProductsList = document.getElementById('topProductsList');
+    let chart = null;
+    let requestId = 0;
+    let exporting = false;
 
     if (statsMonthInput) {
-        const today = new Date();
-        const yyyy = today.getFullYear();
-        const mm = String(today.getMonth() + 1).padStart(2, '0');
-        statsMonthInput.value = `${yyyy}-${mm}`;
-        statsMonthInput.addEventListener('change', calcularEstadisticas);
+        statsMonthInput.value = toMonthInputValue();
+        statsMonthInput.addEventListener('change', () => calcularEstadisticas());
+    }
+
+    function setText(id, text) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = text;
+    }
+
+    function mostrarResumen(r) {
+        setText('statVentas', formatMoney(r.ventas));
+        setText('statMargen', formatMoney(r.margen));
+        setText('statDescuentos', formatMoney(r.descuentos));
+        setText('statReembolsos', formatMoney(r.reembolsos));
+        setText('statReembolsosDetalle', `${r.cantidadReembolsos} ${r.cantidadReembolsos === 1 ? 'venta' : 'ventas'}`);
+        setText('statVentasDetalle', `${r.cantidad} ${r.cantidad === 1 ? 'venta' : 'ventas'}`);
     }
 
     async function calcularEstadisticas() {
-        const monthInput = statsMonthInput ? statsMonthInput.value : '';
-        
-        let query = supabase.from('ventas').select('*').eq('local', state.currentLocal).order('fecha', { ascending: true });
-        
-        if (monthInput) {
-            const [year, month] = monthInput.split('-').map(Number);
-            // Usar los mismos límites locales que el gráfico y la exportación.
-            const startOfMonth = new Date(year, month - 1, 1);
-            const startOfNextMonth = new Date(year, month, 1);
-            query = query.gte('fecha', startOfMonth.toISOString())
-                         .lt('fecha', startOfNextMonth.toISOString());
-        }
-
+        const local = state.currentLocal;
+        const range = monthRange(statsMonthInput?.value || toMonthInputValue());
+        if (!local || !range) return;
+        const current = ++requestId;
         try {
-            const { data, error } = await query;
-            if (error) {
-                if (error.code === '42P01') {
-                    console.warn('La tabla ventas no existe todavía.');
-                    renderEmptyStats();
-                    return;
-                }
-                throw error;
-            }
-
-            let brutas = 0;
-            let descuentos = 0;
-            let netas = 0;
-            let costos = 0;
-            let reembolsos = 0;
-
-            const gananciaBrutaPorDia = {};
-            const gananciaNetaPorDia = {};
-            const descuentosPorDia = {};
-            window.currentMonthVentas = data;
-
-            if (data.length === 0) {
-                renderEmptyStats();
-            } else {
-                data.forEach(v => {
-                    const isRefunded = v.estado === 'reembolsada';
-
-                    if (isRefunded) {
-                        reembolsos += Number(v.total) || 0;
-                    } else {
-                        brutas += Number(v.subtotal) || 0;
-                        descuentos += Number(v.descuento) || 0;
-                        netas += Number(v.total) || 0;
-                        costos += Number(v.costo_total) || 0;
-
-                        const dateObj = new Date(v.fecha);
-                        const fechaStr = dateObj.toLocaleDateString();
-                        const gBruta = Number(v.total) || 0;
-                        const gNeta = gBruta - (Number(v.costo_total) || 0);
-                        const desc = Number(v.descuento) || 0;
-
-                        gananciaBrutaPorDia[fechaStr] = (gananciaBrutaPorDia[fechaStr] || 0) + gBruta;
-                        gananciaNetaPorDia[fechaStr] = (gananciaNetaPorDia[fechaStr] || 0) + gNeta;
-                        descuentosPorDia[fechaStr] = (descuentosPorDia[fechaStr] || 0) + desc;
-                    }
-                });
-            }
-
-            const elDescuentos = document.getElementById('statDescuentos');
-            const elGananciaBruta = document.getElementById('statGananciaBruta');
-            const elGananciaNeta = document.getElementById('statGananciaNeta');
-
-            if (elDescuentos) elDescuentos.textContent = `S/ ${descuentos.toFixed(2)}`;
-            if (elGananciaBruta) elGananciaBruta.textContent = `S/ ${netas.toFixed(2)}`;
-            if (elGananciaNeta) elGananciaNeta.textContent = `S/ ${(netas - costos).toFixed(2)}`;
-            
-            renderChart(gananciaBrutaPorDia, gananciaNetaPorDia, descuentosPorDia, monthInput);
-
-        } catch (err) {
-            console.error('Error al obtener estadísticas:', err);
-            renderEmptyStats();
+            const ventas = await fetchAll(() => supabase.from('ventas')
+                .select('id, fecha, total, descuento, costo_total, estado')
+                .eq('local', local)
+                .gte('fecha', range.start.toISOString())
+                .lt('fecha', range.end.toISOString())
+                .order('fecha').order('id'));
+            if (current !== requestId) return;
+            mostrarResumen(resumirVentas(ventas));
+            await renderChart(ventasPorDia(ventas), range);
+        } catch (error) {
+            console.error('Error al obtener estadísticas:', error);
+            if (current !== requestId) return;
+            mostrarResumen(resumirVentas([]));
+            await customAlert('No se pudieron cargar las estadísticas: ' + describeError(error), 'Error', '⚠️');
         }
+        await loadTopProducts(local, range, current);
     }
 
-    function renderEmptyStats() {
-        const elDescuentos = document.getElementById('statDescuentos');
-        const elGananciaBruta = document.getElementById('statGananciaBruta');
-        const elGananciaNeta = document.getElementById('statGananciaNeta');
-
-        if (elDescuentos) elDescuentos.textContent = `S/ 0.00`;
-        if (elGananciaBruta) elGananciaBruta.textContent = `S/ 0.00`;
-        if (elGananciaNeta) elGananciaNeta.textContent = `S/ 0.00`;
-        renderChart({}, {}, {}, null);
-    }
-
-    function renderChart(gananciaBrutaPorDia, gananciaNetaPorDia, descuentosPorDia, monthInput) {
-        const chartEl = document.getElementById('salesChart');
-        if (!chartEl || typeof Chart === 'undefined') return;
-        const ctx = chartEl.getContext('2d');
-        
-        let labels = [];
-        let valuesGananciaBruta = [];
-        let valuesGananciaNeta = [];
-        let valuesDescuentos = [];
-        
-        if (monthInput) {
-            const [y, m] = monthInput.split('-');
-            const year = parseInt(y);
-            const month = parseInt(m);
-            const daysInMonth = new Date(year, month, 0).getDate();
-            
-            for (let i = 1; i <= daysInMonth; i++) {
-                const dateStr = new Date(year, month - 1, i).toLocaleDateString();
-                labels.push(`${i}/${m}`);
-                valuesGananciaBruta.push(gananciaBrutaPorDia[dateStr] || 0);
-                valuesGananciaNeta.push(gananciaNetaPorDia[dateStr] || 0);
-                valuesDescuentos.push(descuentosPorDia[dateStr] || 0);
-            }
-        } else {
-            labels = Object.keys(gananciaBrutaPorDia);
-            valuesGananciaBruta = Object.values(gananciaBrutaPorDia);
-            valuesGananciaNeta = Object.values(gananciaNetaPorDia);
-            valuesDescuentos = Object.values(descuentosPorDia);
+    async function renderChart(porDia, range) {
+        const canvas = document.getElementById('salesChart');
+        if (!canvas) return;
+        let Chart;
+        try {
+            ({ default: Chart } = await loadChart());
+        } catch (error) {
+            console.warn('No se pudo cargar el gráfico:', error);
+            return;
         }
-
-        if (salesChartInstance) {
-            salesChartInstance.destroy();
+        const labels = [];
+        const series = { ventas: [], margen: [], descuentos: [] };
+        for (let day = new Date(range.start); day < range.end; day.setDate(day.getDate() + 1)) {
+            const dia = porDia.get(toDateInputValue(day));
+            labels.push(`${day.getDate()}/${day.getMonth() + 1}`);
+            series.ventas.push(roundMoney(dia?.ventas || 0));
+            series.margen.push(roundMoney(dia?.margen || 0));
+            series.descuentos.push(roundMoney(dia?.descuentos || 0));
         }
-
-        salesChartInstance = new Chart(ctx, {
+        const dataset = (label, data, color, fill = false) => ({
+            label, data, borderColor: color, backgroundColor: `${color}1a`, borderWidth: 2, tension: 0.3, fill,
+            pointBackgroundColor: color, pointBorderColor: '#fff', pointRadius: 4, pointHoverRadius: 6
+        });
+        chart?.destroy();
+        chart = new Chart(canvas.getContext('2d'), {
             type: 'line',
             data: {
-                labels: labels.length ? labels : ['Sin datos'],
+                labels,
                 datasets: [
-                    {
-                        label: 'Ganancia Bruta (S/)',
-                        data: valuesGananciaBruta.length ? valuesGananciaBruta : [0],
-                        borderColor: '#b56a21',
-                        backgroundColor: 'rgba(181, 106, 33, 0.1)',
-                        borderWidth: 2,
-                        tension: 0.3,
-                        fill: false,
-                        pointBackgroundColor: '#b56a21',
-                        pointBorderColor: '#fff',
-                        pointRadius: 4,
-                        pointHoverRadius: 6
-                    },
-                    {
-                        label: 'Ganancia Neta (S/)',
-                        data: valuesGananciaNeta.length ? valuesGananciaNeta : [0],
-                        borderColor: '#087f87',
-                        backgroundColor: 'rgba(8, 127, 135, 0.1)',
-                        borderWidth: 2,
-                        tension: 0.3,
-                        fill: true,
-                        pointBackgroundColor: '#087f87',
-                        pointBorderColor: '#fff',
-                        pointRadius: 4,
-                        pointHoverRadius: 6
-                    },
-                    {
-                        label: 'Descuentos (S/)',
-                        data: valuesDescuentos.length ? valuesDescuentos : [0],
-                        borderColor: '#c1473c',
-                        backgroundColor: 'rgba(193, 71, 60, 0.1)',
-                        borderWidth: 2,
-                        tension: 0.3,
-                        fill: false,
-                        pointBackgroundColor: '#c1473c',
-                        pointBorderColor: '#fff',
-                        pointRadius: 4,
-                        pointHoverRadius: 6
-                    }
+                    dataset('Ventas (S/)', series.ventas, '#b56a21'),
+                    dataset('Margen (S/)', series.margen, '#087f87', true),
+                    dataset('Descuentos (S/)', series.descuentos, '#c1473c')
                 ]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                interaction: {
-                    mode: 'index',
-                    intersect: false,
-                },
+                interaction: { mode: 'index', intersect: false },
                 scales: {
-                    y: { 
-                        beginAtZero: true, 
-                        grid: { color: '#e1e8eb' },
-                        ticks: { 
-                            color: '#647782',
-                            callback: function(value) {
-                                return 'S/ ' + value;
-                            }
-                        } 
-                    },
-                    x: { 
-                        grid: { display: false }, 
-                        ticks: { color: '#647782' }
-                    }
+                    y: { beginAtZero: true, grid: { color: '#e1e8eb' }, ticks: { color: '#647782', callback: value => 'S/ ' + value } },
+                    x: { grid: { display: false }, ticks: { color: '#647782' } }
                 },
                 plugins: {
                     legend: { labels: { color: '#344b57' } },
                     tooltip: {
-                        backgroundColor: '#172c36',
-                        titleColor: '#fff',
-                        bodyColor: '#fff',
-                        borderColor: '#344b57',
-                        borderWidth: 1,
-                        callbacks: {
-                            label: function(context) {
-                                let label = context.dataset.label || '';
-                                if (label) label += ': ';
-                                if (context.parsed.y !== null) {
-                                    label += 'S/ ' + context.parsed.y.toFixed(2);
-                                }
-                                return label;
-                            }
-                        }
+                        backgroundColor: '#172c36', titleColor: '#fff', bodyColor: '#fff', borderColor: '#344b57', borderWidth: 1,
+                        callbacks: { label: context => `${context.dataset.label}: ${formatMoney(context.parsed.y)}` }
                     }
                 }
             }
         });
     }
 
-    async function loadHistory() {
-        if (!ventasList) return;
-        ventasList.innerHTML = '<tr><td colspan="8" style="text-align:center;">Cargando...</td></tr>';
-        
-        try {
-            const { data, error } = await supabase.from('ventas').select('*').eq('local', state.currentLocal).order('fecha', { ascending: false }).limit(100);
-            if (error) throw error;
-            
-            ventasList.innerHTML = '';
-            
-            if (data.length === 0) {
-                ventasList.innerHTML = `<tr><td colspan="8" style="text-align:center; color: var(--text-secondary);">No hay ventas registradas.</td></tr>`;
-                return;
-            }
-            
-            data.forEach(v => {
-                const tr = document.createElement('tr');
-                const dateObj = new Date(v.fecha);
-                const fechaStr = dateObj.toLocaleDateString();
-                const horaStr = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                
-                let productosStr = 'Sin detalles';
-                if (v.detalles && Array.isArray(v.detalles)) {
-                    productosStr = v.detalles.map(item => `${item.qty}x ${item.nombre}`).join(', ');
-                }
-
-                const isRefunded = v.estado === 'reembolsada';
-                const estadoHtml = isRefunded 
-                    ? `<span style="background: #fff1ef; color: #b42318; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.8rem;">Reembolsada</span>`
-                    : `<span style="background: #e9f6f1; color: #147556; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.8rem;">Completada</span>`;
-                
-                const accionHtml = isRefunded
-                    ? `-`
-                    : `<button class="secondary-btn btn-refund" data-id="${v.id}" style="padding: 0.2rem 0.5rem; font-size: 0.8rem; border-color: #f2c8c4; color: #b42318;">Reembolsar</button>`;
-
-                tr.innerHTML = `
-                    <td>${fechaStr}</td>
-                    <td>${horaStr}</td>
-                    <td>${v.metodo_pago || 'Efectivo'}</td>
-                    <td style="font-size: 0.8rem; color: var(--text-secondary); max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${productosStr}">${productosStr}</td>
-                    <td style="font-weight:bold; ${isRefunded ? 'text-decoration: line-through; opacity: 0.5;' : ''}">S/ ${Number(v.total).toFixed(2)}</td>
-                    <td style="color:#b42318; ${isRefunded ? 'text-decoration: line-through; opacity: 0.5;' : ''}">S/ ${Number(v.descuento).toFixed(2)}</td>
-                    <td>${estadoHtml}</td>
-                    <td>${accionHtml}</td>
-                `;
-                ventasList.appendChild(tr);
-            });
-        } catch (err) {
-            console.error(err);
-            ventasList.innerHTML = `<tr><td colspan="8" style="text-align:center; color: #b42318;">Error al cargar historial.</td></tr>`;
-        }
-    }
-
-    if (ventasList && !window.historyDelegated) {
-        ventasList.addEventListener('click', async (e) => {
-            const btn = e.target.closest('.btn-refund');
-            if (btn) {
-                const ventaId = btn.getAttribute('data-id');
-                await refundSale(ventaId);
-            }
+    async function loadTopProducts(local, range, current) {
+        if (!topProductsList) return;
+        topProductsList.innerHTML = '<tr><td colspan="4" class="table-message">Cargando…</td></tr>';
+        const { data, error } = await supabase.rpc('resumen_productos', {
+            p_local: local, p_desde: range.start.toISOString(), p_hasta: range.end.toISOString()
         });
-        window.historyDelegated = true;
-    }
-
-    async function refundSale(ventaId) {
-        if (refundInProgress) return;
-        refundInProgress = true;
-        const appliedUpdates = [];
-        let refundRecorded = false;
-
-        try {
-            if (!await customConfirm('¿Seguro que deseas reembolsar esta venta? El stock de los productos será devuelto al inventario.')) return;
-
-            const { data: venta, error: fetchErr } = await supabase.from('ventas').select('*').eq('id', ventaId).eq('local', state.currentLocal).single();
-            if (fetchErr) throw fetchErr;
-
-            if (venta.estado === 'reembolsada') {
-                await customAlert('Esta venta ya ha sido reembolsada.', 'Aviso', 'ℹ️');
-                return;
-            }
-
-            if (!Array.isArray(venta.detalles) || venta.detalles.length === 0) {
-                throw new Error('La venta no tiene detalles suficientes para devolver el stock.');
-            }
-
-            // Acumular productos compartidos entre combos e ítems individuales.
-            const quantities = new Map();
-            const addQuantity = (id, quantity) => {
-                if (id == null || String(id).trim() === '' || !Number.isSafeInteger(quantity) || quantity <= 0) {
-                    throw new Error('La venta contiene un producto o una cantidad inválida.');
-                }
-                const key = String(id);
-                const total = (quantities.get(key) || 0) + quantity;
-                if (!Number.isSafeInteger(total)) throw new Error('La cantidad a devolver es inválida.');
-                quantities.set(key, total);
-            };
-            for (const item of venta.detalles) {
-                const quantity = Number(item.qty);
-                if (!Number.isSafeInteger(quantity) || quantity <= 0) {
-                    throw new Error('La venta contiene una cantidad inválida.');
-                }
-                if (typeof item.codigo === 'string' && item.codigo.startsWith('COMBO:')) {
-                    const parts = item.codigo.slice('COMBO:'.length).split(',').filter(Boolean);
-                    if (parts.length === 0) throw new Error('La venta contiene un combo sin productos.');
-                    for (const part of parts) {
-                        const component = /^(.+)-([1-9]\d*)$/.exec(part);
-                        if (!component) throw new Error('La venta contiene un combo inválido.');
-                        addQuantity(component[1], Number(component[2]) * quantity);
-                    }
-                } else {
-                    addQuantity(item.id, quantity);
-                }
-            }
-
-            const { data: products, error: productsErr } = await supabase.from('productos').select('id, stock').eq('local', state.currentLocal).in('id', [...quantities.keys()]);
-            if (productsErr) throw productsErr;
-            const productsById = new Map((products || []).map(product => [String(product.id), product]));
-
-            // Leer stock actual, sin depender de la copia cargada al iniciar sesión.
-            const stockChanges = [];
-            for (const [id, quantity] of quantities) {
-                const product = productsById.get(id);
-                if (!product) throw new Error(`No se encontró el producto ${id} para devolver su stock.`);
-                if (product.stock === null) continue;
-                const previousStock = Number(product.stock);
-                const nextStock = previousStock + quantity;
-                if (!Number.isFinite(previousStock) || !Number.isFinite(nextStock)) {
-                    throw new Error(`El stock del producto ${id} es inválido.`);
-                }
-                stockChanges.push({ id: product.id, previousStock, nextStock });
-            }
-
-            for (const change of stockChanges) {
-                const { data: updated, error: stockErr } = await supabase.from('productos')
-                    .update({ stock: change.nextStock }).eq('id', change.id).eq('local', state.currentLocal)
-                    .eq('stock', change.previousStock).select('id');
-                if (stockErr) throw stockErr;
-                if (!updated || updated.length !== 1) throw new Error('El inventario cambió durante el reembolso. Vuelve a intentarlo.');
-                appliedUpdates.push(change);
-            }
-
-            let updateSale = supabase.from('ventas').update({ estado: 'reembolsada' }).eq('id', ventaId).eq('local', state.currentLocal);
-            updateSale = venta.estado == null ? updateSale.is('estado', null) : updateSale.eq('estado', venta.estado);
-            const { data: updatedSale, error: updErr } = await updateSale.select('id');
-            if (updErr) throw updErr;
-            if (!updatedSale || updatedSale.length !== 1) throw new Error('La venta cambió durante el reembolso. Actualiza el historial.');
-            refundRecorded = true;
-
-            await customAlert('Venta reembolsada con éxito.', '¡Éxito!', '✅');
-            if (typeof onProductsChanged === 'function') {
-                await onProductsChanged();
-            }
-            await loadHistory();
-
-        } catch (err) {
-            console.error('Error al reembolsar:', err);
-            if (refundRecorded) {
-                await customAlert('El reembolso se registró, pero no se pudo actualizar la pantalla. Recarga la página.', 'Aviso', 'ℹ️');
-                return;
-            }
-
-            let rollbackFailed = false;
-            for (const change of appliedUpdates.reverse()) {
-                try {
-                    const { data: restored, error: rollbackErr } = await supabase.from('productos')
-                        .update({ stock: change.previousStock }).eq('id', change.id).eq('local', state.currentLocal)
-                        .eq('stock', change.nextStock).select('id');
-                    if (rollbackErr || !restored || restored.length !== 1) throw rollbackErr || new Error('El stock cambió durante la reversión.');
-                } catch (rollbackErr) {
-                    rollbackFailed = true;
-                    console.error('No se pudo revertir el stock del producto', change.id, rollbackErr);
-                }
-            }
-            const rollbackMessage = rollbackFailed ? ' No se pudo restaurar todo el stock; revisa el inventario antes de reintentar.' : '';
-            await customAlert('No se pudo completar el reembolso. ' + err.message + rollbackMessage, 'Error', '⚠️');
-        } finally {
-            refundInProgress = false;
+        if (current !== requestId) return;
+        if (error) {
+            topProductsList.innerHTML = `<tr><td colspan="4" class="table-message is-error">${escapeHtml(describeError(error))}</td></tr>`;
+            return;
         }
+        const rows = (data || []).slice(0, TOP_PRODUCTOS);
+        if (rows.length === 0) {
+            topProductsList.innerHTML = '<tr><td colspan="4" class="table-message">Sin ventas en este mes.</td></tr>';
+            return;
+        }
+        topProductsList.innerHTML = rows.map(row => `
+            <tr>
+                <td>${escapeHtml(row.producto)}</td>
+                <td class="money-cell">${escapeHtml(row.unidades)}</td>
+                <td class="money-cell">${escapeHtml(formatMoney(row.total_vendido))}</td>
+                <td class="money-cell">${escapeHtml(formatMoney(Number(row.total_vendido) - Number(row.costo_total)))}</td>
+            </tr>`).join('');
     }
 
-    window.refundSale = refundSale;
-
-    // Cargar XLSX dinámicamente si aún no está presente
-    function loadXLSX() {
-        if (window.XLSX) return Promise.resolve(window.XLSX);
-        return new Promise((resolve, reject) => {
-            const script = document.createElement('script');
-            script.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
-            script.onload = () => resolve(window.XLSX);
-            script.onerror = () => reject(new Error('No se pudo cargar la librería XLSX'));
-            document.head.appendChild(script);
-        });
+    function reset() {
+        requestId++;
+        chart?.destroy();
+        chart = null;
+        mostrarResumen(resumirVentas([]));
+        if (topProductsList) topProductsList.innerHTML = '';
     }
 
-    // Exportar Excel (.xlsx auténtico con pestañas por cada mes)
-    if (exportStatsBtn) {
-        exportStatsBtn.addEventListener('click', async () => {
-            const mesInput = statsMonthInput ? statsMonthInput.value : 'Completo';
+    // --- EXCEL ---
+    function filaVenta(venta) {
+        const fecha = new Date(venta.fecha);
+        return [
+            fecha.toLocaleDateString('es-PE'),
+            fecha.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }),
+            venta.metodo_pago || 'Efectivo',
+            resumenProductos(venta.detalles),
+            roundMoney(Number(venta.subtotal) || 0),
+            roundMoney(Number(venta.descuento) || 0),
+            roundMoney(Number(venta.total) || 0),
+            roundMoney((Number(venta.total) || 0) - (Number(venta.costo_total) || 0)),
+            nombreCorto(venta.creado_por_email)
+        ];
+    }
 
+    function construirLibro(XLSX, ventas, localNombre) {
+        const porMes = new Map();
+        for (const venta of ventas) {
+            const fecha = new Date(venta.fecha);
+            if (Number.isNaN(fecha.getTime())) continue;
+            const key = toMonthInputValue(fecha);
+            if (!porMes.has(key)) porMes.set(key, { nombre: `${NOMBRES_MESES[fecha.getMonth()]} ${fecha.getFullYear()}`, ventas: [] });
+            porMes.get(key).ventas.push(venta);
+        }
+        const meses = [...porMes.keys()].sort();
+        const wb = XLSX.utils.book_new();
+
+        const resumen = [
+            [`CONSOLIDADO HISTÓRICO DE VENTAS - KALO (${localNombre.toUpperCase()})`],
+            [],
+            ['Mes', 'N° Ventas', 'Ventas (S/)', 'Descuentos (S/)', 'Margen (S/)', 'Reembolsos (N°)', 'Reembolsos (S/)']
+        ];
+        const total = resumirVentas(ventas);
+        for (const key of meses) {
+            const mes = porMes.get(key);
+            const r = resumirVentas(mes.ventas);
+            resumen.push([mes.nombre, r.cantidad, r.ventas, r.descuentos, r.margen, r.cantidadReembolsos, r.reembolsos]);
+        }
+        resumen.push([]);
+        resumen.push(['TOTAL HISTÓRICO', total.cantidad, total.ventas, total.descuentos, total.margen, total.cantidadReembolsos, total.reembolsos]);
+        resumen.push([]);
+        resumen.push(['Margen = ventas cobradas − costo de la mercadería (no incluye alquiler, sueldos ni otros gastos).']);
+        const wsResumen = XLSX.utils.aoa_to_sheet(resumen);
+        wsResumen['!cols'] = [{ wch: 22 }, { wch: 12 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 16 }];
+        XLSX.utils.book_append_sheet(wb, wsResumen, 'Resumen General');
+
+        for (const key of meses) {
+            const mes = porMes.get(key);
+            const r = resumirVentas(mes.ventas);
+            const filas = [
+                [`REPORTE MENSUAL KALO - ${mes.nombre.toUpperCase()}`],
+                [],
+                ['RESUMEN DEL MES', ''],
+                ['Ventas', r.ventas],
+                ['Descuentos', r.descuentos],
+                ['Margen (ventas − costo)', r.margen],
+                ['Transacciones', r.cantidad],
+                ['Reembolsos', `${r.cantidadReembolsos} (${formatMoney(r.reembolsos)}) — detalle en la hoja Reembolsos`],
+                [],
+                ['DETALLE DE VENTAS'],
+                ['Fecha', 'Hora', 'Método', 'Productos', 'Subtotal (S/)', 'Descuento (S/)', 'Total pagado (S/)', 'Margen (S/)', 'Atendió']
+            ];
+            for (const venta of mes.ventas) {
+                if (venta.estado !== 'reembolsada') filas.push(filaVenta(venta));
+            }
+            const ws = XLSX.utils.aoa_to_sheet(filas);
+            ws['!cols'] = [{ wch: 12 }, { wch: 8 }, { wch: 12 }, { wch: 45 }, { wch: 13 }, { wch: 14 }, { wch: 16 }, { wch: 13 }, { wch: 16 }];
+            XLSX.utils.book_append_sheet(wb, ws, mes.nombre.slice(0, 31));
+        }
+
+        const reembolsadas = ventas.filter(v => v.estado === 'reembolsada');
+        const filasReembolsos = [
+            ['REEMBOLSOS'],
+            [],
+            ['Fecha venta', 'Hora', 'Método', 'Productos', 'Subtotal (S/)', 'Descuento (S/)', 'Total (S/)', 'Margen (S/)', 'Atendió', 'Reembolsado por', 'Fecha reembolso', 'Motivo']
+        ];
+        for (const venta of reembolsadas) {
+            filasReembolsos.push([
+                ...filaVenta(venta),
+                nombreCorto(venta.reembolsado_por_email) || '—',
+                venta.reembolsado_en ? new Date(venta.reembolsado_en).toLocaleString('es-PE') : '—',
+                venta.motivo_reembolso || '—'
+            ]);
+        }
+        if (reembolsadas.length === 0) filasReembolsos.push(['Sin reembolsos.']);
+        const wsReembolsos = XLSX.utils.aoa_to_sheet(filasReembolsos);
+        wsReembolsos['!cols'] = [{ wch: 12 }, { wch: 8 }, { wch: 12 }, { wch: 40 }, { wch: 13 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 16 }, { wch: 18 }, { wch: 40 }];
+        XLSX.utils.book_append_sheet(wb, wsReembolsos, 'Reembolsos');
+        return wb;
+    }
+
+    async function exportarExcel() {
+        if (exporting || !state.currentLocal) return;
+        exporting = true;
+        const label = exportStatsBtn?.textContent;
+        if (exportStatsBtn) {
+            exportStatsBtn.disabled = true;
+            exportStatsBtn.textContent = 'Preparando…';
+        }
+        try {
             let XLSX;
             try {
                 XLSX = await loadXLSX();
-            } catch (err) {
-                console.error('Error al cargar XLSX:', err);
-                await customAlert('Hubo un error al preparar la exportación de Excel. Verifica tu conexión a internet.', 'Error', '⚠️');
+            } catch (error) {
+                console.error('Error al cargar XLSX:', error);
+                await customAlert('No se pudo preparar el Excel. Verifica tu conexión a internet.', 'Error', '⚠️');
                 return;
             }
-
-            // Consultar todas las ventas registradas del local actual
-            let todasVentas = [];
-            try {
-                const { data, error } = await supabase
-                    .from('ventas')
-                    .select('*')
-                    .eq('local', state.currentLocal)
-                    .order('fecha', { ascending: true });
-
-                if (error) throw error;
-                todasVentas = data || [];
-            } catch (err) {
-                console.warn('Error al consultar todas las ventas:', err);
-                todasVentas = window.currentMonthVentas || [];
-            }
-
-            if (!todasVentas || todasVentas.length === 0) {
+            const local = localPorId(state.currentLocal);
+            const ventas = await fetchAll(() => supabase.from('ventas').select('*')
+                .eq('local', state.currentLocal).order('fecha').order('id'));
+            if (ventas.length === 0) {
                 await customAlert('No hay ventas registradas para exportar en este local.', 'Sin datos', 'ℹ️');
                 return;
             }
-
-            const NOMBRES_MESES = [
-                'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-                'Julio', 'Agosto', 'Setiembre', 'Octubre', 'Noviembre', 'Diciembre'
-            ];
-
-            // Agrupar ventas por mes (YYYY-MM)
-            const ventasPorMes = {};
-            todasVentas.forEach(v => {
-                if (v.estado === 'reembolsada') return; // Omitir reembolsos según solicitud
-                const d = new Date(v.fecha);
-                if (isNaN(d.getTime())) return;
-                const yyyy = d.getFullYear();
-                const mm = String(d.getMonth() + 1).padStart(2, '0');
-                const key = `${yyyy}-${mm}`;
-                if (!ventasPorMes[key]) {
-                    ventasPorMes[key] = {
-                        year: yyyy,
-                        monthNum: mm,
-                        monthName: NOMBRES_MESES[d.getMonth()] || `Mes ${mm}`,
-                        ventas: []
-                    };
-                }
-                ventasPorMes[key].ventas.push(v);
-            });
-
-            const monthKeys = Object.keys(ventasPorMes).sort();
-            if (monthKeys.length === 0) {
-                await customAlert('No hay ventas válidas para exportar.', 'Sin datos', 'ℹ️');
-                return;
+            const wb = construirLibro(XLSX, ventas, local ? local.nombre : state.currentLocal);
+            XLSX.writeFile(wb, `Reporte_Kalo_${local ? local.slug : 'local'}_${toDateInputValue()}.xlsx`);
+        } catch (error) {
+            await customAlert('No se pudo exportar: ' + describeError(error), 'Error', '⚠️');
+        } finally {
+            exporting = false;
+            if (exportStatsBtn) {
+                exportStatsBtn.disabled = false;
+                exportStatsBtn.textContent = label;
             }
-
-            const wb = XLSX.utils.book_new();
-
-            // 1. Hoja: Resumen General (Consolidado de todos los meses)
-            const localNombre = state.currentLocal ? state.currentLocal.toUpperCase() : 'LOCAL';
-            const resumenGeneralRows = [
-                [`CONSOLIDADO HISTÓRICO DE VENTAS - KALO (${localNombre})`],
-                [],
-                ['Mes', 'N° Ventas', 'Ventas Totales (S/)', 'Descuentos (S/)', 'Ganancia Neta (S/)']
-            ];
-
-            let globalVentasCount = 0;
-            let globalTotal = 0;
-            let globalDescuentos = 0;
-            let globalGananciaNeta = 0;
-
-            monthKeys.forEach(key => {
-                const group = ventasPorMes[key];
-                let mesTotal = 0;
-                let mesDescuentos = 0;
-                let mesCostos = 0;
-
-                group.ventas.forEach(v => {
-                    mesTotal += Number(v.total) || 0;
-                    mesDescuentos += Number(v.descuento) || 0;
-                    mesCostos += Number(v.costo_total) || 0;
-                });
-
-                const mesGananciaNeta = mesTotal - mesCostos;
-
-                globalVentasCount += group.ventas.length;
-                globalTotal += mesTotal;
-                globalDescuentos += mesDescuentos;
-                globalGananciaNeta += mesGananciaNeta;
-
-                resumenGeneralRows.push([
-                    `${group.monthName} ${group.year}`,
-                    group.ventas.length,
-                    Number(mesTotal.toFixed(2)),
-                    Number(mesDescuentos.toFixed(2)),
-                    Number(mesGananciaNeta.toFixed(2))
-                ]);
-            });
-
-            resumenGeneralRows.push([]);
-            resumenGeneralRows.push([
-                'TOTAL HISTÓRICO',
-                globalVentasCount,
-                Number(globalTotal.toFixed(2)),
-                Number(globalDescuentos.toFixed(2)),
-                Number(globalGananciaNeta.toFixed(2))
-            ]);
-
-            const wsResumen = XLSX.utils.aoa_to_sheet(resumenGeneralRows);
-            wsResumen['!cols'] = [
-                { wch: 22 }, // Mes
-                { wch: 12 }, // N° Ventas
-                { wch: 20 }, // Ventas Totales
-                { wch: 18 }, // Descuentos
-                { wch: 20 }  // Ganancia Neta
-            ];
-            XLSX.utils.book_append_sheet(wb, wsResumen, 'Resumen General');
-
-            // 2. Crear una pestaña por cada mes registrado
-            monthKeys.forEach(key => {
-                const group = ventasPorMes[key];
-                let mesTotal = 0;
-                let mesDescuentos = 0;
-                let mesCostos = 0;
-
-                group.ventas.forEach(v => {
-                    mesTotal += Number(v.total) || 0;
-                    mesDescuentos += Number(v.descuento) || 0;
-                    mesCostos += Number(v.costo_total) || 0;
-                });
-
-                const mesGananciaNeta = mesTotal - mesCostos;
-
-                const monthRows = [
-                    [`REPORTE MENSUAL KALO - ${group.monthName.toUpperCase()} ${group.year}`],
-                    [],
-                    ['RESUMEN DEL MES', ''],
-                    ['Descuentos', Number(mesDescuentos.toFixed(2))],
-                    ['Ganancia Bruta', Number(mesTotal.toFixed(2))],
-                    ['GANANCIA NETA', Number(mesGananciaNeta.toFixed(2))],
-                    ['Transacciones', group.ventas.length],
-                    [],
-                    ['DETALLE DE VENTAS'],
-                    ['Fecha', 'Hora', 'Método', 'Productos', 'Subtotal (S/)', 'Descuento (S/)', 'Total Pagado (S/)', 'Ganancia Neta (S/)', 'Estado']
-                ];
-
-                group.ventas.forEach(v => {
-                    const dateObj = new Date(v.fecha);
-                    const fechaStr = dateObj.toLocaleDateString();
-                    const horaStr = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-                    let productosStr = 'Sin detalles';
-                    if (v.detalles && Array.isArray(v.detalles)) {
-                        productosStr = v.detalles.map(item => `${item.qty}x ${item.nombre}`).join('; ');
-                    }
-                    const ganancia = (Number(v.total) || 0) - (Number(v.costo_total) || 0);
-                    const descuento = Number(v.descuento || 0);
-
-                    monthRows.push([
-                        fechaStr,
-                        horaStr,
-                        v.metodo_pago || 'Efectivo',
-                        productosStr,
-                        Number(Number(v.subtotal || 0).toFixed(2)),
-                        Number(descuento.toFixed(2)),
-                        Number(Number(v.total || 0).toFixed(2)),
-                        Number(ganancia.toFixed(2)),
-                        v.estado || 'completada'
-                    ]);
-                });
-
-                const wsMonth = XLSX.utils.aoa_to_sheet(monthRows);
-                wsMonth['!cols'] = [
-                    { wch: 14 }, // Fecha
-                    { wch: 10 }, // Hora
-                    { wch: 15 }, // Método
-                    { wch: 45 }, // Productos
-                    { wch: 14 }, // Subtotal
-                    { wch: 14 }, // Descuento
-                    { wch: 16 }, // Total Pagado
-                    { wch: 18 }, // Ganancia Neta
-                    { wch: 14 }  // Estado
-                ];
-
-                // Nombre de la pestaña (ej: 'Octubre 2026', 'Setiembre 2026')
-                const tabName = `${group.monthName} ${group.year}`.slice(0, 31);
-                XLSX.utils.book_append_sheet(wb, wsMonth, tabName);
-            });
-
-            // Descargar libro completo con todas las pestañas
-            const fileName = `Reporte_Kalo_Historico_${mesInput}.xlsx`;
-            XLSX.writeFile(wb, fileName);
-        });
+        }
     }
 
-    return {
-        calcularEstadisticas,
-        loadHistory
-    };
+    exportStatsBtn?.addEventListener('click', exportarExcel);
+
+    return { calcularEstadisticas, exportarExcel, construirLibro, reset };
 }

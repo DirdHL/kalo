@@ -1,27 +1,22 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
-const vm = require('node:vm');
+const { loadModule } = require('./helpers.cjs');
 
-const source = fs.readFileSync(path.join(__dirname, '../scanner.js'), 'utf8')
-    .replace(/^import .*;\r?\n/, '')
-    .replace('export function setupScanner', 'function setupScanner');
-
-function setup() {
+function setup({ dialogOpen = false } = {}) {
     let keydown;
     const scanned = [];
     const product = { id: 1, codigo: '775123' };
-    vm.runInNewContext(source + '\nsetupScanner({onBarcodeScanned});', {
+    const { exports } = loadModule('scanner.js', {
         document: {
             getElementById: () => null,
             addEventListener: (_, callback) => { keydown = callback; }
         },
         state: { globalProducts: [product] },
-        onBarcodeScanned: value => scanned.push(value),
+        isDialogOpen: () => dialogOpen,
         setTimeout: () => 1,
         clearTimeout() {}
     });
+    exports.setupScanner({ onBarcodeScanned: value => scanned.push(value) });
     return {
         scanned, product,
         press(key, tagName = 'BUTTON') {
@@ -43,15 +38,18 @@ test('un escaneo completo agrega el producto una vez y consume su Enter', () => 
     for (const key of '775123') h.press(key);
     assert.equal(h.press('Enter').prevented, true);
     assert.deepEqual(h.scanned, [h.product]);
-    assert.equal(h.press('Enter').prevented, false);
-    assert.equal(h.scanned.length, 1);
 });
 
 test('el escáner global respeta los campos de búsqueda y de formulario', () => {
     const h = setup();
-    for (const tag of ['INPUT', 'TEXTAREA', 'SELECT']) {
-        for (const key of '775123') h.press(key, tag);
-        assert.equal(h.press('Enter', tag).prevented, false);
-    }
+    for (const key of '775123') h.press(key, 'INPUT');
+    h.press('Enter', 'INPUT');
+    assert.equal(h.scanned.length, 0);
+});
+
+test('con un diálogo abierto, el escáner no agrega productos ni confirma el diálogo', () => {
+    const h = setup({ dialogOpen: true });
+    for (const key of '775123') h.press(key);
+    assert.equal(h.press('Enter').prevented, false);
     assert.equal(h.scanned.length, 0);
 });

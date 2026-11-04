@@ -1,4 +1,21 @@
-export const ADMIN_EMAILS = ['zzenisx1234@gmail.com', 'nuevohorizonte@gmail.com'];
+// Locales de Kalo. "id" es el valor guardado en la base de datos (columna local).
+// Quién es admin o cajero de cada local se decide en Supabase (ver supabase/usuarios.sql).
+export const LOCALES = [
+    { id: 'LAS BRISAS', slug: 'brisas', nombre: 'Las Brisas' },
+    { id: 'LOS PINOS', slug: 'pinos', nombre: 'Los Pinos' },
+    { id: 'EL POLIDEPORTIVO', slug: 'polideportivo', nombre: 'El Polideportivo' }
+];
+
+export function localPorId(id) {
+    return LOCALES.find(local => local.id === id) || null;
+}
+
+export function localPorSlug(slug) {
+    const value = String(slug ?? '').toLowerCase();
+    return LOCALES.find(local => local.slug === value) || null;
+}
+
+export const CATEGORIA_COMBOS = 'Combos';
 
 // Normaliza un nombre de imagen para comparar
 const normalizeImgKey = (name) => String(name || '')

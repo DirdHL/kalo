@@ -1,0 +1,53 @@
+name: Respaldo de la base de datos
+
+# Cada lunes copia las tablas de Kalo (esquema public), cifra el archivo y lo
+# guarda 90 días en GitHub (Actions → este flujo → Artifacts).
+# Está cifrado porque, si el repositorio es público, cualquiera podría descargarlo.
+# Configuración y restauración: supabase/LEEME.md
+
+on:
+  schedule:
+    - cron: '0 8 * * 1' # lunes 03:00 en Lima
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  respaldo:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+    steps:
+      - name: Revisar configuración
+        id: config
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ] || [ -z "$BACKUP_PASSPHRASE" ]; then
+            echo "::warning::Faltan los secretos SUPABASE_DB_URL y BACKUP_PASSPHRASE (ver supabase/LEEME.md). No se hizo el respaldo."
+            echo "listo=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "listo=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Exportar y cifrar
+        if: steps.config.outputs.listo == 'true'
+        run: |
+          set -euo pipefail
+          archivo="kalo-$(date -u +%Y-%m-%d).dump"
+          docker run --rm -e DB_URL="$SUPABASE_DB_URL" postgres:18 \
+            sh -c 'pg_dump "$DB_URL" --format=custom --no-owner --schema=public' > "$archivo"
+          test -s "$archivo"
+          gpg --batch --yes --pinentry-mode loopback --passphrase "$BACKUP_PASSPHRASE" \
+            --symmetric --cipher-algo AES256 --output "$archivo.gpg" "$archivo"
+          rm -f "$archivo"
+          echo "ARCHIVO=$archivo.gpg" >> "$GITHUB_ENV"
+
+      - name: Guardar respaldo cifrado
+        if: steps.config.outputs.listo == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: respaldo-kalo-${{ github.run_number }}
+          path: ${{ env.ARCHIVO }}
+          retention-days: 90
+          if-no-files-found: error

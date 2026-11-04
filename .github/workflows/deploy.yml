@@ -28,7 +28,7 @@ jobs:
         with:
           node-version: 22
           
-      - name: Crear archivo .env para seguridad
+      - name: Crear .env (URL y clave pública anon de Supabase; la seguridad la da RLS)
         run: |
           echo "VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}" >> .env
           echo "VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}" >> .env

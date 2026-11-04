@@ -1,17 +1,23 @@
 import { state } from "./state.js";
+import { isDialogOpen } from "./ui.js";
 
+// Lector de códigos de barras: escribe muy rápido y termina con Enter.
 export function setupScanner({ onBarcodeScanned }) {
     let barcodeBuffer = '';
     let barcodeTimeout = null;
 
-    const navPosBtn = document.getElementById('navPosBtn');
     const cartTotalValue = document.getElementById('cartTotalValue');
 
     document.addEventListener('keydown', (e) => {
-        // Ignorar si el usuario está tipeando activamente en cualquier campo de texto
+        // Ignorar si el usuario está escribiendo en un campo o respondiendo un diálogo
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') {
             return;
         }
+        if (isDialogOpen()) {
+            barcodeBuffer = '';
+            return;
+        }
+        if (typeof e.key !== 'string') return;
 
         if (barcodeTimeout) {
             clearTimeout(barcodeTimeout);
@@ -26,25 +32,20 @@ export function setupScanner({ onBarcodeScanned }) {
                 e.preventDefault();
                 const scannedCode = barcodeBuffer.trim().toLowerCase();
                 const match = state.globalProducts.find(p => p.codigo && p.codigo.toLowerCase() === scannedCode);
-                
+
                 if (match) {
-                    if (navPosBtn && !navPosBtn.classList.contains('active')) {
-                        navPosBtn.click();
-                    }
                     if (typeof onBarcodeScanned === 'function') {
                         onBarcodeScanned(match);
                     }
-                } else {
-                    if (cartTotalValue) {
-                        const prevColor = cartTotalValue.style.color;
-                        const prevText = cartTotalValue.textContent;
-                        cartTotalValue.style.color = 'var(--ticket-warning, var(--danger))';
-                        cartTotalValue.textContent = 'Código no encontrado';
-                        setTimeout(() => {
-                            cartTotalValue.style.color = prevColor;
-                            cartTotalValue.textContent = prevText;
-                        }, 1000);
-                    }
+                } else if (cartTotalValue) {
+                    const prevColor = cartTotalValue.style.color;
+                    const prevText = cartTotalValue.textContent;
+                    cartTotalValue.style.color = 'var(--ticket-warning, var(--danger))';
+                    cartTotalValue.textContent = 'Código no encontrado';
+                    setTimeout(() => {
+                        cartTotalValue.style.color = prevColor;
+                        cartTotalValue.textContent = prevText;
+                    }, 1000);
                 }
                 barcodeBuffer = '';
             }

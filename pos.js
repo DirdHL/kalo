@@ -1,9 +1,10 @@
 import { supabase } from "./supabase.js";
 import { state } from "./state.js";
-import { customAlert } from "./ui.js";
-import { resolveImage } from "./constants.js";
+import { customAlert, showToast } from "./ui.js";
+import { resolveImage, localPorId } from "./constants.js";
+import { escapeHtml, roundMoney, formatMoney, describeError, faltanteDeStock } from "./utils.js";
 
-export function setupPOS({ onSaleCompleted }) {
+export function setupPOS({ onSaleCompleted, onPricesChanged } = {}) {
     const posGrid = document.getElementById('posGrid');
     const posSearch = document.getElementById('posSearch');
     const cartItemsContainer = document.getElementById('cartItems');
@@ -16,6 +17,7 @@ export function setupPOS({ onSaleCompleted }) {
     const splitEfectivo = document.getElementById('splitEfectivo');
     const splitYape = document.getElementById('splitYape');
     const cobrarBtn = document.getElementById('cobrarBtn');
+    const cobrarHtml = cobrarBtn ? cobrarBtn.innerHTML : 'Cobrar';
     const cartDiscount = document.getElementById('cartDiscount');
     const discountSummaryAmount = document.getElementById('discountSummaryAmount');
     const discountBtns = document.querySelectorAll('.discount-btn');
@@ -32,12 +34,12 @@ export function setupPOS({ onSaleCompleted }) {
     let activeDiscountPercent = null;
     let isProcessingSale = false;
 
-    const roundMoney = value => Math.round((value + Number.EPSILON) * 100) / 100;
-    const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, character => ({
-        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-    }[character]));
+    const productsById = () => new Map(state.globalProducts.map(product => [String(product.id), product]));
+    // Igual que la base de datos: cada precio se redondea a céntimos antes de multiplicar.
+    const lineTotal = item => roundMoney(Number(item.precio_venta) || 0) * item.qty;
+    const cartSubtotal = items => roundMoney(items.reduce((sum, item) => sum + lineTotal(item), 0));
 
-    // --- RENDER CUADRÍCULA POS ---
+    // --- CATÁLOGO ---
     function renderPosGrid(productsToRender, resetPage = false) {
         if (!posGrid) return;
         if (resetPage) posCurrentPage = 1;
@@ -51,8 +53,7 @@ export function setupPOS({ onSaleCompleted }) {
         const totalPages = Math.ceil(posFilteredProducts.length / posItemsPerPage) || 1;
         posCurrentPage = Math.min(Math.max(1, posCurrentPage), totalPages);
         const startIndex = (posCurrentPage - 1) * posItemsPerPage;
-        const endIndex = startIndex + posItemsPerPage;
-        const paginatedItems = posFilteredProducts.slice(startIndex, endIndex);
+        const paginatedItems = posFilteredProducts.slice(startIndex, startIndex + posItemsPerPage);
         if (catalogCount) {
             const count = posFilteredProducts.length;
             catalogCount.textContent = `${count} ${count === 1 ? 'producto' : 'productos'}`;
@@ -69,129 +70,121 @@ export function setupPOS({ onSaleCompleted }) {
         }
 
         paginatedItems.forEach(prod => {
-            const div = document.createElement('button');
-            div.type = 'button';
-            div.className = 'product-card';
-            div.title = prod.nombre;
-            const imgSrc = resolveImage(prod.imagen);
-            const precio = prod.precio_venta ? `S/ ${prod.precio_venta.toFixed(2)}` : 'S/ 0.00';
-            div.ariaLabel = `Agregar ${prod.nombre} al ticket, ${precio}`;
+            const card = document.createElement('button');
+            card.type = 'button';
+            card.className = 'product-card';
+            card.title = prod.nombre || '';
+            const precio = formatMoney(prod.precio_venta);
+            card.setAttribute?.('aria-label', `Agregar ${prod.nombre} al ticket, ${precio}`);
             const stock = prod.stock == null ? null : Number(prod.stock);
             const stockLabel = stock !== null && Number.isFinite(stock)
                 ? `<span class="product-stock${stock === 0 ? ' is-empty' : ''}">${stock === 0 ? 'Sin stock' : `${stock} disponibles`}</span>`
                 : '';
-            
-            div.innerHTML = `
-                <img class="product-image" src="${escapeHtml(imgSrc)}" alt="${escapeHtml(prod.nombre)}" loading="lazy" onerror="this.onerror=null; this.src='./kalo-logo.png'">
+            card.innerHTML = `
+                <img class="product-image" src="${escapeHtml(resolveImage(prod.imagen))}" alt="${escapeHtml(prod.nombre)}" loading="lazy">
                 <h3>${escapeHtml(prod.nombre)}</h3>
-                <p class="product-price">${precio}</p>
+                <p class="product-price">${escapeHtml(precio)}</p>
                 ${stockLabel}
             `;
-            
-            div.addEventListener('click', () => addToCart(prod));
-            posGrid.appendChild(div);
+            card.addEventListener('click', () => addToCart(prod));
+            posGrid.appendChild(card);
         });
 
-        if (posPaginationInfo) {
-            posPaginationInfo.textContent = `Página ${posCurrentPage} de ${totalPages}`;
-        }
-        if (posPrevPageBtn) {
-            posPrevPageBtn.disabled = posCurrentPage === 1;
-            posPrevPageBtn.style.opacity = posPrevPageBtn.disabled ? '0.5' : '1';
-        }
-        if (posNextPageBtn) {
-            posNextPageBtn.disabled = posCurrentPage === totalPages;
-            posNextPageBtn.style.opacity = posNextPageBtn.disabled ? '0.5' : '1';
-        }
+        if (posPaginationInfo) posPaginationInfo.textContent = `Página ${posCurrentPage} de ${totalPages}`;
+        if (posPrevPageBtn) posPrevPageBtn.disabled = posCurrentPage === 1;
+        if (posNextPageBtn) posNextPageBtn.disabled = posCurrentPage === totalPages;
     }
 
-    if (posPrevPageBtn) {
-        posPrevPageBtn.addEventListener('click', () => {
-            if (posCurrentPage > 1) {
-                posCurrentPage--;
-                renderPosGrid(posFilteredProducts);
-            }
-        });
-    }
+    posPrevPageBtn?.addEventListener('click', () => {
+        if (posCurrentPage > 1) {
+            posCurrentPage--;
+            renderPosGrid(posFilteredProducts);
+        }
+    });
 
-    if (posNextPageBtn) {
-        posNextPageBtn.addEventListener('click', () => {
-            const totalPages = Math.ceil(posFilteredProducts.length / posItemsPerPage) || 1;
-            if (posCurrentPage < totalPages) {
-                posCurrentPage++;
-                renderPosGrid(posFilteredProducts);
-            }
-        });
-    }
+    posNextPageBtn?.addEventListener('click', () => {
+        const totalPages = Math.ceil(posFilteredProducts.length / posItemsPerPage) || 1;
+        if (posCurrentPage < totalPages) {
+            posCurrentPage++;
+            renderPosGrid(posFilteredProducts);
+        }
+    });
 
-    // --- FILTRADO POR CATEGORÍA Y BÚSQUEDA ---
     function filterPosProducts() {
         renderPosGrid(state.globalProducts, true);
     }
 
     if (posSearch) {
         posSearch.addEventListener('input', filterPosProducts);
-        
-        posSearch.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                const term = e.target.value.trim().toLowerCase();
-                if (!term) return;
-                
-                const exactMatch = state.globalProducts.find(p => p.codigo && p.codigo.toLowerCase() === term);
-                if (exactMatch) {
-                    addToCart(exactMatch);
-                    e.target.value = '';
-                    renderPosGrid(state.globalProducts, true);
-                } else {
-                    const filtered = state.globalProducts.filter(p => 
-                        p.nombre.toLowerCase().includes(term) || 
-                        (p.codigo && p.codigo.toLowerCase().includes(term))
-                    );
-                    if (filtered.length === 1) {
-                        addToCart(filtered[0]);
-                        e.target.value = '';
-                        renderPosGrid(state.globalProducts, true);
-                    }
-                }
+        posSearch.addEventListener('keydown', event => {
+            if (event.key !== 'Enter') return;
+            const term = event.target.value.trim().toLowerCase();
+            if (!term) return;
+            const exactMatch = state.globalProducts.find(p => p.codigo && p.codigo.toLowerCase() === term);
+            const filtered = exactMatch ? [exactMatch] : state.globalProducts.filter(p =>
+                (p.nombre || '').toLowerCase().includes(term) || (p.codigo && p.codigo.toLowerCase().includes(term)));
+            if (filtered.length === 1) {
+                addToCart(filtered[0]);
+                event.target.value = '';
+                renderPosGrid(state.globalProducts, true);
             }
         });
     }
 
     catBtns.forEach(btn => {
-        btn.addEventListener('click', (e) => {
+        btn.addEventListener('click', event => {
             catBtns.forEach(b => b.classList.remove('active'));
-            e.target.classList.add('active');
-            posCurrentCategory = e.target.getAttribute('data-cat');
+            event.target.classList.add('active');
+            posCurrentCategory = event.target.getAttribute('data-cat');
             filterPosProducts();
         });
     });
 
-    // --- GESTIÓN DEL CARRITO ---
+    // --- TICKET ---
+    function avisarFaltante(faltante) {
+        showToast(`Sin stock suficiente de ${faltante.nombre}: disponible ${faltante.disponible}.`, 'warning');
+    }
+
     function addToCart(prod) {
-        if (isProcessingSale) return;
-        const existing = state.cart.find(item => item.id === prod.id);
-        if (existing) {
-            existing.qty++;
-        } else {
-            state.cart.push({ ...prod, qty: 1 });
+        if (isProcessingSale || !prod) return false;
+        const existing = state.cart.find(item => String(item.id) === String(prod.id));
+        const nextCart = existing
+            ? state.cart.map(item => (item === existing ? { ...item, qty: item.qty + 1 } : item))
+            : [...state.cart, { ...prod, qty: 1 }];
+        const faltante = faltanteDeStock(nextCart, state.combos, productsById());
+        if (faltante) {
+            avisarFaltante(faltante);
+            return false;
         }
+        if (existing) existing.qty++;
+        else state.cart.push({ ...prod, qty: 1 });
         renderCart();
+        return true;
     }
 
     function updateQty(index, delta) {
-        if (isProcessingSale || !state.cart[index]) return;
-        state.cart[index].qty += delta;
-        if (state.cart[index].qty <= 0) {
-            state.cart.splice(index, 1);
+        if (isProcessingSale || !state.cart[index] || !Number.isInteger(delta)) return;
+        if (delta > 0) {
+            const nextCart = state.cart.map((item, i) => (i === index ? { ...item, qty: item.qty + delta } : item));
+            const faltante = faltanteDeStock(nextCart, state.combos, productsById());
+            if (faltante) {
+                avisarFaltante(faltante);
+                return;
+            }
         }
+        state.cart[index].qty += delta;
+        if (state.cart[index].qty <= 0) state.cart.splice(index, 1);
         renderCart();
     }
-    window.updateQty = updateQty;
+
+    cartItemsContainer?.addEventListener('click', event => {
+        const button = event.target.closest?.('[data-qty-delta]');
+        if (button) updateQty(Number(button.dataset.index), Number(button.dataset.qtyDelta));
+    });
 
     function renderCart() {
         if (!cartItemsContainer || !cartTotalValue) return;
         cartItemsContainer.innerHTML = '';
-        let subtotal = 0;
 
         if (state.cart.length === 0) {
             cartItemsContainer.innerHTML = `
@@ -204,35 +197,32 @@ export function setupPOS({ onSaleCompleted }) {
         }
 
         state.cart.forEach((item, index) => {
-            const itemTotal = (item.precio_venta || 0) * item.qty;
-            subtotal += itemTotal;
-            
-            const div = document.createElement('div');
-            div.className = 'cart-item';
-            div.innerHTML = `
+            const row = document.createElement('div');
+            row.className = 'cart-item';
+            const nombre = escapeHtml(item.nombre);
+            row.innerHTML = `
                 <div class="cart-item-info">
-                    <p class="cart-item-title">${escapeHtml(item.nombre)}</p>
-                    <p class="cart-item-price">S/ ${(item.precio_venta || 0).toFixed(2)} x ${item.qty}</p>
+                    <p class="cart-item-title">${nombre}</p>
+                    <p class="cart-item-price">${escapeHtml(formatMoney(item.precio_venta))} x ${item.qty}</p>
                 </div>
                 <div class="cart-item-qty">
-                    <button type="button" class="qty-btn" aria-label="Quitar una unidad de ${escapeHtml(item.nombre)}" onclick="updateQty(${index}, -1)">−</button>
+                    <button type="button" class="qty-btn" aria-label="Quitar una unidad de ${nombre}" data-index="${index}" data-qty-delta="-1">−</button>
                     <span>${item.qty}</span>
-                    <button type="button" class="qty-btn" aria-label="Añadir una unidad de ${escapeHtml(item.nombre)}" onclick="updateQty(${index}, 1)">+</button>
+                    <button type="button" class="qty-btn" aria-label="Añadir una unidad de ${nombre}" data-index="${index}" data-qty-delta="1">+</button>
                 </div>
             `;
-            cartItemsContainer.appendChild(div);
+            cartItemsContainer.appendChild(row);
         });
 
-        subtotal = roundMoney(subtotal);
+        const subtotal = cartSubtotal(state.cart);
         if (activeDiscountPercent !== null && cartDiscount) {
             cartDiscount.value = roundMoney(subtotal * activeDiscountPercent / 100).toFixed(2);
         }
         const discount = Number(cartDiscount ? cartDiscount.value : 0) || 0;
         if (discountSummaryAmount) {
-            discountSummaryAmount.textContent = Number.isFinite(discount) && discount > 0 ? `- S/ ${discount.toFixed(2)}` : 'Opcional';
+            discountSummaryAmount.textContent = Number.isFinite(discount) && discount > 0 ? `- ${formatMoney(discount)}` : 'Opcional';
         }
-        const total = Math.max(0, subtotal - discount);
-        cartTotalValue.textContent = `S/ ${total.toFixed(2)}`;
+        cartTotalValue.textContent = formatMoney(Math.max(0, roundMoney(subtotal - roundMoney(discount))));
         if (mobileCartTotal) mobileCartTotal.textContent = cartTotalValue.textContent;
         if (cartItemCount) {
             const count = state.cart.reduce((sum, item) => sum + item.qty, 0);
@@ -240,279 +230,219 @@ export function setupPOS({ onSaleCompleted }) {
         }
     }
 
-    if (cartDiscount) {
-        cartDiscount.addEventListener('input', () => {
-            activeDiscountPercent = null;
-            discountBtns.forEach(b => b.classList.remove('active-discount'));
-            renderCart();
-        });
+    function resetPaymentControls() {
+        activeDiscountPercent = null;
+        if (cartDiscount) cartDiscount.value = '';
+        discountBtns.forEach(b => b.classList.remove('active-discount'));
+        if (paymentMethod) paymentMethod.value = 'Efectivo';
+        if (splitEfectivo) splitEfectivo.value = '';
+        if (splitYape) splitYape.value = '';
+        if (splitPaymentSection) splitPaymentSection.classList.add('hidden');
     }
 
+    function clearCart() {
+        state.cart = [];
+        resetPaymentControls();
+        renderCart();
+    }
+
+    // Tras recargar productos: el ticket toma los precios y el stock actuales.
+    function onProductsLoaded(products) {
+        const byId = new Map(products.map(product => [String(product.id), product]));
+        const quitados = [];
+        state.cart = state.cart.filter(item => {
+            const fresh = byId.get(String(item.id));
+            if (!fresh) {
+                quitados.push(item.nombre);
+                return false;
+            }
+            Object.assign(item, fresh, { qty: item.qty });
+            return true;
+        });
+        if (quitados.length) showToast(`Se quitó del ticket porque ya no está disponible: ${quitados.join(', ')}.`, 'warning', 6000);
+        renderPosGrid(products);
+        renderCart();
+    }
+
+    cartDiscount?.addEventListener('input', () => {
+        activeDiscountPercent = null;
+        discountBtns.forEach(b => b.classList.remove('active-discount'));
+        renderCart();
+    });
+
     discountBtns.forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const isAlreadyActive = e.target.classList.contains('active-discount');
+        btn.addEventListener('click', event => {
+            const isAlreadyActive = event.target.classList.contains('active-discount');
             discountBtns.forEach(b => b.classList.remove('active-discount'));
-            
-            if (isAlreadyActive) {
+            if (isAlreadyActive || cartSubtotal(state.cart) <= 0) {
                 activeDiscountPercent = null;
                 if (cartDiscount) cartDiscount.value = '';
                 renderCart();
                 return;
             }
-
-            e.target.classList.add('active-discount');
-            const percent = parseInt(e.target.getAttribute('data-percent'), 10);
-            let subtotal = 0;
-            state.cart.forEach(item => subtotal += (item.precio_venta || 0) * item.qty);
-            
-            if (subtotal > 0 && cartDiscount) {
-                activeDiscountPercent = percent;
-                const discountAmount = (subtotal * (percent / 100)).toFixed(2);
-                cartDiscount.value = discountAmount;
-                renderCart();
-            } else if (cartDiscount) {
-                activeDiscountPercent = null;
-                cartDiscount.value = '';
-                e.target.classList.remove('active-discount');
-                renderCart();
-            }
+            event.target.classList.add('active-discount');
+            activeDiscountPercent = parseInt(event.target.getAttribute('data-percent'), 10);
+            renderCart();
         });
     });
 
-    if (paymentMethod) {
-        paymentMethod.addEventListener('change', (e) => {
-            if (e.target.value === 'Ambos') {
-                if (splitPaymentSection) splitPaymentSection.classList.remove('hidden');
-                if (splitEfectivo) splitEfectivo.value = '';
-                if (splitYape) splitYape.value = '';
-            } else {
-                if (splitPaymentSection) splitPaymentSection.classList.add('hidden');
-            }
-        });
+    paymentMethod?.addEventListener('change', event => {
+        const split = event.target.value === 'Ambos';
+        splitPaymentSection?.classList.toggle('hidden', !split);
+        if (split) {
+            if (splitEfectivo) splitEfectivo.value = '';
+            if (splitYape) splitYape.value = '';
+        }
+    });
+
+    // --- BOLETA ---
+    function setText(id, text) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = text;
     }
 
-    // --- COBRAR Y GENERAR BOLETA ---
-    if (cobrarBtn) {
-        cobrarBtn.addEventListener('click', async () => {
-            if (isProcessingSale) return;
-            if (state.cart.length === 0) {
-                await customAlert('El ticket está vacío.', 'Aviso', '⚠️');
+    function showReceipt(venta) {
+        const receiptModal = document.getElementById('receiptModal');
+        if (!receiptModal) return;
+        const local = localPorId(venta.local || state.currentLocal);
+        const numero = venta.id == null ? '' : String(venta.id);
+        setText('receiptLocalName', `Local: ${local ? local.nombre : state.currentLocal}`);
+        setText('receiptSaleNumber', numero ? `Venta N° ${numero.length > 12 ? numero.slice(0, 8).toUpperCase() : numero}` : '');
+        const now = new Date();
+        setText('receiptDate', `${now.toLocaleDateString('es-PE')} ${now.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}`);
+
+        const tbody = document.getElementById('receiptItems');
+        if (tbody) {
+            tbody.innerHTML = '';
+            for (const item of venta.items || []) {
+                const row = document.createElement('tr');
+                const description = document.createElement('td');
+                description.textContent = `${item.cantidad}x ${item.nombre}`;
+                const amount = document.createElement('td');
+                amount.className = 'receipt-amount';
+                amount.textContent = formatMoney(roundMoney(Number(item.precio_unitario) * item.cantidad));
+                row.appendChild(description);
+                row.appendChild(amount);
+                tbody.appendChild(row);
+            }
+        }
+
+        setText('receiptSubtotal', formatMoney(venta.subtotal));
+        const discountRow = document.getElementById('receiptDiscountRow');
+        const descuento = Number(venta.descuento) || 0;
+        if (discountRow) discountRow.classList.toggle('hidden', descuento <= 0);
+        setText('receiptDiscount', `- ${formatMoney(descuento)}`);
+        setText('receiptTotal', formatMoney(venta.total));
+        setText('receiptPaymentMethod', venta.metodo_pago === 'Ambos'
+            ? `${formatMoney(venta.efectivo)} Efvo | ${formatMoney(venta.yape)} Yape`
+            : `Pago: ${venta.metodo_pago === 'Yape' ? 'Yape / Plin' : venta.metodo_pago}`);
+
+        receiptModal.classList.remove('hidden');
+        let autoPrintTimeout = null;
+        const finishSale = () => {
+            receiptModal.classList.add('hidden');
+            clearTimeout(autoPrintTimeout);
+            window.removeEventListener('afterprint', finishSale);
+        };
+        const closeBtn = document.getElementById('closeReceiptBtn');
+        const printBtn = document.getElementById('printReceiptBtn');
+        if (closeBtn) closeBtn.onclick = finishSale;
+        if (printBtn) printBtn.onclick = () => window.print();
+        autoPrintTimeout = setTimeout(() => {
+            window.addEventListener('afterprint', finishSale);
+            window.print();
+        }, 500);
+    }
+
+    // --- COBRAR ---
+    async function checkout() {
+        if (isProcessingSale) return;
+        if (state.cart.length === 0) {
+            await customAlert('El ticket está vacío.', 'Aviso', '⚠️');
+            return;
+        }
+        const saleItems = state.cart.map(item => ({ ...item }));
+        if (saleItems.some(item => !Number.isSafeInteger(item.qty) || item.qty <= 0 ||
+            !Number.isFinite(Number(item.precio_venta ?? 0)) || Number(item.precio_venta ?? 0) < 0)) {
+            await customAlert('Revisa los precios y cantidades del ticket.', 'Datos inválidos', '⚠️');
+            return;
+        }
+        const subtotal = cartSubtotal(saleItems);
+        const discount = Number(cartDiscount ? cartDiscount.value : 0);
+        if (!Number.isFinite(discount) || discount < 0 || roundMoney(discount) > subtotal) {
+            await customAlert('El descuento debe estar entre cero y el subtotal del ticket.', 'Descuento inválido', '⚠️');
+            return;
+        }
+        const total = roundMoney(subtotal - roundMoney(discount));
+        const metodo = paymentMethod ? paymentMethod.value : 'Efectivo';
+        if (!['Efectivo', 'Yape', 'Ambos'].includes(metodo)) {
+            await customAlert('Selecciona un método de pago válido.', 'Pago inválido', '⚠️');
+            return;
+        }
+
+        let efectivo = null;
+        let yape = null;
+        if (metodo === 'Ambos') {
+            const ef = Number(splitEfectivo ? splitEfectivo.value : NaN);
+            const yp = Number(splitYape ? splitYape.value : NaN);
+            if (!Number.isFinite(ef) || !Number.isFinite(yp) || ef < 0 || yp < 0) {
+                await customAlert('Los montos de efectivo y Yape deben ser números mayores o iguales a cero.', 'Montos incorrectos', '⚠️');
                 return;
             }
-            
-            const saleItems = state.cart.map(item => ({ ...item }));
-            if (saleItems.some(item => !Number.isSafeInteger(item.qty) || item.qty <= 0 ||
-                !Number.isFinite(Number(item.precio_venta)) || Number(item.precio_venta) < 0)) {
-                await customAlert('Revisa los precios y cantidades del ticket.', 'Datos inválidos', '⚠️');
+            efectivo = roundMoney(ef);
+            yape = roundMoney(yp);
+            if (roundMoney(efectivo + yape) !== total) {
+                await customAlert(`Los montos divididos (${formatMoney(ef + yp)}) no coinciden con el total a pagar (${formatMoney(total)}).`, 'Montos incorrectos', '⚠️');
                 return;
             }
-            const subtotal = roundMoney(saleItems.reduce((sum, item) => sum + Number(item.precio_venta || 0) * item.qty, 0));
-            
-            const discount = Number(cartDiscount ? cartDiscount.value : 0);
-            if (!Number.isFinite(discount) || discount < 0 || discount > subtotal) {
-                await customAlert('El descuento debe estar entre cero y el subtotal del ticket.', 'Descuento inválido', '⚠️');
-                return;
-            }
-            const total = roundMoney(subtotal - discount);
-            const metodo = paymentMethod ? paymentMethod.value : 'Efectivo';
-            let efectivo = metodo === 'Efectivo' ? total : 0;
-            let yape = metodo === 'Yape' ? total : 0;
+        }
 
-            if (!['Efectivo', 'Yape', 'Ambos'].includes(metodo)) {
-                await customAlert('Selecciona un método de pago válido.', 'Pago inválido', '⚠️');
-                return;
-            }
-
-            if (metodo === 'Ambos') {
-                const ef = Number(splitEfectivo ? splitEfectivo.value : NaN);
-                const yp = Number(splitYape ? splitYape.value : NaN);
-
-                if (!Number.isFinite(ef) || !Number.isFinite(yp) || ef < 0 || yp < 0) {
-                    await customAlert('Los montos de efectivo y Yape deben ser números mayores o iguales a cero.', 'Montos incorrectos', '⚠️');
-                    return;
-                }
-                
-                efectivo = roundMoney(ef);
-                yape = roundMoney(yp);
-                if (roundMoney(efectivo + yape) !== total) {
-                    await customAlert(`Los montos divididos (S/ ${(ef + yp).toFixed(2)}) no coinciden con el total a pagar (S/ ${total.toFixed(2)}).`, 'Montos incorrectos', '⚠️');
-                    return;
-                }
-            }
-
-            const appliedStockUpdates = [];
-            let saleRecorded = false;
-            try {
-                isProcessingSale = true;
+        try {
+            isProcessingSale = true;
+            if (cobrarBtn) {
                 cobrarBtn.disabled = true;
                 cobrarBtn.textContent = 'Procesando...';
-
-                // Agrupar descuentos necesarios
-                const stockUpdates = new Map();
-                const addStockRequirement = (id, quantity) => {
-                    if (!Number.isSafeInteger(quantity) || quantity <= 0) {
-                        throw new Error('El combo contiene una cantidad inválida. Revisa su configuración.');
-                    }
-                    const key = String(id);
-                    stockUpdates.set(key, (stockUpdates.get(key) || 0) + quantity);
-                };
-                for (const item of saleItems) {
-                    if (item.codigo && item.codigo.startsWith('COMBO:')) {
-                        const parts = item.codigo.slice('COMBO:'.length).split(',');
-                        for (const part of parts) {
-                            const component = /^(.+)-([1-9]\d*)$/.exec(part);
-                            if (!component) throw new Error('El combo contiene productos o cantidades inválidos. Revisa su configuración.');
-                            addStockRequirement(component[1], Number(component[2]) * item.qty);
-                        }
-                    } else {
-                        addStockRequirement(item.id, item.qty);
-                    }
-                }
-
-                let costoTotalVenta = 0;
-
-                // Descontar únicamente del stock numérico (sin tocar lotes de vencimiento)
-                const pendingStockUpdates = [];
-                for (const [id, qtyToDeduct] of stockUpdates) {
-                    const dbProd = state.globalProducts.find(p => String(p.id) === id);
-                    if (!dbProd) throw new Error('Un producto del ticket ya no está disponible. Actualiza el inventario.');
-                    costoTotalVenta += (Number(dbProd.precio_compra) || 0) * qtyToDeduct;
-                    if (dbProd.stock !== null) {
-                        const previousStock = Number(dbProd.stock);
-                        if (!Number.isSafeInteger(previousStock) || previousStock < qtyToDeduct) {
-                            throw new Error(`Stock insuficiente para ${dbProd.nombre}. Disponible: ${dbProd.stock}.`);
-                        }
-                        pendingStockUpdates.push({ id: dbProd.id, previousStock, newStock: previousStock - qtyToDeduct });
-                    }
-                }
-
-                for (const update of pendingStockUpdates) {
-                    const { data, error } = await supabase.from('productos').update({ stock: update.newStock })
-                        .eq('id', update.id).eq('local', state.currentLocal).eq('stock', update.previousStock).select('id');
-                    if (error) throw error;
-                    if (!data || data.length !== 1) throw new Error('El stock cambió en otra caja. Actualiza el inventario y vuelve a intentarlo.');
-                    appliedStockUpdates.push(update);
-                }
-                
-                // Guardar la venta en la tabla 'ventas'
-                const { error: saleError } = await supabase.from('ventas').insert([{
-                        subtotal: subtotal,
-                        descuento: discount,
-                        total: total,
-                        metodo_pago: metodo,
-                        efectivo,
-                        yape,
-                        costo_total: roundMoney(costoTotalVenta),
-                        detalles: saleItems,
-                        local: state.currentLocal
-                    }]);
-                if (saleError) throw saleError;
-                saleRecorded = true;
-
-                // Limpiar al confirmar el registro; el cierre de una boleta anterior no debe borrar otra venta.
-                state.cart = [];
-                activeDiscountPercent = null;
-                if (cartDiscount) cartDiscount.value = '';
-                discountBtns.forEach(b => b.classList.remove('active-discount'));
-                renderCart();
-                if (paymentMethod) paymentMethod.value = 'Efectivo';
-                if (splitEfectivo) splitEfectivo.value = '';
-                if (splitYape) splitYape.value = '';
-                if (splitPaymentSection) splitPaymentSection.classList.add('hidden');
-
-                // Generar Boleta / Ticket
-                const receiptModal = document.getElementById('receiptModal');
-                if (receiptModal) {
-                    document.getElementById('receiptLocalName').textContent = 'Local: ' + state.currentLocal;
-                    const now = new Date();
-                    document.getElementById('receiptDate').textContent = now.toLocaleDateString() + ' ' + now.toLocaleTimeString();
-                    
-                    const tbody = document.getElementById('receiptItems');
-                    tbody.innerHTML = '';
-                    saleItems.forEach(item => {
-                        const tr = document.createElement('tr');
-                        tr.innerHTML = `
-                            <td style="padding: 0.2rem 0; border-bottom: 1px dashed #ccc;">
-                                ${item.qty}x ${item.nombre}
-                            </td>
-                            <td style="padding: 0.2rem 0; text-align: right; border-bottom: 1px dashed #ccc;">
-                                S/ ${((item.precio_venta || 0) * item.qty).toFixed(2)}
-                            </td>
-                        `;
-                        tbody.appendChild(tr);
-                    });
-                    
-                    document.getElementById('receiptSubtotal').textContent = 'S/ ' + subtotal.toFixed(2);
-                    
-                    const discountRow = document.getElementById('receiptDiscountRow');
-                    if (discount > 0) {
-                        discountRow.style.display = 'flex';
-                        document.getElementById('receiptDiscount').textContent = '- S/ ' + discount.toFixed(2);
-                    } else {
-                        discountRow.style.display = 'none';
-                    }
-                    
-                    document.getElementById('receiptTotal').textContent = 'S/ ' + total.toFixed(2);
-                    
-                    if (metodo === 'Ambos') {
-                        document.getElementById('receiptPaymentMethod').textContent = `S/ ${efectivo.toFixed(2)} Efvo | S/ ${yape.toFixed(2)} Yape`;
-                    } else {
-                        document.getElementById('receiptPaymentMethod').textContent = 'Pago: ' + metodo;
-                    }
-                    
-                    receiptModal.classList.remove('hidden');
-                    
-                    const finishSale = () => {
-                        receiptModal.classList.add('hidden');
-                        clearTimeout(autoPrintTimeout);
-                        window.removeEventListener('afterprint', finishSale);
-                    };
-
-                    document.getElementById('closeReceiptBtn').onclick = finishSale;
-                    document.getElementById('printReceiptBtn').onclick = () => window.print();
-
-                    const autoPrintTimeout = setTimeout(() => {
-                        window.addEventListener('afterprint', finishSale);
-                        window.print();
-                    }, 500);
-
-                }
-
-                if (typeof onSaleCompleted === 'function') {
-                    await onSaleCompleted();
-                }
-
-            } catch (err) {
-                const rollbackErrors = [];
-                if (!saleRecorded) {
-                    for (const update of appliedStockUpdates.reverse()) {
-                        try {
-                            const { data, error } = await supabase.from('productos').update({ stock: update.previousStock })
-                                .eq('id', update.id).eq('local', state.currentLocal).eq('stock', update.newStock).select('id');
-                            if (error) throw error;
-                            if (!data || data.length !== 1) throw new Error(`El stock del producto ${update.id} cambió durante la restauración.`);
-                        } catch (rollbackError) {
-                            rollbackErrors.push(rollbackError.message);
-                        }
-                    }
-                }
-                let message = saleRecorded ? 'La venta fue registrada, pero no se pudo completar la actualización de pantalla: ' : 'No se pudo registrar la venta: ';
-                message += err.message;
-                if (rollbackErrors.length) message += '\nNo se pudo restaurar todo el stock. Revisa el inventario antes de volver a cobrar.\n' + rollbackErrors.join('\n');
-                await customAlert(message, 'Error', '⚠️');
-            } finally {
-                isProcessingSale = false;
-                cobrarBtn.disabled = false;
-                cobrarBtn.textContent = 'Cobrar';
             }
-        });
+            const { data, error } = await supabase.rpc('registrar_venta', {
+                p_local: state.currentLocal,
+                p_items: saleItems.map(item => ({ id: item.id, cantidad: item.qty })),
+                p_descuento: roundMoney(discount),
+                p_metodo: metodo,
+                p_efectivo: efectivo,
+                p_yape: yape,
+                p_total_esperado: total
+            });
+            if (error) throw error;
+
+            clearCart();
+            showReceipt(data || {});
+            try {
+                if (typeof onSaleCompleted === 'function') await onSaleCompleted();
+            } catch {
+                showToast('La venta se registró, pero no se pudo actualizar el inventario en pantalla.', 'warning', 6000);
+            }
+        } catch (err) {
+            if (err?.code === 'KL001' && typeof onPricesChanged === 'function') onPricesChanged();
+            await customAlert(`No se pudo registrar la venta: ${describeError(err)}`, 'Error', '⚠️');
+        } finally {
+            isProcessingSale = false;
+            if (cobrarBtn) {
+                cobrarBtn.disabled = false;
+                cobrarBtn.innerHTML = cobrarHtml;
+            }
+        }
     }
+
+    cobrarBtn?.addEventListener('click', checkout);
 
     renderCart();
 
     return {
         renderPosGrid,
         addToCart,
-        renderCart
+        renderCart,
+        clearCart,
+        onProductsLoaded,
+        checkout
     };
 }
