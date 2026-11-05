@@ -160,8 +160,9 @@ export function ventasPorDia(ventas) {
         const fecha = new Date(venta.fecha);
         if (Number.isNaN(fecha.getTime())) continue;
         const key = toDateInputValue(fecha);
-        const dia = dias.get(key) || { ventas: 0, margen: 0, descuentos: 0 };
+        const dia = dias.get(key) || { cantidad: 0, ventas: 0, margen: 0, descuentos: 0 };
         const total = Number(venta.total) || 0;
+        dia.cantidad++;
         dia.ventas += total;
         dia.margen += total - (Number(venta.costo_total) || 0);
         dia.descuentos += Number(venta.descuento) || 0;

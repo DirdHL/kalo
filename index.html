@@ -27,6 +27,7 @@
         <symbol id="icon-shield" viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 4.5 3.4 8.3 8 9 4.6-.7 8-4.5 8-9V6l-8-3Z"/><path d="m9 12 2 2 4-4"/></symbol>
         <symbol id="icon-store" viewBox="0 0 24 24"><path d="M3 10h18l-2-6H5l-2 6Z"/><path d="M4 10v10h16V10M9 20v-6h6v6M3 10a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0"/></symbol>
         <symbol id="icon-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></symbol>
+        <symbol id="icon-download" viewBox="0 0 24 24"><path d="M12 4v11m-5-5 5 5 5-5M4 20h16"/></symbol>
     </svg>
     <main class="container">
 
@@ -300,17 +301,27 @@
                 <div class="dashboard-header">
                     <div>
                         <h1>Estadísticas 📊</h1>
-                        <p class="muted">Rendimiento del local en el mes</p>
+                        <p class="muted" id="statsSubtitle">Cómo le va al local, mes por mes</p>
                     </div>
-                    <div class="stats-tools">
-                        <input type="month" id="statsMonth" aria-label="Mes de las estadísticas">
-                        <span class="tools-divider" aria-hidden="true"></span>
-                        <span class="report-label">Reporte Excel de este local:</span>
-                        <select id="reportPeriod" class="report-select" aria-label="Periodo del reporte">
-                            <option value="mes">Mes elegido</option>
-                            <option value="anio">Año completo</option>
-                        </select>
-                        <button type="button" id="exportStatsBtn" class="secondary-btn export-btn" title="Descarga un reporte en Excel con resumen, gráficos, productos, pérdidas, ventas e inventario">📥 Descargar reporte</button>
+                    <div class="report-box" role="group" aria-labelledby="reportBoxTitle">
+                        <p class="report-box-title" id="reportBoxTitle">Descargar reporte en Excel</p>
+                        <div class="report-box-actions">
+                            <button type="button" id="exportStatsBtn" class="secondary-btn export-btn" title="Resumen, gráficos, productos, pérdidas, ventas e inventario del mes"><svg class="icon" aria-hidden="true"><use href="#icon-download"></use></svg><span class="export-label">Este mes</span></button>
+                            <button type="button" id="exportYearBtn" class="secondary-btn export-btn" title="Lo mismo, pero de todo el año, mes por mes"><svg class="icon" aria-hidden="true"><use href="#icon-download"></use></svg><span class="export-label">Todo el año</span></button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="period-bar">
+                    <div class="period-text">
+                        <h2 id="statsMonthLabel" class="period-title">Este mes</h2>
+                        <p class="muted period-help">Las tarjetas, el gráfico y el top 10 de abajo son de este mes.</p>
+                    </div>
+                    <div class="period-controls" role="group" aria-label="Cambiar de mes">
+                        <button type="button" id="prevMonthBtn" class="secondary-btn">◀ Mes anterior</button>
+                        <input type="month" id="statsMonth" class="styled-input" aria-label="Elegir mes">
+                        <button type="button" id="nextMonthBtn" class="secondary-btn">Mes siguiente ▶</button>
+                        <button type="button" id="thisMonthBtn" class="secondary-btn">Este mes</button>
                     </div>
                 </div>
 
@@ -328,6 +339,7 @@
                     <div class="stat-card">
                         <h3 class="stat-title">Descuentos</h3>
                         <p class="stat-value" id="statDescuentos">S/ 0.00</p>
+                        <p class="stat-detail">Rebajas dadas al cobrar</p>
                     </div>
                     <div class="stat-card stat-card-refunds">
                         <h3 class="stat-title">Reembolsos</h3>
@@ -336,9 +348,40 @@
                     </div>
                 </div>
 
-                <div class="chart-box">
-                    <canvas id="salesChart" aria-label="Ventas, margen y descuentos por día"></canvas>
-                </div>
+                <section class="chart-card" aria-labelledby="chartTitle">
+                    <div class="chart-head">
+                        <div>
+                            <h2 class="section-title" id="chartTitle">Ventas de cada día</h2>
+                            <p class="chart-help">Pasa el mouse o toca un día para ver sus números.</p>
+                        </div>
+                        <ul class="chart-legend">
+                            <li><span class="legend-key is-bar" aria-hidden="true"></span><span><strong>Ventas</strong>: lo cobrado ese día</span></li>
+                            <li><span class="legend-key is-line" aria-hidden="true"></span><span><strong>Margen</strong>: ventas − costo de mercadería</span></li>
+                        </ul>
+                    </div>
+                    <div class="chart-box">
+                        <canvas id="salesChart" role="img" aria-label="Gráfico de barras con las ventas de cada día del mes y una línea con el margen"></canvas>
+                        <p class="chart-empty hidden" id="chartEmpty">No hay ventas en este mes.</p>
+                    </div>
+                    <details class="chart-table">
+                        <summary>Ver los números de cada día</summary>
+                        <div class="table-container">
+                            <table class="data-table compact-table days-table">
+                                <thead>
+                                    <tr>
+                                        <th>Día</th>
+                                        <th>Ventas</th>
+                                        <th>N.° de ventas</th>
+                                        <th>Margen</th>
+                                        <th>Descuentos</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="statsDaysList"></tbody>
+                                <tfoot id="statsDaysTotal"></tfoot>
+                            </table>
+                        </div>
+                    </details>
+                </section>
 
                 <h2 class="section-title">Top 10 productos más vendidos del mes</h2>
                 <div class="table-container">

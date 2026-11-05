@@ -130,8 +130,8 @@ test('ventasPorDia agrupa por día local sin contar reembolsos', () => {
             { fecha: '2026-11-04T16:00:00Z', total: 50, costo_total: 2, descuento: 0, estado: 'reembolsada' }
         ]);
         assert.deepEqual(plain([...dias]), [
-            ['2026-11-03', { ventas: 10, margen: 6, descuentos: 1 }],
-            ['2026-11-04', { ventas: 5, margen: 3, descuentos: 0 }]
+            ['2026-11-03', { cantidad: 1, ventas: 10, margen: 6, descuentos: 1 }],
+            ['2026-11-04', { cantidad: 1, ventas: 5, margen: 3, descuentos: 0 }]
         ]);
     });
 });

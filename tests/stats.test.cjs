@@ -6,12 +6,17 @@ const { loadModule, utils, constants, rendered, fakeDocument, elements, fakeSupa
 const { exports: reporte } = loadModule('reporte.js', { ...utils(), ...constants(), Date });
 
 const LOCAL = 'LAS BRISAS';
-const STAT_IDS = ['statsMonth', 'exportStatsBtn', 'topProductsList', 'salesChart', 'statVentas', 'statMargen',
-    'statDescuentos', 'statReembolsos', 'statReembolsosDetalle', 'statVentasDetalle', 'reportPeriod'];
+const STAT_IDS = ['statsView', 'statsMonth', 'statsMonthLabel', 'prevMonthBtn', 'nextMonthBtn', 'thisMonthBtn',
+    'exportStatsBtn', 'exportYearBtn', 'reportBoxTitle', 'topProductsList', 'salesChart', 'chartEmpty',
+    'statsDaysList', 'statsDaysTotal', 'statVentas', 'statMargen', 'statDescuentos', 'statReembolsos',
+    'statReembolsosDetalle', 'statVentasDetalle'];
 
-function setupStats({ ventas = [], productos = [], month = '2026-10', rpc = {}, period = 'mes', local = LOCAL } = {}) {
+// "Hoy" fijo para las pruebas: jueves 5 de noviembre de 2026, 10:00 (hora local).
+const HOY = () => new Date(2026, 10, 5, 10, 0);
+
+function setupStats({ ventas = [], productos = [], month = '2026-10', rpc = {}, local = LOCAL, fail = {} } = {}) {
     const ids = elements(STAT_IDS);
-    const supabase = fakeSupabase({ tables: { ventas, productos }, rpc: { resumen_productos: () => [], ...rpc } });
+    const supabase = fakeSupabase({ tables: { ventas, productos }, rpc: { resumen_productos: () => [], ...rpc }, fail });
     const alerts = [];
     const charts = [];
     const files = [];
@@ -30,10 +35,10 @@ function setupStats({ ventas = [], productos = [], month = '2026-10', rpc = {}, 
     const stats = exports.setupStats({
         loadChart: async () => ({ default: FakeChart }),
         loadExcel: async () => ExcelJS,
-        descargar: async (contenido, nombre) => { files.push({ contenido, nombre }); }
+        descargar: async (contenido, nombre) => { files.push({ contenido, nombre }); },
+        ahora: HOY
     });
     ids.statsMonth.value = month;
-    ids.reportPeriod.value = period;
     return { ids, supabase, stats, alerts, charts, files };
 }
 
@@ -70,7 +75,7 @@ test('cuenta todas las ventas del mes aunque pasen de 1000', async () => {
     assert.equal(t.supabase.calls.filter(c => c.table === 'ventas').length, 3);
 });
 
-test('muestra margen y reembolsos, y el gráfico usa los nombres correctos', async () => {
+test('muestra margen y reembolsos; el gráfico tiene barras de ventas y una línea de margen', async () => {
     const t = setupStats({ ventas: [
         sale(1, '2026-10-05T15:00:00Z', { total: 10, costo_total: 4, descuento: 2 }),
         sale(2, '2026-10-06T15:00:00Z', { total: 8, costo_total: 3, estado: 'reembolsada' })
@@ -82,8 +87,16 @@ test('muestra margen y reembolsos, y el gráfico usa los nombres correctos', asy
     assert.equal(t.ids.statReembolsos.textContent, 'S/ 8.00');
     assert.equal(t.ids.statReembolsosDetalle.textContent, '1 venta');
     const config = t.charts[0].config;
-    assert.deepEqual(plain(config.data.datasets.map(d => d.label)), ['Ventas (S/)', 'Margen (S/)', 'Descuentos (S/)']);
+    assert.deepEqual(plain(config.data.datasets.map(d => [d.type, d.label])), [['bar', 'Ventas'], ['line', 'Margen']]);
     assert.equal(config.data.labels.length, 31);
+    assert.equal(config.data.labels[0], '1', 'el eje muestra solo el número del día');
+    assert.equal(config.data.datasets[0].data[4], 10);
+    assert.equal(config.data.datasets[1].data[4], 6);
+    assert.equal(config.data.datasets[0].data[5], 0, 'el día del reembolso no suma ventas');
+    assert.equal(config.options.plugins.legend.display, false, 'la leyenda va escrita en la página y no oculta líneas');
+    assert.equal(config.options.scales.x.title.text, 'Días de octubre');
+    assert.equal(t.ids.chartEmpty.classList.contains('hidden'), true);
+    assert.equal(t.ids.statsView.classList.contains('is-loading'), false);
 });
 
 test('los productos más vendidos se muestran escapados', async () => {
@@ -154,14 +167,16 @@ test('cada local es aparte: desde El Polideportivo el reporte trae solo sus vent
     assert.equal(t.files[0].nombre, 'Kalo_Reporte_2026-10_El-Polideportivo.xlsx');
 });
 
-test('el año completo pide todo el año y agrupa por mes', () => withTimezone('America/Lima', async () => {
-    const t = setupStats({ ventas: [ventaConItems(1, '2026-03-05T15:00:00Z'), ventaConItems(2, '2026-10-06T15:00:00Z')], period: 'anio' });
-    await t.stats.exportarExcel();
+test('el botón del año descarga todo el año, agrupado por mes', () => withTimezone('America/Lima', async () => {
+    const t = setupStats({ ventas: [ventaConItems(1, '2026-03-05T15:00:00Z'), ventaConItems(2, '2026-10-06T15:00:00Z')] });
+    await t.ids.exportYearBtn.click();
     const consulta = t.supabase.calls.find(c => c.table === 'ventas');
     assert.deepEqual(plain(consulta.filters.slice(1)), [['gte', 'fecha', '2026-01-01T05:00:00.000Z'], ['lt', 'fecha', '2027-01-01T05:00:00.000Z']]);
     const wb = await abrir(t.files[0]);
     assert.ok(wb.getWorksheet('Por mes'));
     assert.equal(t.files[0].nombre, 'Kalo_Reporte_2026_Las-Brisas.xlsx');
+    assert.equal(t.ids.exportYearBtn.disabled, false);
+    assert.equal(t.ids.exportStatsBtn.disabled, false);
 }));
 
 test('sin ventas en el periodo, el reporte avisa en lugar de generar un archivo vacío', async () => {
@@ -181,4 +196,108 @@ test('el top muestra exactamente 10 productos, numerados en orden', async () => 
     assert.match(html, /rank-badge is-podium">1<\/span><\/td>\s*<td class="top-product-name">Producto 1</);
     assert.match(html, /rank-badge">10<\/span><\/td>\s*<td class="top-product-name">Producto 10</);
     assert.equal(html.includes('Producto 11<'), false);
+});
+
+// --- Filtro de mes y gráfico más claros ---
+
+test('el mes en curso no dibuja los días que faltan y la tabla llega hasta hoy', () => withTimezone('America/Lima', async () => {
+    const t = setupStats({ month: '2026-11', ventas: [
+        sale(1, '2026-11-01T15:00:00Z', { total: 20, costo_total: 12 }),
+        sale(2, '2026-11-05T14:00:00Z', { total: 8, costo_total: 5, descuento: 2 }),
+        sale(3, '2026-11-05T14:30:00Z', { total: 4, costo_total: 1 })
+    ] });
+    await t.stats.calcularEstadisticas();
+    const config = t.charts[0].config;
+    const [ventas, margen] = config.data.datasets.map(d => d.data);
+    assert.equal(config.data.labels.length, 30);
+    assert.deepEqual(plain(ventas.slice(0, 5)), [20, 0, 0, 0, 12]);
+    assert.deepEqual(plain(margen.slice(0, 5)), [8, 0, 0, 0, 6]);
+    assert.ok(ventas.slice(5).every(v => v === null), 'del 6 al 30 no hay barras: todavía no llegan');
+    assert.ok(margen.slice(5).every(v => v === null), 'ni puntos de margen que caigan a cero');
+
+    const { tooltip } = config.options.plugins;
+    const item = (dataIndex, datasetIndex = 0) => ({ dataIndex, datasetIndex, raw: config.data.datasets[datasetIndex].data[dataIndex], dataset: config.data.datasets[datasetIndex] });
+    assert.equal(tooltip.callbacks.title([item(4)]), 'Hoy, jueves, 5 de noviembre');
+    assert.equal(tooltip.callbacks.title([item(0)]), 'Domingo, 1 de noviembre');
+    assert.equal(tooltip.callbacks.label(item(4)), 'Ventas: S/ 12.00');
+    assert.equal(tooltip.callbacks.label(item(4, 1)), 'Margen: S/ 6.00');
+    assert.equal(tooltip.callbacks.footer([item(4)]), '2 ventas · Descuentos: S/ 2.00');
+    assert.equal(tooltip.callbacks.footer([item(1)]), 'Sin ventas este día');
+    assert.equal(tooltip.filter(item(10)), false, 'un día que todavía no llega no muestra montos');
+    assert.equal(tooltip.callbacks.title([]), '', 'sin datos (día futuro) no hay recuadro ni error');
+    assert.ok(tooltip.itemSort(item(4), item(4, 1)) < 0, 'en el recuadro, Ventas va antes que Margen');
+    assert.equal(tooltip.callbacks.footer([]), '');
+
+    assert.equal(t.ids.statsMonthLabel.textContent, 'Noviembre de 2026 (mes en curso)');
+    assert.equal(t.ids.nextMonthBtn.disabled, true, 'no se puede ir a un mes que no llega');
+    assert.equal(t.ids.thisMonthBtn.disabled, true);
+    const tabla = rendered(t.ids.statsDaysList);
+    assert.equal((tabla.match(/<tr>/g) || []).length, 5, 'del 1 al 5 de noviembre');
+    assert.match(tabla, /<td>Dom 1<\/td>/);
+    assert.match(tabla, /<td>Jue 5 \(hoy\)<\/td>/);
+    assert.match(tabla, /Mar 3<\/td><td colspan="4" class="is-empty">Sin ventas/);
+    const total = rendered(t.ids.statsDaysTotal);
+    assert.match(total, /Total del mes<\/td>\s*<td class="money-cell">S\/ 32\.00<\/td>\s*<td class="money-cell">3<\/td>\s*<td class="money-cell">S\/ 14\.00/);
+}));
+
+test('las flechas cambian de mes, cruzan de año y no dejan pasar al futuro', async () => {
+    const t = setupStats({ month: '2026-11' });
+    await t.stats.calcularEstadisticas();
+    assert.equal(t.ids.exportStatsBtn.textContent, 'Noviembre 2026');
+    assert.equal(t.ids.exportYearBtn.textContent, 'Todo el año 2026');
+    assert.equal(t.ids.reportBoxTitle.textContent, 'Descargar reporte en Excel de Las Brisas');
+
+    await t.ids.prevMonthBtn.click();
+    assert.equal(t.ids.statsMonth.value, '2026-10');
+    assert.equal(t.ids.statsMonthLabel.textContent, 'Octubre de 2026');
+    assert.equal(t.ids.nextMonthBtn.disabled, false);
+    assert.equal(t.ids.thisMonthBtn.disabled, false);
+    assert.equal(t.ids.exportStatsBtn.textContent, 'Octubre 2026', 'el botón del reporte sigue al mes elegido');
+    const ultima = t.supabase.calls.filter(c => c.table === 'ventas').at(-1);
+    assert.equal(ultima.filters.find(f => f[0] === 'gte')[2], new Date(2026, 9, 1).toISOString());
+
+    t.ids.statsMonth.value = '2026-01';
+    await t.ids.prevMonthBtn.click();
+    assert.equal(t.ids.statsMonth.value, '2025-12');
+    assert.equal(t.ids.statsMonthLabel.textContent, 'Diciembre de 2025');
+    assert.equal(t.ids.exportYearBtn.textContent, 'Todo el año 2025');
+
+    await t.ids.nextMonthBtn.click();
+    assert.equal(t.ids.statsMonth.value, '2026-01');
+    await t.ids.thisMonthBtn.click();
+    assert.equal(t.ids.statsMonth.value, '2026-11');
+
+    for (const escrito of ['2027-03', '2026-13', 'marzo', '']) {
+        t.ids.statsMonth.value = escrito;
+        await t.stats.calcularEstadisticas();
+        assert.equal(t.ids.statsMonth.value, '2026-11', `"${escrito}" vuelve al mes actual`);
+    }
+    assert.equal(t.ids.statsMonth.max, '2026-11');
+});
+
+test('un mes sin ventas muestra un aviso en lugar de un gráfico vacío', async () => {
+    const t = setupStats({ month: '2026-09' });
+    await t.stats.calcularEstadisticas();
+    assert.equal(t.charts.length, 0);
+    assert.equal(t.ids.chartEmpty.classList.contains('hidden'), false);
+    assert.equal(t.ids.chartEmpty.textContent, 'No hay ventas registradas en setiembre 2026.');
+    assert.equal((rendered(t.ids.statsDaysList).match(/Sin ventas/g) || []).length, 30);
+});
+
+test('si las ventas no cargan, no queda el gráfico del mes anterior', async () => {
+    let fallar = false;
+    const t = setupStats({
+        ventas: [sale(1, '2026-10-05T15:00:00Z')],
+        fail: { ventas: () => (fallar ? { data: null, error: { message: 'Failed to fetch' } } : null) }
+    });
+    await t.stats.calcularEstadisticas();
+    assert.equal(t.charts.length, 1);
+    fallar = true;
+    await t.ids.prevMonthBtn.click();
+    assert.equal(t.charts[0].destroyed, true);
+    assert.equal(t.ids.chartEmpty.classList.contains('hidden'), false);
+    assert.equal(t.ids.chartEmpty.textContent, 'No se pudieron cargar las ventas de este mes.');
+    assert.equal(t.ids.statVentas.textContent, 'S/ 0.00');
+    assert.equal(t.alerts.length, 1);
+    assert.equal(t.ids.statsView.classList.contains('is-loading'), false);
 });
