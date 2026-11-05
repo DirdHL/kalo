@@ -12,6 +12,7 @@ Esta carpeta guarda la seguridad de Kalo **dentro de la base de datos**. La app 
 | `01_fase_a_seguridad.sql` | Roles, RLS, funciones nuevas, tablas `venta_items` y `combo_items`, copia de datos antiguos | Primero. La app anterior sigue funcionando |
 | `02_fase_b_cierre.sql` | Cierra la escritura directa de ventas (solo por las funciones) | Después de publicar la app nueva |
 | `03_fase_c_2fa_admins.sql` | Exige verificación en dos pasos a los admins | Cuando ambos admins la activaron |
+| `04_imagenes_storage.sql` | Crea el bucket de Storage `imagenes` para que las vendedoras suban y borren fotos de productos desde Inventario | Antes de publicar la versión con "Subir imagen" |
 | `usuarios.sql` | Ver, agregar o quitar cuentas | Cuando cambie el personal |
 | `diagnostico.sql` | Muestra estructura, políticas y cuentas (solo lectura) | Si algo falla |
 

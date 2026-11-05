@@ -61,6 +61,7 @@ function element(tag = 'div', props = {}) {
         },
         getAttribute(name) { return this.attributes[name] ?? null; },
         setAttribute(name, value) { this.attributes[name] = String(value); },
+        removeAttribute(name) { delete this.attributes[name]; },
         addEventListener(type, handler) { (listeners[type] ||= []).push(handler); },
         async dispatch(type, event = {}) {
             for (const handler of listeners[type] || []) await handler({ target: el, preventDefault() {}, ...event });

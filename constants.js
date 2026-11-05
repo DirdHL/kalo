@@ -26,10 +26,31 @@ const normalizeImgKey = (name) => String(name || '')
 
 let _imgIndex = null;
 
+// Imágenes subidas por las vendedoras a Supabase Storage (bucket "imagenes").
+// En la columna imagen se guardan como "sb:NOMBRE.webp".
+export const PREFIJO_NUBE = 'sb:';
+export const NOMBRE_NUBE_VALIDO = /^[A-Z0-9][A-Z0-9-]{0,79}\.(webp|jpg|png)$/;
+let _nubeBase = '';
+
+// La fija imagenes.js al cargar: URL pública del bucket, terminada en "/".
+export function configurarImagenesNube(base) {
+    _nubeBase = String(base || '');
+}
+
+export function urlImagenNube(nombre) {
+    return _nubeBase && NOMBRE_NUBE_VALIDO.test(nombre) ? _nubeBase + nombre : './kalo-logo.png';
+}
+
+// "GALLETA-OREO-36G.webp" → "GALLETA OREO 36G"
+export function etiquetaImagen(nombre) {
+    return String(nombre || '').replace(/^sb:/, '').replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
 // Devuelve la ruta de la imagen; si el producto tiene un nombre antiguo (ej: Agua_Loa_3L.svg)
 // busca la versión renombrada (ej: AGUA-LOA-3L.svg). Si no existe, usa el logo.
 export function resolveImage(imagen) {
     if (!imagen) return './kalo-logo.png';
+    if (String(imagen).startsWith(PREFIJO_NUBE)) return urlImagenNube(String(imagen).slice(PREFIJO_NUBE.length));
     if (!_imgIndex) {
         _imgIndex = new Map();
         AVAILABLE_IMAGES.forEach(f => _imgIndex.set(normalizeImgKey(f), f));

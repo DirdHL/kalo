@@ -544,7 +544,19 @@
     <div class="modal-overlay hidden image-picker-overlay" id="imagePickerModal" role="dialog" aria-modal="true" aria-labelledby="imagePickerTitle">
         <div class="modal modal-wide">
             <h2 id="imagePickerTitle" class="modal-title">Escoger imagen 📸</h2>
-            <p class="muted">Haz clic en la imagen que corresponda al producto.</p>
+            <p class="muted">Haz clic en la imagen que corresponda al producto, o sube una foto nueva.</p>
+            <div class="image-upload-box">
+                <span class="field-label">Subir imagen nueva</span>
+                <div class="image-upload-row">
+                    <img id="imageUploadPreview" class="image-preview hidden" alt="Vista previa de la foto">
+                    <input type="file" id="imageUploadFile" accept="image/*" class="styled-input image-upload-file" aria-label="Escoger foto">
+                </div>
+                <div class="image-upload-row">
+                    <input type="text" id="imageUploadName" class="styled-input" maxlength="80" placeholder="Nombre (ej. Galleta Oreo 36g)" aria-label="Nombre de la imagen">
+                    <button type="button" id="imageUploadBtn" class="primary-btn image-upload-btn">Subir imagen</button>
+                </div>
+                <p id="imageUploadMsg" class="form-status" role="status"></p>
+            </div>
             <input type="search" id="imagePickerSearch" class="styled-input image-search" placeholder="🔍 Buscar imagen (ej: agua, galleta, gatorade)..." aria-label="Buscar imagen">
             <div class="image-grid" id="imageGrid"></div>
             <div class="modal-actions">

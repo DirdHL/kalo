@@ -8,12 +8,13 @@ const INV_IDS = ['productModal', 'productModalTitle', 'openModalBtn', 'closeModa
     'imageGrid', 'openComboModalBtn', 'closeComboModalBtn', 'comboModal', 'comboNameInput', 'comboPriceInput',
     'comboPreviewImg', 'openComboImagePickerBtn', 'comboProductList', 'saveComboBtn', 'comboStatusMsg', 'lotesList',
     'loteQtyInput', 'loteExpInput', 'addLoteBtn', 'productList', 'invSearch', 'prevPageBtn', 'nextPageBtn',
-    'paginationInfo', 'alertsBadge', 'alertsList', 'comboRealSalePrice', 'comboRealCost', 'comboNetProfit'];
+    'paginationInfo', 'alertsBadge', 'alertsList', 'comboRealSalePrice', 'comboRealCost', 'comboNetProfit',
+    'imageUploadFile', 'imageUploadName', 'imageUploadPreview', 'imageUploadBtn', 'imageUploadMsg'];
 const XSS = '<img src=x onerror=alert(1)>';
 
 const row = (id, overrides = {}) => ({ id, nombre: `Producto ${id}`, categoria: 'Bebidas', codigo: null, precio_compra: 1, precio_venta: 2, stock: 5, alerta_stock: null, lotes: null, local: 'LAS BRISAS', activo: true, ...overrides });
 
-function setupInventory({ products = [], comboItems = [], confirm = () => true, rpc = {} } = {}) {
+function setupInventory({ products = [], comboItems = [], confirm = () => true, rpc = {}, nube = {} } = {}) {
     const ids = elements(INV_IDS);
     ids.productName.value = 'Agua';
     ids.categoria.value = 'Bebidas';
@@ -27,11 +28,17 @@ function setupInventory({ products = [], comboItems = [], confirm = () => true, 
         document, state, supabase,
         customAlert: async message => { alerts.push(message); },
         customConfirm: async () => confirm(),
-        AVAILABLE_IMAGES: [], resolveImage: () => './kalo-logo.png', CATEGORIA_COMBOS: 'Combos',
+        AVAILABLE_IMAGES: ['AGUA-LOA-3L.svg'], resolveImage: () => './kalo-logo.png', CATEGORIA_COMBOS: 'Combos',
+        PREFIJO_NUBE: 'sb:', urlImagenNube: name => `https://x.supabase.co/img/${name}`,
+        etiquetaImagen: name => name.replace(/\.[^.]+$/, '').replace(/-/g, ' '),
+        nombreArchivoImagen: text => String(text).trim().toUpperCase().replace(/[^A-Z0-9]+/g, '-'),
+        listarImagenesNube: async () => [], subirImagenNube: async () => { throw new Error('sin stub'); },
+        borrarImagenNube: async () => {},
+        ...nube,
         ...utils()
     });
     const inv = exports.setupInventory({ onProductsLoaded: products => loaded.push(products) });
-    return { ids, state, supabase, inv, alerts, loaded, save: () => ids.addProductBtn.click(), saveCombo: () => ids.saveComboBtn.click() };
+    return { ids, state, supabase, inv, alerts, loaded, document, save: () => ids.addProductBtn.click(), saveCombo: () => ids.saveComboBtn.click() };
 }
 
 const updates = t => t.supabase.calls.filter(call => call.op === 'update');
@@ -165,4 +172,80 @@ test('un lote que vence hoy aparece como próximo a vencer, no como vencido', as
     assert.match(html, /Próximo a vencer/);
     assert.equal(html.includes('>Vencido<'), false);
     assert.equal(t.ids.alertsBadge.textContent, 1);
+});
+
+// --- Imágenes subidas por el personal (Supabase Storage) ---
+const flush = () => new Promise(resolve => setTimeout(resolve, 0));
+const gridCells = t => t.ids.imageGrid.children.filter(child => child.className?.startsWith('image-cell'));
+
+test('el selector muestra primero las imágenes subidas y solo esas se pueden borrar', async () => {
+    const t = setupInventory({ nube: { listarImagenesNube: async () => ['GALLETA-OREO.webp'] } });
+    await t.ids.openImagePickerBtn.click();
+    await flush();
+    const cells = gridCells(t);
+    assert.equal(cells.length, 2);
+    assert.match(cells[0].className, /is-uploaded/);
+    assert.equal(cells[0].children.length, 2, 'imagen subida: botón elegir + botón borrar');
+    assert.equal(cells[1].children.length, 1, 'imagen de la app: sin botón borrar');
+    await cells[0].children[0].click();
+    assert.equal(t.ids.previewImg.src, 'https://x.supabase.co/img/GALLETA-OREO.webp');
+    await t.save();
+    assert.equal(t.supabase.db.productos[0].imagen, 'sb:GALLETA-OREO.webp');
+});
+
+test('subir una imagen pide foto y nombre, y la deja elegida para el producto', async () => {
+    const subidas = [];
+    const t = setupInventory({ nube: { subirImagenNube: async (file, nombre) => { subidas.push(nombre); return 'sb:CHIFLES.webp'; } } });
+    await t.ids.openImagePickerBtn.click();
+    await flush();
+    await t.ids.imageUploadBtn.click();
+    assert.match(t.ids.imageUploadMsg.textContent, /escoge una foto/);
+    t.ids.imageUploadFile.files = [{ name: 'foto.jpg', type: 'image/jpeg' }];
+    await t.ids.imageUploadBtn.click();
+    assert.match(t.ids.imageUploadMsg.textContent, /Escribe un nombre/);
+    t.ids.imageUploadName.value = 'Chifles';
+    await t.ids.imageUploadBtn.click();
+    assert.deepEqual(subidas, ['Chifles']);
+    assert.ok(t.ids.imagePickerModal.classList.contains('hidden'));
+    assert.equal(t.ids.previewImg.src, 'https://x.supabase.co/img/CHIFLES.webp');
+    assert.equal(t.ids.imageUploadBtn.disabled, false);
+});
+
+test('un error al subir se muestra y no cierra el selector', async () => {
+    const t = setupInventory({ nube: { subirImagenNube: async () => { throw new Error('Ya existe una imagen llamada "CHIFLES". Usa otro nombre.'); } } });
+    await t.ids.openImagePickerBtn.click();
+    t.ids.imageUploadFile.files = [{ name: 'foto.jpg', type: 'image/jpeg' }];
+    t.ids.imageUploadName.value = 'Chifles';
+    await t.ids.imageUploadBtn.click();
+    assert.match(t.ids.imageUploadMsg.textContent, /Ya existe/);
+    assert.ok(!t.ids.imagePickerModal.classList.contains('hidden'));
+});
+
+test('borrar una imagen pide confirmación y quita la que estaba elegida', async () => {
+    const borradas = [];
+    let confirmar = false;
+    const t = setupInventory({
+        confirm: () => confirmar,
+        nube: { listarImagenesNube: async () => ['CHIFLES.webp'], borrarImagenNube: async name => { borradas.push(name); } }
+    });
+    await t.ids.openImagePickerBtn.click();
+    await flush();
+    await gridCells(t)[0].children[0].click();
+    await t.ids.openImagePickerBtn.click();
+    await flush();
+    await gridCells(t)[0].children[1].click();
+    assert.deepEqual(borradas, [], 'cancelado: no borra');
+    confirmar = true;
+    await gridCells(t)[0].children[1].click();
+    assert.deepEqual(borradas, ['CHIFLES.webp']);
+    assert.equal(gridCells(t).length, 1, 'solo queda la imagen de la app');
+    assert.equal(t.ids.previewImg.src, './kalo-logo.png');
+});
+
+test('si no cargan las imágenes subidas, avisa y deja usar las de la app', async () => {
+    const t = setupInventory({ nube: { listarImagenesNube: async () => { throw new Error('Failed to fetch'); } } });
+    await t.ids.openImagePickerBtn.click();
+    await flush();
+    assert.match(rendered(t.ids.imageGrid), /No se pudieron cargar/);
+    assert.equal(gridCells(t).length, 1);
 });

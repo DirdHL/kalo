@@ -1,6 +1,7 @@
 import { supabase } from "./supabase.js";
 import { state } from "./state.js";
-import { AVAILABLE_IMAGES, resolveImage, CATEGORIA_COMBOS } from "./constants.js";
+import { AVAILABLE_IMAGES, resolveImage, CATEGORIA_COMBOS, PREFIJO_NUBE, urlImagenNube, etiquetaImagen } from "./constants.js";
+import { listarImagenesNube, subirImagenNube, borrarImagenNube, nombreArchivoImagen } from "./imagenes.js";
 import { customAlert, customConfirm } from "./ui.js";
 import { escapeHtml, formatMoney, describeError, fetchAll, estadoVencimiento, parseLocalDate } from "./utils.js";
 
@@ -37,7 +38,14 @@ export function setupInventory({ onProductsLoaded } = {}) {
     const closeImagePickerBtn = document.getElementById('closeImagePickerBtn');
     const imagePickerSearch = document.getElementById('imagePickerSearch');
     const imageGrid = document.getElementById('imageGrid');
+    const imageUploadFile = document.getElementById('imageUploadFile');
+    const imageUploadName = document.getElementById('imageUploadName');
+    const imageUploadPreview = document.getElementById('imageUploadPreview');
+    const imageUploadBtn = document.getElementById('imageUploadBtn');
+    const imageUploadMsg = document.getElementById('imageUploadMsg');
     let isPickingComboImage = false;
+    let imagenesNube = [];          // nombres en Supabase Storage (ej. GALLETA-OREO.webp)
+    let nubeEstado = 'sin-cargar';  // 'sin-cargar' | 'cargando' | 'ok' | 'error'
 
     // Combos
     const openComboModalBtn = document.getElementById('openComboModalBtn');
@@ -75,55 +83,192 @@ export function setupInventory({ onProductsLoaded } = {}) {
     }
 
     // --- IMÁGENES ---
-    function renderImageGrid(isComboPicker = false, filterText = '') {
+    // En el selector van primero las fotos subidas por el personal (se pueden borrar) y luego las de la app.
+    function imagenesDelSelector() {
+        const nube = imagenesNube.map(name => ({
+            valor: PREFIJO_NUBE + name, archivo: name, src: urlImagenNube(name), label: etiquetaImagen(name), nube: true
+        }));
+        const app = AVAILABLE_IMAGES.map(name => ({
+            valor: name, archivo: name, src: `./img/${encodeURI(name)}`, label: etiquetaImagen(name), nube: false
+        }));
+        return nube.concat(app);
+    }
+
+    function elegirImagen(valor, src) {
+        if (isPickingComboImage) {
+            comboSelectedImage = valor;
+            if (comboPreviewImg) comboPreviewImg.src = src;
+        } else {
+            selectedImageName = valor;
+            if (previewImg) previewImg.src = src;
+        }
+        imagePickerModal?.classList.add('hidden');
+    }
+
+    function renderImageGrid(filterText = imagePickerSearch?.value || '') {
         if (!imageGrid) return;
         imageGrid.innerHTML = '';
         const term = (filterText || '').toLowerCase().trim();
-        const label = name => name.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ').replace(/\s+/g, ' ').trim();
-        const filtered = AVAILABLE_IMAGES.filter(name => !term || label(name).toLowerCase().includes(term));
+        const filtered = imagenesDelSelector().filter(img => !term || img.label.toLowerCase().includes(term));
+
+        if (nubeEstado === 'cargando' || nubeEstado === 'error') {
+            const aviso = document.createElement('p');
+            aviso.className = 'image-grid-note';
+            aviso.textContent = nubeEstado === 'cargando'
+                ? 'Cargando imágenes subidas...'
+                : 'No se pudieron cargar las imágenes subidas. Revisa el internet y vuelve a abrir.';
+            imageGrid.appendChild(aviso);
+        }
 
         if (filtered.length === 0) {
-            imageGrid.innerHTML = `
-                <div class="image-grid-empty">
-                    <p>🔍 Sin resultados</p>
-                    <p>No encontramos ninguna imagen que coincida con "${escapeHtml(filterText)}".</p>
-                </div>
+            const vacio = document.createElement('div');
+            vacio.className = 'image-grid-empty';
+            vacio.innerHTML = `
+                <p>🔍 Sin resultados</p>
+                <p>No encontramos ninguna imagen que coincida con "${escapeHtml(filterText)}".</p>
             `;
+            imageGrid.appendChild(vacio);
             return;
         }
 
-        filtered.forEach(name => {
+        filtered.forEach(img => {
+            const cell = document.createElement('div');
+            cell.className = img.nube ? 'image-cell is-uploaded' : 'image-cell';
             const item = document.createElement('button');
             item.type = 'button';
             item.className = 'image-item';
             item.innerHTML = `
-                <img src="./img/${escapeHtml(encodeURI(name))}" alt="" loading="lazy">
-                <span>${escapeHtml(label(name))}</span>
+                <img src="${escapeHtml(img.src)}" alt="" loading="lazy">
+                <span>${escapeHtml(img.label)}</span>
             `;
-            item.addEventListener('click', () => {
-                const src = `./img/${encodeURI(name)}`;
-                if (isComboPicker) {
-                    comboSelectedImage = name;
-                    if (comboPreviewImg) comboPreviewImg.src = src;
-                } else {
-                    selectedImageName = name;
-                    if (previewImg) previewImg.src = src;
-                }
-                imagePickerModal?.classList.add('hidden');
-            });
-            imageGrid.appendChild(item);
+            item.addEventListener('click', () => elegirImagen(img.valor, img.src));
+            cell.appendChild(item);
+            if (img.nube) {
+                const del = document.createElement('button');
+                del.type = 'button';
+                del.className = 'image-delete-btn';
+                del.title = `Eliminar imagen ${img.label}`;
+                del.setAttribute('aria-label', `Eliminar imagen ${img.label}`);
+                del.textContent = '🗑️';
+                del.addEventListener('click', () => eliminarImagen(img));
+                cell.appendChild(del);
+            }
+            imageGrid.appendChild(cell);
         });
+    }
+
+    async function cargarImagenesNube() {
+        nubeEstado = 'cargando';
+        renderImageGrid();
+        try {
+            imagenesNube = await listarImagenesNube();
+            nubeEstado = 'ok';
+        } catch (error) {
+            console.error('Error al listar imágenes subidas:', error);
+            nubeEstado = 'error';
+        }
+        renderImageGrid();
+    }
+
+    function setUploadStatus(text, ok = false) {
+        if (!imageUploadMsg) return;
+        imageUploadMsg.style.color = ok ? '#147556' : '#b42318';
+        imageUploadMsg.textContent = text;
+    }
+
+    function quitarVistaPrevia() {
+        if (!imageUploadPreview) return;
+        if (String(imageUploadPreview.src || '').startsWith('blob:')) URL.revokeObjectURL(imageUploadPreview.src);
+        imageUploadPreview.removeAttribute('src');
+        imageUploadPreview.classList.add('hidden');
+    }
+
+    function limpiarSubida() {
+        if (imageUploadFile) imageUploadFile.value = '';
+        if (imageUploadName) imageUploadName.value = '';
+        quitarVistaPrevia();
+        setUploadStatus('');
+    }
+
+    imageUploadFile?.addEventListener('change', () => {
+        const file = imageUploadFile.files?.[0];
+        setUploadStatus('');
+        quitarVistaPrevia();
+        if (!file) return;
+        if (imageUploadPreview) {
+            imageUploadPreview.src = URL.createObjectURL(file);
+            imageUploadPreview.classList.remove('hidden');
+        }
+        // Sugerir un nombre a partir del archivo si todavía no escribieron uno
+        if (imageUploadName && !imageUploadName.value.trim()) {
+            imageUploadName.value = file.name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ').trim().slice(0, 80);
+        }
+        imageUploadName?.focus();
+    });
+
+    async function subirImagen() {
+        if (!imageUploadBtn || imageUploadBtn.disabled) return;
+        const file = imageUploadFile?.files?.[0];
+        const nombre = imageUploadName ? imageUploadName.value.trim() : '';
+        if (!file) return setUploadStatus('Primero escoge una foto.');
+        if (!nombreArchivoImagen(nombre)) return setUploadStatus('Escribe un nombre para la imagen (ej. Galleta Oreo 36g).');
+        imageUploadBtn.disabled = true;
+        imageUploadBtn.textContent = 'Subiendo...';
+        setUploadStatus('');
+        try {
+            const valor = await subirImagenNube(file, nombre);
+            const archivo = valor.slice(PREFIJO_NUBE.length);
+            if (!imagenesNube.includes(archivo)) imagenesNube = [...imagenesNube, archivo].sort();
+            limpiarSubida();
+            renderImageGrid();
+            // La foto recién subida queda elegida para el producto o combo
+            elegirImagen(valor, urlImagenNube(archivo));
+        } catch (error) {
+            console.error('Error al subir imagen:', error);
+            setUploadStatus(describeError(error));
+        } finally {
+            imageUploadBtn.disabled = false;
+            imageUploadBtn.textContent = 'Subir imagen';
+        }
+    }
+
+    async function eliminarImagen(img) {
+        const enUso = state.globalProducts.filter(p => p.imagen === img.valor).length;
+        const aviso = enUso > 0
+            ? `\n\n${enUso} producto(s) de este local la usan y se mostrarán con el logo de Kalo.`
+            : '';
+        const ok = await customConfirm(`¿Eliminar la imagen "${img.label}"? Se borra para los 3 locales.${aviso}`, 'Eliminar imagen', '🗑️');
+        if (!ok) return;
+        try {
+            await borrarImagenNube(img.archivo);
+            imagenesNube = imagenesNube.filter(name => name !== img.archivo);
+            if (selectedImageName === img.valor) {
+                selectedImageName = '';
+                if (previewImg) previewImg.src = './kalo-logo.png';
+            }
+            if (comboSelectedImage === img.valor) {
+                comboSelectedImage = '';
+                if (comboPreviewImg) comboPreviewImg.src = './kalo-logo.png';
+            }
+            renderImageGrid();
+        } catch (error) {
+            console.error('Error al eliminar imagen:', error);
+            await customAlert(describeError(error), 'No se pudo eliminar', '❌');
+        }
     }
 
     function openImagePicker(forCombo) {
         isPickingComboImage = forCombo;
         if (imagePickerSearch) imagePickerSearch.value = '';
+        limpiarSubida();
         imagePickerModal?.classList.remove('hidden');
-        renderImageGrid(forCombo, '');
+        renderImageGrid('');
+        cargarImagenesNube();
         setTimeout(() => imagePickerSearch?.focus(), 100);
     }
 
-    imagePickerSearch?.addEventListener('input', event => renderImageGrid(isPickingComboImage, event.target.value));
+    imagePickerSearch?.addEventListener('input', event => renderImageGrid(event.target.value));
+    imageUploadBtn?.addEventListener('click', subirImagen);
     openImagePickerBtn?.addEventListener('click', () => openImagePicker(false));
     openComboImagePickerBtn?.addEventListener('click', () => openImagePicker(true));
     closeImagePickerBtn?.addEventListener('click', () => imagePickerModal?.classList.add('hidden'));
