@@ -36,6 +36,19 @@
             <p class="login-intro">Cargando Kalo…</p>
         </section>
 
+        <!-- Sin conexión: la sesión sigue abierta y Kalo reintenta solo -->
+        <section class="glass-card login-card hidden" id="reconnectCard" aria-labelledby="reconnectTitle">
+            <div class="login-brand"><img src="./kalo-logo.png" alt=""><span>kalo<span class="brand-dot">.</span></span></div>
+            <span class="eyebrow">Sin conexión</span>
+            <h1 id="reconnectTitle">Reconectando…</h1>
+            <p class="login-intro">Tu sesión sigue abierta, no hace falta volver a escribir la contraseña. Kalo entra solo apenas vuelva el internet.</p>
+            <button type="button" id="reconnectBtn" class="primary-btn">Reintentar ahora</button>
+            <p id="reconnectStatusMsg" class="form-status" role="status"></p>
+            <div class="gate-actions">
+                <button type="button" class="link-btn" data-action="logout-gate">Cerrar sesión</button>
+            </div>
+        </section>
+
         <!-- Ingreso -->
         <section class="glass-card login-card hidden" id="loginCard" aria-labelledby="loginTitle">
             <div class="login-brand"><img src="./kalo-logo.png" alt=""><span>kalo<span class="brand-dot">.</span></span></div>
@@ -557,8 +570,15 @@
     </div>
 
     <!-- Ticket de venta -->
-    <div id="receiptModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-label="Ticket de venta">
+    <!-- Aviso de venta registrada. La boleta solo se imprime si la vendedora lo pide. -->
+    <div id="receiptModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="saleSuccessTitle">
         <div class="modal-content receipt">
+            <div class="sale-success" role="status">
+                <span class="sale-success-icon" aria-hidden="true">✓</span>
+                <h2 id="saleSuccessTitle">¡Venta registrada!</h2>
+                <p id="saleSuccessTotal" class="sale-success-total"></p>
+                <p id="saleSuccessDetail" class="sale-success-detail"></p>
+            </div>
             <div id="receiptPrintArea">
                 <div class="receipt-header">
                     <h2>KALO</h2>
@@ -587,8 +607,8 @@
                 </div>
             </div>
             <div class="modal-actions">
-                <button type="button" id="closeReceiptBtn" class="secondary-btn receipt-close">Cerrar</button>
-                <button type="button" id="printReceiptBtn" class="primary-btn">🖨️ Imprimir</button>
+                <button type="button" id="printReceiptBtn" class="secondary-btn receipt-print">🖨️ Imprimir boleta</button>
+                <button type="button" id="closeReceiptBtn" class="primary-btn receipt-close">Nueva venta</button>
             </div>
         </div>
     </div>

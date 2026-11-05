@@ -147,7 +147,9 @@ export function setupPOS({ onSaleCompleted, onPricesChanged } = {}) {
 
     function addToCart(prod) {
         if (isProcessingSale || !prod) return false;
-        const existing = state.cart.find(item => String(item.id) === String(prod.id));
+        // Escanear el siguiente producto con el aviso de venta abierto empieza la nueva venta.
+        cerrarAvisoDeVenta();
+        const existing =state.cart.find(item => String(item.id) === String(prod.id));
         const nextCart = existing
             ? state.cart.map(item => (item === existing ? { ...item, qty: item.qty + 1 } : item))
             : [...state.cart, { ...prod, qty: 1 }];
@@ -337,21 +339,29 @@ export function setupPOS({ onSaleCompleted, onPricesChanged } = {}) {
             ? `${formatMoney(venta.efectivo)} Efvo | ${formatMoney(venta.yape)} Yape`
             : `Pago: ${venta.metodo_pago === 'Yape' ? 'Yape / Plin' : venta.metodo_pago}`);
 
+        // Aviso de venta exitosa. La boleta ya no se imprime sola (no todos los locales tienen
+        // impresora): solo si la vendedora toca "Imprimir boleta".
+        const pago = venta.metodo_pago === 'Ambos' ? 'Efectivo + Yape'
+            : venta.metodo_pago === 'Yape' ? 'Yape / Plin' : (venta.metodo_pago || 'Efectivo');
+        setText('saleSuccessTotal', formatMoney(venta.total));
+        setText('saleSuccessDetail', `Cobrado con ${pago}${numero ? ` · Venta N° ${numero.length > 12 ? numero.slice(0, 8).toUpperCase() : numero}` : ''}`);
+
         receiptModal.classList.remove('hidden');
-        let autoPrintTimeout = null;
-        const finishSale = () => {
-            receiptModal.classList.add('hidden');
-            clearTimeout(autoPrintTimeout);
-            window.removeEventListener('afterprint', finishSale);
-        };
         const closeBtn = document.getElementById('closeReceiptBtn');
         const printBtn = document.getElementById('printReceiptBtn');
-        if (closeBtn) closeBtn.onclick = finishSale;
+        if (closeBtn) closeBtn.onclick = cerrarAvisoDeVenta;
         if (printBtn) printBtn.onclick = () => window.print();
-        autoPrintTimeout = setTimeout(() => {
-            window.addEventListener('afterprint', finishSale);
-            window.print();
-        }, 500);
+        receiptModal.onkeydown = event => {
+            if (event.key === 'Escape') cerrarAvisoDeVenta();
+        };
+        closeBtn?.focus?.();
+    }
+
+    function cerrarAvisoDeVenta() {
+        const receiptModal = document.getElementById('receiptModal');
+        if (!receiptModal) return;
+        receiptModal.classList.add('hidden');
+        receiptModal.onkeydown = null;
     }
 
     // --- COBRAR ---

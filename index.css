@@ -437,9 +437,18 @@ body:has(.modal-overlay:not(.hidden)) { overflow: hidden; }
 .receipt-footer p { margin: 0; }
 .receipt-footer .receipt-thanks { margin-top: 14px; font-weight: bold; }
 .receipt .modal-actions { margin-top: 22px; }
-.receipt .modal-actions button { flex: 1; border: 0; }
-.receipt-close { background: #374151; color: #fff; }
-.receipt-close:hover { background: #1f2937; }
+.receipt .modal-actions button { flex: 1; border: 0; font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; }
+.receipt-close { background: #147556; color: #fff; }
+.receipt-close:hover { background: #0f5c43; }
+.receipt-print { background: #e5e7eb; color: #1f2937; }
+.receipt-print:hover { background: #d1d5db; }
+/* Aviso de venta exitosa (en pantalla; no sale en la boleta impresa). */
+.sale-success { margin: -16px -16px 16px; padding: 22px 16px 16px; border-bottom: 1px solid #b9dccb; background: #e3f1ea; color: #0f4f3b; font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; text-align: center; }
+.sale-success-icon { display: inline-grid; place-items: center; width: 52px; height: 52px; border-radius: 50%; background: #147556; color: #fff; font-size: 30px; font-weight: 700; line-height: 1; animation: sale-pop .35s ease-out; }
+.sale-success h2 { margin: 10px 0 2px; font-size: 22px; }
+.sale-success-total { margin: 0; font-size: 28px; font-weight: 800; }
+.sale-success-detail { margin: 2px 0 0; font-size: 14px; }
+@keyframes sale-pop { from { transform: scale(.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
 .toast-host { position: fixed; left: 50%; bottom: 16px; z-index: 10000; display: flex; flex-direction: column; gap: 8px; width: min(92vw, 440px); transform: translateX(-50%); pointer-events: none; }
 .toast { padding: 12px 16px; border-radius: 10px; background: #233e3a; color: #fff6e8; box-shadow: 0 8px 30px rgb(10 35 45 / 25%); font-size: 15px; font-weight: 500; pointer-events: auto; animation: toast-in .18s ease-out; }
@@ -472,6 +481,6 @@ body:has(.modal-overlay:not(.hidden)) { overflow: hidden; }
     #receiptModal, #receiptModal * { visibility: visible; }
     #receiptModal { position: absolute; inset: 0 auto auto 0; display: flex; align-items: flex-start; justify-content: flex-start; width: 100%; height: auto; margin: 0; padding: 0; background: transparent !important; backdrop-filter: none; overflow: visible; }
     #receiptModal .modal-content { width: 100% !important; max-width: 100% !important; max-height: none; overflow: visible; border: 0 !important; padding: 0 !important; background: transparent !important; box-shadow: none !important; }
-    #receiptModal .modal-actions { display: none !important; }
+    #receiptModal .modal-actions, #receiptModal .sale-success { display: none !important; }
     .toast-host { display: none !important; }
 }

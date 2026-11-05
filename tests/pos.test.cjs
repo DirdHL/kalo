@@ -6,7 +6,7 @@ const POS_IDS = ['posGrid', 'posSearch', 'cartItems', 'cartTotalValue', 'cartIte
     'paymentMethod', 'splitPaymentSection', 'splitEfectivo', 'splitYape', 'cobrarBtn', 'cartDiscount', 'discountSummaryAmount',
     'posPrevPageBtn', 'posNextPageBtn', 'posPaginationInfo', 'receiptModal', 'receiptLocalName', 'receiptSaleNumber',
     'receiptDate', 'receiptItems', 'receiptSubtotal', 'receiptDiscountRow', 'receiptDiscount', 'receiptTotal',
-    'receiptPaymentMethod', 'closeReceiptBtn', 'printReceiptBtn'];
+    'receiptPaymentMethod', 'closeReceiptBtn', 'printReceiptBtn', 'saleSuccessTotal', 'saleSuccessDetail'];
 const XSS = '<img src=x onerror=alert(1)>';
 
 const product = (id = 1, overrides = {}) => ({ id, nombre: `Producto ${id}`, categoria: 'Bebidas', stock: 10, precio_compra: 4, precio_venta: 10, local: 'LAS BRISAS', ...overrides });
@@ -23,6 +23,7 @@ function setupPos({ products = [product()], cart = [], combos = new Map(), rpc, 
     const alerts = [];
     const toasts = [];
     const timers = new Map();
+    const prints = [];
     // Respuesta como la de registrar_venta (precios desde "la base")
     const servidor = params => {
         const items = params.p_items.map(({ id, cantidad }) => {
@@ -41,7 +42,7 @@ function setupPos({ products = [product()], cart = [], combos = new Map(), rpc, 
     const supabase = fakeSupabase({ rpc: { registrar_venta: rpc || servidor } });
     const { exports } = loadModule('pos.js', {
         document: fakeDocument(ids, { '.discount-btn': [discountButton], '.cat-filter-btn': [categoryButton] }),
-        window: { addEventListener() {}, removeEventListener() {}, print() {} },
+        window: { addEventListener() {}, removeEventListener() {}, print() { prints.push(1); } },
         state, supabase,
         setTimeout(callback) { const id = timers.size + 1; timers.set(id, callback); return id; },
         clearTimeout(id) { timers.delete(id); },
@@ -52,7 +53,7 @@ function setupPos({ products = [product()], cart = [], combos = new Map(), rpc, 
         ...utils()
     });
     const pos = exports.setupPOS({ onSaleCompleted, onPricesChanged });
-    return { ids, state, supabase, pos, alerts, toasts, timers, discountButton, categoryButton };
+    return { ids, state, supabase, pos, alerts, toasts, timers, prints, discountButton, categoryButton };
 }
 
 const clickQty = (t, index, delta) => t.ids.cartItems.dispatch('click', {
@@ -132,10 +133,32 @@ test('una venta usa registrar_venta con el total esperado y muestra la boleta qu
     assert.equal(t.ids.cobrarBtn.disabled, false);
     assert.equal(completed, 1);
 
-    t.pos.addToCart(products[0]);
-    t.ids.closeReceiptBtn.onclick();
-    assert.equal(t.state.cart.length, 1, 'cerrar la boleta no borra el siguiente ticket');
+    // Aviso de venta exitosa, sin imprimir solo.
+    assert.equal(t.ids.saleSuccessTotal.textContent, 'S/ 28.99');
+    assert.equal(t.ids.saleSuccessDetail.textContent, 'Cobrado con Efectivo + Yape · Venta N° 77');
+    assert.equal(t.prints.length, 0, 'la boleta no se imprime automáticamente');
     assert.equal(t.timers.size, 0);
+
+    await t.ids.printReceiptBtn.onclick();
+    assert.equal(t.prints.length, 1, 'se imprime solo al tocar "Imprimir boleta"');
+    assert.equal(t.ids.receiptModal.classList.contains('hidden'), false);
+
+    t.ids.closeReceiptBtn.onclick();
+    assert.equal(t.ids.receiptModal.classList.contains('hidden'), true);
+    t.pos.addToCart(products[0]);
+    assert.equal(t.state.cart.length, 1, 'cerrar el aviso no borra el siguiente ticket');
+});
+
+test('escanear el siguiente producto con el aviso abierto lo cierra y sigue vendiendo', async () => {
+    const products = [product(1)];
+    const t = setupPos({ products, cart: [{ ...products[0], qty: 1 }] });
+    await t.pos.checkout();
+    assert.equal(t.ids.receiptModal.classList.contains('hidden'), false);
+    assert.equal(t.ids.saleSuccessDetail.textContent, 'Cobrado con Efectivo · Venta N° 77');
+    t.pos.addToCart(products[0]);
+    assert.equal(t.ids.receiptModal.classList.contains('hidden'), true);
+    assert.equal(t.state.cart.length, 1);
+    await t.ids.receiptModal.onkeydown?.({ key: 'Escape' });
 });
 
 test('si la base rechaza la venta, el ticket se conserva y no se abre la boleta', async () => {

@@ -41,6 +41,47 @@ export function mensajeLogin(error) {
     return describeError(error);
 }
 
+// Códigos con los que Supabase avisa que la sesión ya no existe (se cerró, se borró la cuenta o
+// rechazó la renovación). Solo en esos casos hay que volver a pedir correo y contraseña.
+const CODIGOS_SESION_TERMINADA = new Set([
+    'refresh_token_not_found', 'refresh_token_already_used', 'session_not_found',
+    'session_expired', 'user_not_found', 'user_banned', 'bad_jwt'
+]);
+
+// ¿La sesión terminó de verdad? Un corte de internet, un servidor lento o una caída momentánea
+// de Supabase NO cuentan: la sesión sigue guardada y basta con reintentar.
+export function sesionTerminada(error) {
+    if (!error) return false;
+    const name = String(error.name || '');
+    if (name === 'AuthRetryableFetchError') return false;
+    if (name === 'AuthSessionMissingError') return true;
+    if (CODIGOS_SESION_TERMINADA.has(String(error.code || ''))) return true;
+    if (/invalid refresh token/i.test(String(error.message || ''))) return true;
+    return name === 'AuthApiError' && (error.status === 401 || error.status === 403);
+}
+
+// La base de datos no aceptó el token de acceso (vencido o inválido; pasa, por ejemplo, si la
+// hora del equipo está mal). Se renueva el token y se reintenta antes de pedir la contraseña.
+export function tokenRechazado(error) {
+    return /^PGRST30[123]$/.test(String(error?.code || '')) || /JWT expired/i.test(String(error?.message || ''));
+}
+
+export const ESPERA_MAXIMA_MS = 20000;
+export const REINTENTO_MS = 15000;
+
+// Si Supabase no responde (internet colgado), Kalo no se queda en "Cargando…" para siempre.
+export function conLimite(promesa, ms = ESPERA_MAXIMA_MS) {
+    let timer;
+    const limite = new Promise((_, reject) => {
+        timer = setTimeout(() => {
+            const error = new Error('network timeout: Supabase no respondió a tiempo');
+            error.name = 'TiempoAgotado';
+            reject(error);
+        }, ms);
+    });
+    return Promise.race([Promise.resolve(promesa), limite]).finally(() => clearTimeout(timer));
+}
+
 export function setupAuth({ onReady, onSignedOut, onMfaChanged } = {}) {
     const $ = id => document.getElementById(id);
     const bootCard = $('bootCard');
@@ -49,7 +90,13 @@ export function setupAuth({ onReady, onSignedOut, onMfaChanged } = {}) {
     const enrollCard = $('mfaEnrollCard');
     const pickerCard = $('localPicker');
     const appView = $('appView');
-    const pantallas = [bootCard, loginCard, mfaCard, enrollCard, pickerCard, appView].filter(Boolean);
+    const reconnectCard = $('reconnectCard');
+    const pantallas = [bootCard, loginCard, mfaCard, enrollCard, pickerCard, appView, reconnectCard].filter(Boolean);
+
+    const reconnectStatus = $('reconnectStatusMsg');
+    const reconnectBtn = $('reconnectBtn');
+    let reintento = null;
+    let verificando = false;
 
     const loginForm = $('loginForm');
     const emailInput = $('emailInput');
@@ -75,6 +122,10 @@ export function setupAuth({ onReady, onSignedOut, onMfaChanged } = {}) {
     const pickerBackBtn = $('localPickerBackBtn');
 
     function mostrar(pantalla) {
+        if (pantalla !== reconnectCard) {
+            clearTimeout(reintento);
+            reintento = null;
+        }
         for (const el of pantallas) el.classList.toggle('hidden', el !== pantalla);
     }
 
@@ -82,11 +133,41 @@ export function setupAuth({ onReady, onSignedOut, onMfaChanged } = {}) {
         if (el) el.textContent = text || '';
     }
 
-    async function cargarPerfil() {
-        const { data, error } = await supabase.rpc('mi_perfil');
+    async function pedirPerfil() {
+        const { data, error } = await conLimite(supabase.rpc('mi_perfil'));
         if (error) throw error;
-        if (!data) throw new Error('No encontramos tu cuenta.');
+        if (!data) return null;
         return { email: data.email, rol: data.rol, local: data.local, aal: data.aal, esAdmin: data.admin_activo === true };
+    }
+
+    async function cargarPerfil() {
+        try {
+            return await pedirPerfil();
+        } catch (error) {
+            if (!tokenRechazado(error)) throw error;
+            const { error: refreshError } = await conLimite(supabase.auth.refreshSession());
+            if (refreshError) throw refreshError;
+            return pedirPerfil();
+        }
+    }
+
+    // Sin internet la sesión NO se cierra: se muestra "Reconectando" y Kalo vuelve a intentar solo.
+    function mostrarReconexion(error) {
+        if (!reconnectCard) return;
+        setStatus(reconnectStatus, describeError(error));
+        if (reconnectBtn) reconnectBtn.disabled = false;
+        mostrar(reconnectCard);
+        clearTimeout(reintento);
+        reintento = setTimeout(() => verificarSesion(), REINTENTO_MS);
+    }
+
+    // Solo se vuelve a pedir la contraseña cuando Supabase dice que la sesión terminó.
+    async function manejarFallo(error) {
+        if (sesionTerminada(error) || tokenRechazado(error) || !reconnectCard) {
+            await cerrarSesion('Tu sesión terminó. Vuelve a iniciar sesión.');
+            return;
+        }
+        mostrarReconexion(error);
     }
 
     async function estadoMfa() {
@@ -115,7 +196,11 @@ export function setupAuth({ onReady, onSignedOut, onMfaChanged } = {}) {
         try {
             perfil = await cargarPerfil();
         } catch (error) {
-            await cerrarSesion(describeError(error));
+            await manejarFallo(error);
+            return;
+        }
+        if (!perfil) {
+            await cerrarSesion('No encontramos tu cuenta. Pide ayuda al administrador.');
             return;
         }
         if (perfil.rol !== 'admin' && perfil.rol !== 'cajero') {
@@ -131,9 +216,9 @@ export function setupAuth({ onReady, onSignedOut, onMfaChanged } = {}) {
         if (perfil.rol === 'admin') {
             let mfa;
             try {
-                mfa = await estadoMfa();
+                mfa = await conLimite(estadoMfa());
             } catch (error) {
-                await cerrarSesion(describeError(error));
+                await manejarFallo(error);
                 return;
             }
             if (mfa.verificado && mfa.nivel !== 'aal2') {
@@ -221,11 +306,13 @@ export function setupAuth({ onReady, onSignedOut, onMfaChanged } = {}) {
             if (error) throw error;
             enrolado = data;
         } catch (error) {
-            const message = /disabled|not enabled/i.test(String(error?.message))
+            const desactivada = /disabled|not enabled/i.test(String(error?.message));
+            const message = desactivada
                 ? 'La verificación en dos pasos está desactivada en Supabase (Authentication → Multi-Factor → TOTP).'
                 : describeError(error);
-            if (obligatoria) await cerrarSesion(message);
-            else await customAlert(message, 'No se pudo activar', '⚠️');
+            if (!obligatoria) await customAlert(message, 'No se pudo activar', '⚠️');
+            else if (desactivada) await cerrarSesion(message);
+            else await manejarFallo(error);
             return;
         }
 
@@ -317,17 +404,51 @@ export function setupAuth({ onReady, onSignedOut, onMfaChanged } = {}) {
         }, 0);
     });
 
-    (async () => {
-        mostrar(bootCard);
-        let session = null;
-        try {
-            ({ data: { session } } = await supabase.auth.getSession());
-        } catch {
-            session = null;
+    // Al abrir Kalo (y en cada reintento): si hay una sesión guardada se usa, aunque el internet
+    // tarde en volver. Solo se muestra el ingreso si no hay sesión o si Supabase la dio por terminada.
+    async function verificarSesion() {
+        if (verificando) return;
+        verificando = true;
+        clearTimeout(reintento);
+        if (esperandoConexion()) {
+            setStatus(reconnectStatus, 'Conectando…');
+            if (reconnectBtn) reconnectBtn.disabled = true;
+        } else {
+            mostrar(bootCard);
         }
-        if (session) await continuarSesion();
-        else mostrar(loginCard);
-    })();
+        try {
+            let resultado;
+            try {
+                resultado = await conLimite(supabase.auth.getSession());
+            } catch (error) {
+                resultado = { data: { session: null }, error };
+            }
+            const error = resultado?.error || null;
+            if (resultado?.data?.session) {
+                await continuarSesion();
+            } else if (error && !sesionTerminada(error) && reconnectCard) {
+                mostrarReconexion(error);
+            } else {
+                setStatus(loginStatus, error ? 'Tu sesión terminó. Vuelve a iniciar sesión.' : '');
+                mostrar(loginCard);
+            }
+        } finally {
+            verificando = false;
+        }
+    }
+
+    function esperandoConexion() {
+        return Boolean(reconnectCard) && !reconnectCard.classList.contains('hidden');
+    }
+
+    reconnectBtn?.addEventListener('click', () => verificarSesion());
+    // Apenas vuelve el internet, o la vendedora regresa a la pestaña, se reintenta sin esperar.
+    window.addEventListener('online', () => { if (esperandoConexion()) verificarSesion(); });
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible' && esperandoConexion()) verificarSesion();
+    });
+
+    verificarSesion();
 
     return {
         cerrarSesion: () => cerrarSesion(''),
