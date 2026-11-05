@@ -54,6 +54,8 @@ export default defineConfig(({ mode }) => {
     base: '/kalo/',
     plugins: [kaloCsp(env.VITE_SUPABASE_URL)],
     build: {
+      // ExcelJS (~930 kB) se carga solo al descargar el reporte, nunca al abrir la caja.
+      chunkSizeWarningLimit: 1000,
       rollupOptions: {
         input: {
           main: resolve(projectDir, 'index.html'),

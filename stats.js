@@ -1,19 +1,32 @@
 import { supabase } from "./supabase.js";
 import { state } from "./state.js";
 import { customAlert } from "./ui.js";
-import { localPorId } from "./constants.js";
-import { escapeHtml, formatMoney, describeError, fetchAll, resumirVentas, ventasPorDia, monthRange, toMonthInputValue, toDateInputValue, resumenProductos, nombreCorto, roundMoney } from "./utils.js";
+import { rangoPeriodo, calcularReporte, construirExcel, graficosReporte, nombreArchivoReporte } from "./reporte.js";
+import { escapeHtml, formatMoney, describeError, fetchAll, resumirVentas, ventasPorDia, monthRange, toMonthInputValue, toDateInputValue, roundMoney } from "./utils.js";
 
-const NOMBRES_MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Setiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 const TOP_PRODUCTOS = 10;
 
 // Las librerías pesadas se cargan solo al abrir Estadísticas o al exportar.
 const cargarChart = () => import('chart.js/auto');
-const cargarXLSX = () => import('xlsx');
+const cargarExcel = () => import('exceljs');
 
-export function setupStats({ loadChart = cargarChart, loadXLSX = cargarXLSX } = {}) {
+const TIPO_XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+function descargarArchivo(contenido, nombre) {
+    const url = URL.createObjectURL(new Blob([contenido], { type: TIPO_XLSX }));
+    const enlace = document.createElement('a');
+    enlace.href = url;
+    enlace.download = nombre;
+    document.body.appendChild(enlace);
+    enlace.click();
+    enlace.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+export function setupStats({ loadChart = cargarChart, loadExcel = cargarExcel, descargar = descargarArchivo } = {}) {
     const statsMonthInput = document.getElementById('statsMonth');
     const exportStatsBtn = document.getElementById('exportStatsBtn');
+    const reportPeriod = document.getElementById('reportPeriod');
     const topProductsList = document.getElementById('topProductsList');
     let chart = null;
     let requestId = 0;
@@ -149,126 +162,93 @@ export function setupStats({ loadChart = cargarChart, loadXLSX = cargarXLSX } = 
         if (topProductsList) topProductsList.innerHTML = '';
     }
 
-    // --- EXCEL ---
-    function filaVenta(venta) {
-        const fecha = new Date(venta.fecha);
-        return [
-            fecha.toLocaleDateString('es-PE'),
-            fecha.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }),
-            venta.metodo_pago || 'Efectivo',
-            resumenProductos(venta.detalles),
-            roundMoney(Number(venta.subtotal) || 0),
-            roundMoney(Number(venta.descuento) || 0),
-            roundMoney(Number(venta.total) || 0),
-            roundMoney((Number(venta.total) || 0) - (Number(venta.costo_total) || 0)),
-            nombreCorto(venta.creado_por_email)
-        ];
+    // --- REPORTE EXCEL ---
+    const COLUMNAS_REPORTE = 'id, fecha, local, subtotal, descuento, total, costo_total, metodo_pago, efectivo, yape, estado, detalles, creado_por_email, reembolsado_por_email, reembolsado_en, motivo_reembolso, venta_items(producto_id, nombre, cantidad, precio_unitario, costo_unitario, componentes)';
+
+    const filtrarLocales = (consulta, locales) => consulta.eq('local', locales[0]);
+
+    function avance(texto) {
+        if (exportStatsBtn) exportStatsBtn.textContent = texto;
     }
 
-    function construirLibro(XLSX, ventas, localNombre) {
-        const porMes = new Map();
-        for (const venta of ventas) {
-            const fecha = new Date(venta.fecha);
-            if (Number.isNaN(fecha.getTime())) continue;
-            const key = toMonthInputValue(fecha);
-            if (!porMes.has(key)) porMes.set(key, { nombre: `${NOMBRES_MESES[fecha.getMonth()]} ${fecha.getFullYear()}`, ventas: [] });
-            porMes.get(key).ventas.push(venta);
+    // Lienzos fuera de la vista para dibujar los gráficos que van dentro del Excel.
+    function dibujarGraficos(Chart, modelo) {
+        const lienzos = [];
+        const crearCanvas = (ancho, alto) => {
+            const canvas = document.createElement('canvas');
+            canvas.width = ancho;
+            canvas.height = alto;
+            canvas.style.position = 'fixed';
+            canvas.style.left = '-10000px';
+            canvas.style.top = '0';
+            canvas.style.width = `${ancho}px`;
+            canvas.style.height = `${alto}px`;
+            document.body?.appendChild(canvas);
+            lienzos.push(canvas);
+            return canvas;
+        };
+        try {
+            return graficosReporte(Chart, modelo, crearCanvas);
+        } finally {
+            lienzos.forEach(canvas => canvas.remove?.());
         }
-        const meses = [...porMes.keys()].sort();
-        const wb = XLSX.utils.book_new();
-
-        const resumen = [
-            [`CONSOLIDADO HISTÓRICO DE VENTAS - KALO (${localNombre.toUpperCase()})`],
-            [],
-            ['Mes', 'N° Ventas', 'Ventas (S/)', 'Descuentos (S/)', 'Margen (S/)', 'Reembolsos (N°)', 'Reembolsos (S/)']
-        ];
-        const total = resumirVentas(ventas);
-        for (const key of meses) {
-            const mes = porMes.get(key);
-            const r = resumirVentas(mes.ventas);
-            resumen.push([mes.nombre, r.cantidad, r.ventas, r.descuentos, r.margen, r.cantidadReembolsos, r.reembolsos]);
-        }
-        resumen.push([]);
-        resumen.push(['TOTAL HISTÓRICO', total.cantidad, total.ventas, total.descuentos, total.margen, total.cantidadReembolsos, total.reembolsos]);
-        resumen.push([]);
-        resumen.push(['Margen = ventas cobradas − costo de la mercadería (no incluye alquiler, sueldos ni otros gastos).']);
-        const wsResumen = XLSX.utils.aoa_to_sheet(resumen);
-        wsResumen['!cols'] = [{ wch: 22 }, { wch: 12 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 16 }];
-        XLSX.utils.book_append_sheet(wb, wsResumen, 'Resumen General');
-
-        for (const key of meses) {
-            const mes = porMes.get(key);
-            const r = resumirVentas(mes.ventas);
-            const filas = [
-                [`REPORTE MENSUAL KALO - ${mes.nombre.toUpperCase()}`],
-                [],
-                ['RESUMEN DEL MES', ''],
-                ['Ventas', r.ventas],
-                ['Descuentos', r.descuentos],
-                ['Margen (ventas − costo)', r.margen],
-                ['Transacciones', r.cantidad],
-                ['Reembolsos', `${r.cantidadReembolsos} (${formatMoney(r.reembolsos)}) — detalle en la hoja Reembolsos`],
-                [],
-                ['DETALLE DE VENTAS'],
-                ['Fecha', 'Hora', 'Método', 'Productos', 'Subtotal (S/)', 'Descuento (S/)', 'Total pagado (S/)', 'Margen (S/)', 'Atendió']
-            ];
-            for (const venta of mes.ventas) {
-                if (venta.estado !== 'reembolsada') filas.push(filaVenta(venta));
-            }
-            const ws = XLSX.utils.aoa_to_sheet(filas);
-            ws['!cols'] = [{ wch: 12 }, { wch: 8 }, { wch: 12 }, { wch: 45 }, { wch: 13 }, { wch: 14 }, { wch: 16 }, { wch: 13 }, { wch: 16 }];
-            XLSX.utils.book_append_sheet(wb, ws, mes.nombre.slice(0, 31));
-        }
-
-        const reembolsadas = ventas.filter(v => v.estado === 'reembolsada');
-        const filasReembolsos = [
-            ['REEMBOLSOS'],
-            [],
-            ['Fecha venta', 'Hora', 'Método', 'Productos', 'Subtotal (S/)', 'Descuento (S/)', 'Total (S/)', 'Margen (S/)', 'Atendió', 'Reembolsado por', 'Fecha reembolso', 'Motivo']
-        ];
-        for (const venta of reembolsadas) {
-            filasReembolsos.push([
-                ...filaVenta(venta),
-                nombreCorto(venta.reembolsado_por_email) || '—',
-                venta.reembolsado_en ? new Date(venta.reembolsado_en).toLocaleString('es-PE') : '—',
-                venta.motivo_reembolso || '—'
-            ]);
-        }
-        if (reembolsadas.length === 0) filasReembolsos.push(['Sin reembolsos.']);
-        const wsReembolsos = XLSX.utils.aoa_to_sheet(filasReembolsos);
-        wsReembolsos['!cols'] = [{ wch: 12 }, { wch: 8 }, { wch: 12 }, { wch: 40 }, { wch: 13 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 16 }, { wch: 18 }, { wch: 40 }];
-        XLSX.utils.book_append_sheet(wb, wsReembolsos, 'Reembolsos');
-        return wb;
     }
 
     async function exportarExcel() {
         if (exporting || !state.currentLocal) return;
         exporting = true;
         const label = exportStatsBtn?.textContent;
-        if (exportStatsBtn) {
-            exportStatsBtn.disabled = true;
-            exportStatsBtn.textContent = 'Preparando…';
-        }
+        if (exportStatsBtn) exportStatsBtn.disabled = true;
         try {
-            let XLSX;
+            const periodo = reportPeriod?.value === 'anio' ? 'anio' : 'mes';
+            const rango = rangoPeriodo(periodo, statsMonthInput?.value || toMonthInputValue());
+            if (!rango) return;
+            // Cada local es aparte: el reporte es siempre del local que se está viendo.
+            const locales = [state.currentLocal];
+            const ordenar = consulta => consulta.order('fecha').order('id');
+
+            avance('Leyendo ventas…');
+            const ventas = await fetchAll(() => ordenar(filtrarLocales(supabase.from('ventas').select(COLUMNAS_REPORTE), locales)
+                .gte('fecha', rango.desde.toISOString()).lt('fecha', rango.hasta.toISOString())));
+            if (ventas.length === 0) {
+                await customAlert(`No hay ventas registradas en ${rango.titulo} para este reporte.`, 'Sin datos', 'ℹ️');
+                return;
+            }
+            const ventasPrevias = await fetchAll(() => ordenar(filtrarLocales(supabase.from('ventas')
+                .select('id, fecha, subtotal, descuento, total, costo_total, metodo_pago, efectivo, yape, estado'), locales)
+                .gte('fecha', rango.anteriorDesde.toISOString()).lt('fecha', rango.anteriorHasta.toISOString())));
+            avance('Revisando inventario…');
+            const productos = await fetchAll(() => filtrarLocales(supabase.from('productos')
+                .select('id, nombre, categoria, local, stock, alerta_stock, precio_compra, precio_venta, lotes')
+                .eq('activo', true), locales).order('id'));
+
+            const modelo = calcularReporte({ ventas, ventasPrevias, productos, rango, locales, generadoPor: state.perfil?.email, ahora: new Date() });
+
+            avance('Dibujando gráficos…');
+            let graficos = {};
             try {
-                XLSX = await loadXLSX();
+                const { default: Chart } = await loadChart();
+                graficos = dibujarGraficos(Chart, modelo);
             } catch (error) {
-                console.error('Error al cargar XLSX:', error);
+                console.warn('El reporte se arma sin gráficos:', error);
+            }
+
+            avance('Armando el Excel…');
+            let ExcelJS;
+            try {
+                const modulo = await loadExcel();
+                ExcelJS = modulo.default || modulo;
+            } catch (error) {
+                console.error('Error al cargar ExcelJS:', error);
                 await customAlert('No se pudo preparar el Excel. Verifica tu conexión a internet.', 'Error', '⚠️');
                 return;
             }
-            const local = localPorId(state.currentLocal);
-            const ventas = await fetchAll(() => supabase.from('ventas').select('*')
-                .eq('local', state.currentLocal).order('fecha').order('id'));
-            if (ventas.length === 0) {
-                await customAlert('No hay ventas registradas para exportar en este local.', 'Sin datos', 'ℹ️');
-                return;
-            }
-            const wb = construirLibro(XLSX, ventas, local ? local.nombre : state.currentLocal);
-            XLSX.writeFile(wb, `Reporte_Kalo_${local ? local.slug : 'local'}_${toDateInputValue()}.xlsx`);
+            const libro = construirExcel(ExcelJS, modelo, graficos);
+            const contenido = await libro.xlsx.writeBuffer();
+            await descargar(contenido, nombreArchivoReporte(modelo));
         } catch (error) {
-            await customAlert('No se pudo exportar: ' + describeError(error), 'Error', '⚠️');
+            console.error('Error al exportar:', error);
+            await customAlert('No se pudo generar el reporte: ' + describeError(error), 'Error', '⚠️');
         } finally {
             exporting = false;
             if (exportStatsBtn) {
@@ -280,5 +260,5 @@ export function setupStats({ loadChart = cargarChart, loadXLSX = cargarXLSX } = 
 
     exportStatsBtn?.addEventListener('click', exportarExcel);
 
-    return { calcularEstadisticas, exportarExcel, construirLibro, reset };
+    return { calcularEstadisticas, exportarExcel, reset };
 }

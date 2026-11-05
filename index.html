@@ -303,9 +303,14 @@
                         <p class="muted">Rendimiento del local en el mes</p>
                     </div>
                     <div class="stats-tools">
-                        <button type="button" id="exportStatsBtn" class="secondary-btn export-btn">📥 Exportar Excel</button>
-                        <span class="tools-divider" aria-hidden="true"></span>
                         <input type="month" id="statsMonth" aria-label="Mes de las estadísticas">
+                        <span class="tools-divider" aria-hidden="true"></span>
+                        <span class="report-label">Reporte Excel de este local:</span>
+                        <select id="reportPeriod" class="report-select" aria-label="Periodo del reporte">
+                            <option value="mes">Mes elegido</option>
+                            <option value="anio">Año completo</option>
+                        </select>
+                        <button type="button" id="exportStatsBtn" class="secondary-btn export-btn" title="Descarga un reporte en Excel con resumen, gráficos, productos, pérdidas, ventas e inventario">📥 Descargar reporte</button>
                     </div>
                 </div>
 

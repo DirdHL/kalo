@@ -1,40 +1,40 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const ExcelJS = require('exceljs');
 const { loadModule, utils, constants, rendered, fakeDocument, elements, fakeSupabase, plain } = require('./helpers.cjs');
+
+const { exports: reporte } = loadModule('reporte.js', { ...utils(), ...constants(), Date });
 
 const LOCAL = 'LAS BRISAS';
 const STAT_IDS = ['statsMonth', 'exportStatsBtn', 'topProductsList', 'salesChart', 'statVentas', 'statMargen',
-    'statDescuentos', 'statReembolsos', 'statReembolsosDetalle', 'statVentasDetalle'];
+    'statDescuentos', 'statReembolsos', 'statReembolsosDetalle', 'statVentasDetalle', 'reportPeriod'];
 
-function setupStats({ ventas = [], month = '2026-10', rpc = {} } = {}) {
+function setupStats({ ventas = [], productos = [], month = '2026-10', rpc = {}, period = 'mes', local = LOCAL } = {}) {
     const ids = elements(STAT_IDS);
-    const supabase = fakeSupabase({ tables: { ventas }, rpc: { resumen_productos: () => [], ...rpc } });
+    const supabase = fakeSupabase({ tables: { ventas, productos }, rpc: { resumen_productos: () => [], ...rpc } });
     const alerts = [];
     const charts = [];
-    const sheets = [];
     const files = [];
     class FakeChart {
         constructor(_ctx, config) { this.config = config; charts.push(this); }
         destroy() { this.destroyed = true; }
     }
-    const XLSX = {
-        utils: {
-            book_new: () => ({}),
-            aoa_to_sheet: rows => ({ rows }),
-            book_append_sheet: (_wb, sheet, name) => sheets.push({ name, rows: sheet.rows })
-        },
-        writeFile: (_wb, name) => files.push(name)
-    };
     const { exports } = loadModule('stats.js', {
         document: fakeDocument(ids), supabase,
-        state: { currentLocal: LOCAL },
+        state: { currentLocal: local },
         customAlert: async message => { alerts.push(message); },
-        localPorId: constants().localPorId,
+        ...constants(),
+        ...reporte,
         ...utils()
     });
-    const stats = exports.setupStats({ loadChart: async () => ({ default: FakeChart }), loadXLSX: async () => XLSX });
+    const stats = exports.setupStats({
+        loadChart: async () => ({ default: FakeChart }),
+        loadExcel: async () => ExcelJS,
+        descargar: async (contenido, nombre) => { files.push({ contenido, nombre }); }
+    });
     ids.statsMonth.value = month;
-    return { ids, supabase, stats, alerts, charts, sheets, files };
+    ids.reportPeriod.value = period;
+    return { ids, supabase, stats, alerts, charts, files };
 }
 
 function withTimezone(tz, fn) {
@@ -96,36 +96,80 @@ test('los productos más vendidos se muestran escapados', async () => {
     assert.equal(t.supabase.rpcCalls[0].params.p_local, LOCAL);
 });
 
-test('el Excel incluye todas las ventas, separa los reembolsos y usa nombres correctos', () => withTimezone('America/Lima', async () => {
+const ventaConItems = (id, fecha, overrides = {}) => sale(id, fecha, {
+    total: 10, subtotal: 10, costo_total: 4, efectivo: 10,
+    venta_items: [{ producto_id: 1, nombre: 'Agua', cantidad: 2, precio_unitario: 5, costo_unitario: 2, componentes: null }],
+    ...overrides
+});
+const productosBrisas = [{ id: 1, nombre: 'Agua', categoria: 'Bebidas', local: LOCAL, stock: 8, alerta_stock: 2, precio_compra: 2, precio_venta: 5, lotes: null, activo: true }];
+
+async function abrir(file) {
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(file.contenido);
+    return wb;
+}
+
+test('el reporte del mes pide ventas con su detalle, compara con el mes anterior y descarga un Excel con diseño', () => withTimezone('America/Lima', async () => {
     const ventas = [
-        ...Array.from({ length: 1100 }, (_, i) => sale(i + 1, new Date(Date.UTC(2026, 8, 1 + (i % 28), 15)).toISOString())),
-        ...Array.from({ length: 100 }, (_, i) => sale(2000 + i, new Date(Date.UTC(2026, 9, 1 + (i % 28), 15)).toISOString())),
-        sale(5000, '2026-10-10T15:00:00Z', { estado: 'reembolsada', total: 7, motivo_reembolso: 'Cobro duplicado', reembolsado_por_email: 'zzenisx1234@gmail.com', reembolsado_en: '2026-10-10T15:05:00Z' })
+        ...Array.from({ length: 1200 }, (_, i) => ventaConItems(i + 1, new Date(Date.UTC(2026, 9, 1 + (i % 28), 15)).toISOString())),
+        ventaConItems(5000, '2026-10-10T15:00:00Z', { estado: 'reembolsada', motivo_reembolso: 'Cobro duplicado', reembolsado_por_email: 'zzenisx1234@gmail.com', reembolsado_en: '2026-10-10T15:05:00Z' }),
+        ventaConItems(6000, '2026-09-10T15:00:00Z', { total: 300 })
     ];
-    const t = setupStats({ ventas });
+    const t = setupStats({ ventas, productos: productosBrisas });
     await t.stats.exportarExcel();
-    assert.deepEqual(t.sheets.map(s => s.name), ['Resumen General', 'Setiembre 2026', 'Octubre 2026', 'Reembolsos']);
-    const resumen = t.sheets[0].rows;
-    assert.deepEqual(plain(resumen[2]), ['Mes', 'N° Ventas', 'Ventas (S/)', 'Descuentos (S/)', 'Margen (S/)', 'Reembolsos (N°)', 'Reembolsos (S/)']);
-    const total = resumen.find(row => row[0] === 'TOTAL HISTÓRICO');
-    assert.deepEqual(plain(total), ['TOTAL HISTÓRICO', 1200, 1200, 0, 720, 1, 7]);
-    const septiembre = t.sheets[1].rows;
-    assert.equal(septiembre.length - 11, 1100, 'todas las ventas de setiembre, aunque superen 1000');
-    const octubre = t.sheets[2].rows;
-    assert.equal(octubre.length - 11, 100, 'la venta reembolsada no está en el detalle del mes');
-    const reembolsos = t.sheets[3].rows;
-    assert.equal(reembolsos.length, 4);
-    assert.deepEqual(plain(reembolsos[3].slice(-3, -2)), ['zzenisx1234']);
-    assert.equal(reembolsos[3].at(-1), 'Cobro duplicado');
-    assert.match(t.files[0], /^Reporte_Kalo_brisas_\d{4}-\d{2}-\d{2}\.xlsx$/);
+    assert.deepEqual(t.alerts, []);
+    assert.equal(t.files.length, 1);
+    assert.equal(t.files[0].nombre, 'Kalo_Reporte_2026-10_Las-Brisas.xlsx');
+
+    const consultas = t.supabase.calls.filter(c => c.table === 'ventas');
+    assert.match(consultas[0].columns, /venta_items\(producto_id, nombre, cantidad, precio_unitario, costo_unitario, componentes\)/);
+    assert.deepEqual(plain(consultas[0].filters), [['eq', 'local', LOCAL], ['gte', 'fecha', '2026-10-01T05:00:00.000Z'], ['lt', 'fecha', '2026-11-01T05:00:00.000Z']]);
+    assert.equal(consultas.filter(c => c.filters.some(f => f[2] === '2026-10-01T05:00:00.000Z' && f[0] === 'gte')).length, 2, 'pagina: 1201 ventas en 2 páginas');
+    assert.ok(consultas.some(c => c.filters.some(f => f[0] === 'gte' && f[2] === '2026-09-01T05:00:00.000Z')), 'pide el mes anterior para comparar');
+    assert.deepEqual(plain(t.supabase.calls.find(c => c.table === 'productos').filters), [['eq', 'activo', true], ['eq', 'local', LOCAL]]);
+
+    const wb = await abrir(t.files[0]);
+    assert.deepEqual(wb.worksheets.map(ws => ws.name), ['Resumen', 'Por día', 'Productos', 'Categorías', 'Vendedoras', 'Pérdidas y alertas', 'Ventas', 'Reembolsos', 'Inventario']);
+    const resumen = wb.getWorksheet('Resumen');
+    assert.equal(resumen.getCell('A6').value, 12000, 'todas las ventas del mes, aunque pasen de 1000');
+    assert.equal(resumen.getCell('A1').fill.fgColor.argb, 'FF233E3A', 'encabezado con el color de Kalo');
+    assert.equal(wb.getWorksheet('Ventas').rowCount >= 1201 + 5, true);
     assert.equal(t.ids.exportStatsBtn.disabled, false);
 }));
 
-test('sin ventas, el Excel avisa en lugar de generar un archivo vacío', async () => {
+test('cada local es aparte: desde El Polideportivo el reporte trae solo sus ventas', async () => {
+    const t = setupStats({
+        local: 'EL POLIDEPORTIVO',
+        ventas: [ventaConItems(1, '2026-10-05T15:00:00Z', { local: 'EL POLIDEPORTIVO' }), ventaConItems(2, '2026-10-06T15:00:00Z'), ventaConItems(3, '2026-10-07T15:00:00Z', { local: 'LOS PINOS' })]
+    });
+    await t.stats.exportarExcel();
+    for (const consulta of t.supabase.calls.filter(c => c.table === 'ventas' || c.table === 'productos')) {
+        assert.ok(consulta.filters.some(f => f[0] === 'eq' && f[1] === 'local' && f[2] === 'EL POLIDEPORTIVO'), consulta.table);
+        assert.equal(consulta.filters.some(f => f[0] === 'in'), false);
+    }
+    const wb = await abrir(t.files[0]);
+    assert.equal(wb.getWorksheet('Locales'), undefined);
+    assert.equal(wb.getWorksheet('Resumen').getCell('A2').value, 'Octubre 2026 · El Polideportivo');
+    assert.equal(wb.getWorksheet('Resumen').getCell('A6').value, 10, 'solo la venta de Poli');
+    assert.equal(t.files[0].nombre, 'Kalo_Reporte_2026-10_El-Polideportivo.xlsx');
+});
+
+test('el año completo pide todo el año y agrupa por mes', () => withTimezone('America/Lima', async () => {
+    const t = setupStats({ ventas: [ventaConItems(1, '2026-03-05T15:00:00Z'), ventaConItems(2, '2026-10-06T15:00:00Z')], period: 'anio' });
+    await t.stats.exportarExcel();
+    const consulta = t.supabase.calls.find(c => c.table === 'ventas');
+    assert.deepEqual(plain(consulta.filters.slice(1)), [['gte', 'fecha', '2026-01-01T05:00:00.000Z'], ['lt', 'fecha', '2027-01-01T05:00:00.000Z']]);
+    const wb = await abrir(t.files[0]);
+    assert.ok(wb.getWorksheet('Por mes'));
+    assert.equal(t.files[0].nombre, 'Kalo_Reporte_2026_Las-Brisas.xlsx');
+}));
+
+test('sin ventas en el periodo, el reporte avisa en lugar de generar un archivo vacío', async () => {
     const t = setupStats();
     await t.stats.exportarExcel();
     assert.equal(t.files.length, 0);
-    assert.match(t.alerts[0], /No hay ventas/);
+    assert.match(t.alerts[0], /No hay ventas registradas en Octubre 2026/);
+    assert.equal(t.ids.exportStatsBtn.disabled, false);
 });
 
 test('el top muestra exactamente 10 productos, numerados en orden', async () => {

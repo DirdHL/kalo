@@ -349,6 +349,9 @@ body:has(.modal-overlay:not(.hidden)) { overflow: hidden; }
 .export-btn { width: auto; padding: 6px 14px; background: #e5f5ec; border: 0; font-weight: 700; }
 .tools-divider { width: 1px; height: 20px; background: var(--card-border); }
 #statsMonth { border: 0; background: transparent; color: var(--text-primary); color-scheme: light; font-size: 15px; cursor: pointer; }
+.report-label { color: var(--text-secondary); font-size: 14px; font-weight: 600; }
+.report-select { min-height: 36px; padding: 4px 8px; border: 1px solid #9eafa1; border-radius: 8px; background: var(--card-bg); color: var(--text-primary); font-size: 14px; }
+.export-btn:disabled { opacity: .75; }
 .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 18px; }
 .stat-detail { margin-top: 4px; color: var(--text-secondary); font-size: 13px; }
 .stat-card-margin { border-top-color: #087f66; }
