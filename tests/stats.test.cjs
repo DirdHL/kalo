@@ -127,3 +127,14 @@ test('sin ventas, el Excel avisa en lugar de generar un archivo vacío', async (
     assert.equal(t.files.length, 0);
     assert.match(t.alerts[0], /No hay ventas/);
 });
+
+test('el top muestra exactamente 10 productos, numerados en orden', async () => {
+    const filas = Array.from({ length: 25 }, (_, i) => ({ producto: `Producto ${i + 1}`, unidades: 30 - i, total_vendido: 100 - i, costo_total: 10 }));
+    const t = setupStats({ rpc: { resumen_productos: () => filas } });
+    await t.stats.calcularEstadisticas();
+    const html = rendered(t.ids.topProductsList);
+    assert.equal((html.match(/<tr>/g) || []).length, 10);
+    assert.match(html, /rank-badge is-podium">1<\/span><\/td>\s*<td class="top-product-name">Producto 1</);
+    assert.match(html, /rank-badge">10<\/span><\/td>\s*<td class="top-product-name">Producto 10</);
+    assert.equal(html.includes('Producto 11<'), false);
+});

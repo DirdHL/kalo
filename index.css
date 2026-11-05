@@ -154,6 +154,15 @@ h2 { font-size: 20px; }
 .dashboard-header .primary-btn { white-space: nowrap; }
 #dashboardCard, #statsView, #historyView, #alertsView { flex: 1; min-height: 0; overflow: auto !important; }
 #dashboardCard > .category-filters { margin-bottom: 10px; }
+/* Las tablas de Inventario, Estadísticas e Historial muestran todas sus filas: baja la vista entera
+   en vez de encogerse a un cuadro chico con scroll propio. */
+.view-panel > .table-container { flex: none; min-height: 0; max-height: none; }
+@media (min-width: 961px) {
+    /* Sin scroll propio, el encabezado de la tabla queda fijo arriba al bajar por la vista. */
+    .view-panel > .table-container { overflow: visible !important; }
+    .view-panel > .table-container .data-table th:first-child { border-top-left-radius: 10px; }
+    .view-panel > .table-container .data-table th:last-child { border-top-right-radius: 10px; }
+}
 .table-container, #dashboardCard > .table-container { min-width: 0; min-height: 120px; overflow: auto !important; border: 1px solid var(--card-border); border-radius: 10px; }
 .data-table { width: 100%; min-width: 700px; border-collapse: separate; border-spacing: 0; text-align: left; font-size: 16px !important; }
 .data-table th { position: sticky; top: 0; z-index: 1; padding: 12px; background: #d9e2d3; border-bottom: 1px solid #a5b49f; color: #3a5146; font-size: 14px; font-weight: 600; white-space: nowrap; }
@@ -349,6 +358,10 @@ body:has(.modal-overlay:not(.hidden)) { overflow: hidden; }
 .chart-box { position: relative; height: 340px; margin-bottom: 22px; padding: 14px; border: 1px solid var(--card-border); border-radius: 12px; background: var(--bg-surface); }
 .section-title { margin: 0 0 10px; font-size: 18px; }
 .compact-table { min-width: 520px; }
+.top-table .rank-cell { width: 52px; text-align: center; }
+.rank-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 30px; height: 30px; border-radius: 50%; background: var(--bg-surface); color: var(--text-secondary); font-weight: 700; font-variant-numeric: tabular-nums; }
+.rank-badge.is-podium { background: #f2b65f; color: #182c29; }
+.top-table .top-product-name { font-weight: 600; }
 .refresh-btn { display: inline-flex; align-items: center; gap: 6px; width: auto; }
 .refresh-btn .icon { width: 17px; height: 17px; }
 
@@ -365,7 +378,6 @@ body:has(.modal-overlay:not(.hidden)) { overflow: hidden; }
 
 .history-table { font-size: 16px !important; }
 /* Historial: la tabla no se encoge en un cuadro con scroll propio; crece con las ventas y baja toda la página. */
-#historyView .history-table-container { flex: none; min-height: 0; max-height: none; overflow-y: visible !important; overflow-x: auto !important; }
 .history-table td { padding: 12px; vertical-align: top; }
 .history-table td:nth-child(3) { max-width: none; }
 .history-table .products-cell { min-width: 260px; max-width: none; overflow: visible; color: var(--text-primary); font-size: 15px; line-height: 1.45; white-space: normal; text-overflow: clip; }
@@ -391,7 +403,7 @@ body:has(.modal-overlay:not(.hidden)) { overflow: hidden; }
 .btn-refund, .depurar-btn { width: auto; min-height: 36px; padding: 4px 10px; font-size: 14px; background: #fff1ef; border-color: #f2c8c4; color: #b42318; }
 .table-message { text-align: center; color: var(--text-secondary); }
 .table-message.is-error { color: #b42318; }
-.inventory-thumb { display: block; width: 40px; height: 40px; border-radius: 8px; object-fit: cover; }
+.inventory-thumb { display: block; width: 48px; height: 48px; border-radius: 8px; object-fit: contain; background: var(--card-bg); }
 .price-cell { color: var(--primary); }
 .row-actions { display: flex; justify-content: center; gap: 6px; }
 .data-table .edit-btn, .data-table .delete-btn { border: 0; background: transparent; font-size: 19px; }

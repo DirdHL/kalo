@@ -5,7 +5,7 @@ import { localPorId } from "./constants.js";
 import { escapeHtml, formatMoney, describeError, fetchAll, resumirVentas, ventasPorDia, monthRange, toMonthInputValue, toDateInputValue, resumenProductos, nombreCorto, roundMoney } from "./utils.js";
 
 const NOMBRES_MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Setiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-const TOP_PRODUCTOS = 15;
+const TOP_PRODUCTOS = 10;
 
 // Las librerías pesadas se cargan solo al abrir Estadísticas o al exportar.
 const cargarChart = () => import('chart.js/auto');
@@ -117,23 +117,24 @@ export function setupStats({ loadChart = cargarChart, loadXLSX = cargarXLSX } = 
 
     async function loadTopProducts(local, range, current) {
         if (!topProductsList) return;
-        topProductsList.innerHTML = '<tr><td colspan="4" class="table-message">Cargando…</td></tr>';
+        topProductsList.innerHTML = '<tr><td colspan="5" class="table-message">Cargando…</td></tr>';
         const { data, error } = await supabase.rpc('resumen_productos', {
             p_local: local, p_desde: range.start.toISOString(), p_hasta: range.end.toISOString()
         });
         if (current !== requestId) return;
         if (error) {
-            topProductsList.innerHTML = `<tr><td colspan="4" class="table-message is-error">${escapeHtml(describeError(error))}</td></tr>`;
+            topProductsList.innerHTML = `<tr><td colspan="5" class="table-message is-error">${escapeHtml(describeError(error))}</td></tr>`;
             return;
         }
         const rows = (data || []).slice(0, TOP_PRODUCTOS);
         if (rows.length === 0) {
-            topProductsList.innerHTML = '<tr><td colspan="4" class="table-message">Sin ventas en este mes.</td></tr>';
+            topProductsList.innerHTML = '<tr><td colspan="5" class="table-message">Sin ventas en este mes.</td></tr>';
             return;
         }
-        topProductsList.innerHTML = rows.map(row => `
+        topProductsList.innerHTML = rows.map((row, index) => `
             <tr>
-                <td>${escapeHtml(row.producto)}</td>
+                <td class="rank-cell"><span class="rank-badge${index < 3 ? ' is-podium' : ''}">${index + 1}</span></td>
+                <td class="top-product-name">${escapeHtml(row.producto)}</td>
                 <td class="money-cell">${escapeHtml(row.unidades)}</td>
                 <td class="money-cell">${escapeHtml(formatMoney(row.total_vendido))}</td>
                 <td class="money-cell">${escapeHtml(formatMoney(Number(row.total_vendido) - Number(row.costo_total)))}</td>
