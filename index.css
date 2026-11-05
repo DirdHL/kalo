@@ -363,7 +363,20 @@ body:has(.modal-overlay:not(.hidden)) { overflow: hidden; }
 .cash-card-value { font-size: 22px; font-variant-numeric: tabular-nums; }
 .cash-card-detail { color: var(--text-secondary); font-size: 12px; }
 
-.history-table { font-size: 15px !important; }
+.history-table { font-size: 16px !important; }
+/* Historial: la tabla no se encoge en un cuadro con scroll propio; crece con las ventas y baja toda la página. */
+#historyView .history-table-container { flex: none; min-height: 0; max-height: none; overflow-y: visible !important; overflow-x: auto !important; }
+.history-table td { padding: 12px; vertical-align: top; }
+.history-table td:nth-child(3) { max-width: none; }
+.history-table .products-cell { min-width: 260px; max-width: none; overflow: visible; color: var(--text-primary); font-size: 15px; line-height: 1.45; white-space: normal; text-overflow: clip; }
+.history-table .date-cell strong { font-size: 17px; font-variant-numeric: tabular-nums; }
+.history-table .is-refunded-row td { background: #fbf1f0; }
+.history-daybar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
+.history-day { margin: 0; font-size: 20px; }
+.history-day-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.history-day-controls .secondary-btn { width: auto; min-height: 42px; padding: 8px 14px; font-size: 15px; white-space: nowrap; }
+.history-day-controls .secondary-btn:disabled { opacity: .5; cursor: default; }
+.history-day-controls .styled-input { width: auto; min-height: 42px; padding: 6px 10px; }
 .products-cell { max-width: 190px; overflow: hidden; color: var(--text-secondary); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
 .money-cell { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .discount-cell { color: #b42318; }

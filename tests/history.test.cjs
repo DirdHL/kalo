@@ -19,7 +19,8 @@ const venta = (id, overrides = {}) => ({
 });
 
 function setupHistory({ ventas = [], perfil = CAJERO, rpc = {}, prompt = 'Cobro duplicado', confirm = true } = {}) {
-    const ids = elements(['ventasList', 'cierreFecha', 'cierreFechaWrap', 'cierreResumen', 'historySubtitle', 'refreshHistoryBtn']);
+    const ids = elements(['ventasList', 'cierreFecha', 'cierreFechaWrap', 'cierreResumen', 'historySubtitle', 'historyDayLabel',
+        'prevDayBtn', 'nextDayBtn', 'todayBtn', 'refreshHistoryBtn']);
     const supabase = fakeSupabase({ tables: { ventas }, rpc });
     const state = { perfil, currentLocal: 'LAS BRISAS' };
     const alerts = [];
@@ -41,38 +42,79 @@ const refundButtons = t => t.ids.ventasList.children.filter(row => row.innerHTML
 const clickRefund = (t, id) => t.ids.ventasList.dispatch('click', {
     target: { closest: () => ({ getAttribute: () => String(id) }) }
 });
-const historyQuery = t => t.supabase.calls.find(call => call.table === 'ventas' && call.limit === 100);
-const cierreQueries = t => t.supabase.calls.filter(call => call.table === 'ventas' && call.range);
+const ventasQueries = t => t.supabase.calls.filter(call => call.table === 'ventas');
+const historyQuery = t => ventasQueries(t).at(-1);
+const cierreQueries = ventasQueries;
+const diaDe = iso => utils().toDateInputValue(new Date(iso));
 const filtro = (call, op) => call.filters.find(([o, key]) => o === op && key === 'fecha')?.[2];
 
-test('la vendedora ve solo lo de hoy y no puede elegir otro día del cierre', async () => {
+test('la vendedora ve todas las ventas de hoy y no puede elegir otro día', async () => {
     const t = setupHistory({ ventas: [venta(1), venta(2, { fecha: haceDias(1) }), venta(3, { fecha: haceDias(5) })] });
     await t.history.loadHistory();
-    assert.equal(filtro(historyQuery(t), 'gte'), inicioDelDia().toISOString(), 'pide solo ventas desde hoy');
+    const q = historyQuery(t);
+    assert.equal(filtro(q, 'gte'), inicioDelDia().toISOString(), 'pide solo ventas desde hoy');
+    assert.equal(q.limit, null, 'sin tope de 100: todas las de hoy');
     assert.equal(t.ids.ventasList.children.length, 1);
     assert.equal(t.ids.cierreFechaWrap.classList.contains('hidden'), true, 'sin selector de día');
-    assert.equal(t.ids.historySubtitle.textContent, 'Cierre de caja y ventas de hoy');
+    assert.equal(t.ids.historySubtitle.textContent, 'Cierre de caja y todas las ventas de hoy');
+    assert.match(t.ids.historyDayLabel.textContent, /^Hoy, /);
 
-    t.ids.cierreFecha.value = haceDias(1).slice(0, 10);
-    await t.history.loadCierre();
-    assert.equal(filtro(cierreQueries(t).at(-1), 'gte'), inicioDelDia().toISOString(), 'el cierre siempre es el de hoy');
+    t.ids.cierreFecha.value = diaDe(haceDias(1));
+    await t.history.loadHistory();
+    assert.equal(filtro(historyQuery(t), 'gte'), inicioDelDia().toISOString(), 'aunque cambie la fecha, sigue siendo hoy');
 
     const vacio = setupHistory({ ventas: [venta(9, { fecha: haceDias(2) })] });
     await vacio.history.loadHistory();
     assert.match(rendered(vacio.ids.ventasList), /Todavía no hay ventas hoy/);
 });
 
-test('el admin ve las últimas 100 ventas y elige el día del cierre', async () => {
-    const t = setupHistory({ perfil: ADMIN, ventas: [venta(1), venta(2, { fecha: haceDias(3) })] });
+test('muestra más de 100 ventas del día (antes se cortaba en 100)', async () => {
+    const ventas = Array.from({ length: 130 }, (_, i) => venta(i + 1));
+    const t = setupHistory({ ventas });
     await t.history.loadHistory();
-    assert.equal(filtro(historyQuery(t), 'gte'), undefined, 'sin límite de fecha');
-    assert.equal(t.ids.ventasList.children.length, 2);
-    assert.equal(t.ids.cierreFechaWrap.classList.contains('hidden'), false);
-    assert.match(t.ids.historySubtitle.textContent, /últimas 100 ventas/);
+    assert.equal(t.ids.ventasList.children.length, 130);
+    assert.match(t.ids.cierreResumen.innerHTML, /Ventas<\/span>\s*<strong class="cash-card-value">130</);
+    assert.equal(ventasQueries(t).length, 1, 'una sola consulta para tabla y cierre');
+});
 
-    t.ids.cierreFecha.value = utils().toDateInputValue(new Date(haceDias(3)));
-    await t.history.loadCierre();
-    assert.equal(filtro(cierreQueries(t).at(-1), 'gte'), inicioDelDia(new Date(haceDias(3))).toISOString());
+test('el admin empieza en hoy y puede ir a días anteriores y volver', async () => {
+    const t = setupHistory({ perfil: ADMIN, ventas: [venta(1), venta(2, { fecha: haceDias(1) }), venta(3, { fecha: haceDias(3) })] });
+    await t.history.loadHistory();
+    assert.equal(filtro(historyQuery(t), 'gte'), inicioDelDia().toISOString(), 'por defecto hoy');
+    assert.equal(t.ids.ventasList.children.length, 1);
+    assert.equal(t.ids.cierreFechaWrap.classList.contains('hidden'), false);
+    assert.equal(t.ids.nextDayBtn.disabled, true, 'no hay día siguiente a hoy');
+
+    await t.ids.prevDayBtn.click();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    assert.equal(t.ids.cierreFecha.value, diaDe(haceDias(1)));
+    assert.equal(filtro(historyQuery(t), 'gte'), inicioDelDia(new Date(haceDias(1))).toISOString());
+    assert.equal(t.ids.ventasList.children.length, 1);
+    assert.match(rendered(t.ids.ventasList), /data-id="2"/);
+    assert.equal(t.ids.nextDayBtn.disabled, false);
+    assert.doesNotMatch(t.ids.historyDayLabel.textContent, /^Hoy/);
+
+    t.ids.cierreFecha.value = diaDe(haceDias(3));
+    await t.ids.cierreFecha.dispatch('change');
+    await new Promise(resolve => setTimeout(resolve, 0));
+    assert.match(rendered(t.ids.ventasList), /data-id="3"/);
+
+    t.ids.cierreFecha.value = diaDe(haceDias(2));
+    await t.history.loadHistory();
+    assert.match(rendered(t.ids.ventasList), /No hubo ventas ese día/);
+
+    await t.ids.todayBtn.click();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    assert.equal(t.ids.cierreFecha.value, utils().toDateInputValue());
+    assert.match(rendered(t.ids.ventasList), /data-id="1"/);
+});
+
+test('una fecha futura vuelve a hoy', async () => {
+    const t = setupHistory({ perfil: ADMIN, ventas: [venta(1)] });
+    const manana = new Date(); manana.setDate(manana.getDate() + 1);
+    t.ids.cierreFecha.value = utils().toDateInputValue(manana);
+    await t.history.loadHistory();
+    assert.equal(t.ids.cierreFecha.value, utils().toDateInputValue());
 });
 
 test('el historial escapa los datos y muestra reembolsar según el rol', async () => {
@@ -93,8 +135,9 @@ test('el historial escapa los datos y muestra reembolsar según el rol', async (
     assert.deepEqual(refundButtons(cajero).map(row => row.innerHTML.match(/data-id="(\d+)"/)[1]), ['1']);
 
     const admin = setupHistory({ ventas, perfil: ADMIN });
+    admin.ids.cierreFecha.value = diaDe(haceDias(2));
     await admin.history.loadHistory();
-    assert.deepEqual(refundButtons(admin).map(row => row.innerHTML.match(/data-id="(\d+)"/)[1]).sort(), ['1', '2']);
+    assert.deepEqual(refundButtons(admin).map(row => row.innerHTML.match(/data-id="(\d+)"/)[1]), ['2'], 'el admin reembolsa ventas de días anteriores');
 });
 
 test('reembolsar pide motivo y usa reembolsar_venta', async () => {
@@ -151,5 +194,6 @@ test('el cierre de caja suma efectivo y Yape del día sin reembolsos', async () 
     assert.equal(html.includes('Margen'), false, 'el cierre no muestra márgenes');
     const query = cierreQueries(t)[0];
     assert.deepEqual(plain(query.filters.map(f => f.slice(0, 2))), [['eq', 'local'], ['gte', 'fecha'], ['lt', 'fecha']]);
+    assert.equal(t.ids.ventasList.children.length, 3, 'la tabla muestra las 3 ventas de hoy');
     assert.equal(query.columns.includes('costo_total'), false, 'no pide costos');
 });

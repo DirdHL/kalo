@@ -1,10 +1,10 @@
 import { supabase } from "./supabase.js";
 import { state } from "./state.js";
 import { customAlert, customConfirm, customPrompt, showToast } from "./ui.js";
-import { escapeHtml, formatMoney, describeError, fetchAll, resumirVentas, puedeReembolsar, resumenProductos, nombreCorto, dayRange, toDateInputValue, REEMBOLSO_CAJERO_MINUTOS } from "./utils.js";
+import { escapeHtml, formatMoney, describeError, fetchAll, resumirVentas, puedeReembolsar, resumenProductos, nombreCorto, dayRange, toDateInputValue, parseLocalDate, REEMBOLSO_CAJERO_MINUTOS } from "./utils.js";
 
-const LIMITE_HISTORIAL = 100;
-const COLUMNAS_HISTORIAL = 'id, fecha, local, total, descuento, metodo_pago, estado, detalles, creado_por_email, reembolsado_por_email, reembolsado_en, motivo_reembolso';
+// Una sola consulta por día: la tabla y el cierre de caja salen de las mismas ventas.
+const COLUMNAS_HISTORIAL = 'id, fecha, local, total, descuento, efectivo, yape, metodo_pago, estado, detalles, creado_por_email, reembolsado_por_email, reembolsado_en, motivo_reembolso';
 
 export function setupHistory({ onStockChanged } = {}) {
     const ventasList = document.getElementById('ventasList');
@@ -12,61 +12,86 @@ export function setupHistory({ onStockChanged } = {}) {
     const cierreFechaWrap = document.getElementById('cierreFechaWrap');
     const cierreResumen = document.getElementById('cierreResumen');
     const historySubtitle = document.getElementById('historySubtitle');
+    const historyDayLabel = document.getElementById('historyDayLabel');
+    const prevDayBtn = document.getElementById('prevDayBtn');
+    const nextDayBtn = document.getElementById('nextDayBtn');
+    const todayBtn = document.getElementById('todayBtn');
     const refreshHistoryBtn = document.getElementById('refreshHistoryBtn');
     let ventasCargadas = [];
     let refundInProgress = false;
+    let cargaActual = 0;
+
+    // Las vendedoras solo ven lo del día: su cierre de caja y las ventas de hoy.
+    // (La base de datos tampoco les entrega ventas de otros días.) El admin puede elegir el día.
+    const soloHoy = () => !state.perfil?.esAdmin;
+
+    function diaElegido() {
+        const hoy = toDateInputValue();
+        if (soloHoy()) return hoy;
+        const valor = cierreFecha?.value || '';
+        // No hay ventas en el futuro: un día posterior a hoy vuelve a hoy.
+        return parseLocalDate(valor) && valor <= hoy ? valor : hoy;
+    }
+
+    function moverDia(dias) {
+        const actual = parseLocalDate(diaElegido());
+        actual.setDate(actual.getDate() + dias);
+        if (cierreFecha) cierreFecha.value = toDateInputValue(actual);
+        loadHistory();
+    }
 
     if (cierreFecha) {
         cierreFecha.value = toDateInputValue();
-        cierreFecha.addEventListener('change', () => loadCierre());
+        cierreFecha.max = toDateInputValue();
+        cierreFecha.addEventListener('change', () => loadHistory());
+    }
+    prevDayBtn?.addEventListener('click', () => moverDia(-1));
+    nextDayBtn?.addEventListener('click', () => moverDia(1));
+    todayBtn?.addEventListener('click', () => {
+        if (cierreFecha) cierreFecha.value = toDateInputValue();
+        loadHistory();
+    });
+
+    function nombreDelDia(dia) {
+        const texto = parseLocalDate(dia).toLocaleDateString('es-PE', { weekday: 'long', day: 'numeric', month: 'long' });
+        return dia === toDateInputValue() ? `Hoy, ${texto}` : texto.charAt(0).toUpperCase() + texto.slice(1);
     }
 
-    // Las vendedoras solo ven lo del día: su cierre de caja y las ventas de hoy.
-    // (La base de datos tampoco les entrega ventas de otros días.) El admin ve todo.
-    const soloHoy = () => !state.perfil?.esAdmin;
-
-    function aplicarModo() {
+    function aplicarModo(dia) {
         const hoy = soloHoy();
+        const esHoy = dia === toDateInputValue();
         cierreFechaWrap?.classList.toggle('hidden', hoy);
-        if (hoy && cierreFecha) cierreFecha.value = toDateInputValue();
+        if (cierreFecha) {
+            cierreFecha.value = dia;
+            cierreFecha.max = toDateInputValue();
+        }
+        if (nextDayBtn) nextDayBtn.disabled = esHoy;
+        if (todayBtn) todayBtn.disabled = esHoy;
+        if (historyDayLabel) historyDayLabel.textContent = nombreDelDia(dia);
         if (historySubtitle) {
             historySubtitle.textContent = hoy
-                ? 'Cierre de caja y ventas de hoy'
-                : `Cierre de caja y últimas ${LIMITE_HISTORIAL} ventas del local`;
+                ? 'Cierre de caja y todas las ventas de hoy'
+                : 'Cierre de caja y todas las ventas del día elegido';
         }
     }
 
     // --- CIERRE DE CAJA ---
-    async function loadCierre() {
-        if (!cierreResumen || !state.currentLocal) return;
-        const dia = soloHoy() ? toDateInputValue() : (cierreFecha?.value || toDateInputValue());
-        const range = dayRange(dia);
-        if (!range) return;
-        cierreResumen.innerHTML = '<p class="muted">Calculando…</p>';
-        try {
-            const ventas = await fetchAll(() => supabase.from('ventas')
-                .select('id, total, descuento, efectivo, yape, metodo_pago, estado')
-                .eq('local', state.currentLocal)
-                .gte('fecha', range.start.toISOString())
-                .lt('fecha', range.end.toISOString())
-                .order('fecha').order('id'));
-            const r = resumirVentas(ventas);
-            const card = (titulo, valor, detalle = '') => `
-                <div class="cash-card">
-                    <span class="cash-card-title">${escapeHtml(titulo)}</span>
-                    <strong class="cash-card-value">${escapeHtml(valor)}</strong>
-                    ${detalle ? `<span class="cash-card-detail">${escapeHtml(detalle)}</span>` : ''}
-                </div>`;
-            cierreResumen.innerHTML = [
-                card('Ventas', String(r.cantidad), `${formatMoney(r.ventas)} cobrados`),
-                card('Efectivo en caja', formatMoney(r.efectivo), 'Debe coincidir con el conteo'),
-                card('Yape / Plin', formatMoney(r.yape)),
-                card('Descuentos', formatMoney(r.descuentos)),
-                card('Reembolsos', String(r.cantidadReembolsos), formatMoney(r.reembolsos))
-            ].join('');
-        } catch (error) {
-            cierreResumen.innerHTML = `<p class="table-message is-error">No se pudo calcular el cierre: ${escapeHtml(describeError(error))}</p>`;
-        }
+    function renderCierre(ventas) {
+        if (!cierreResumen) return;
+        const r = resumirVentas(ventas);
+        const card = (titulo, valor, detalle = '') => `
+            <div class="cash-card">
+                <span class="cash-card-title">${escapeHtml(titulo)}</span>
+                <strong class="cash-card-value">${escapeHtml(valor)}</strong>
+                ${detalle ? `<span class="cash-card-detail">${escapeHtml(detalle)}</span>` : ''}
+            </div>`;
+        cierreResumen.innerHTML = [
+            card('Ventas', String(r.cantidad), `${formatMoney(r.ventas)} cobrados`),
+            card('Efectivo en caja', formatMoney(r.efectivo), 'Debe coincidir con el conteo'),
+            card('Yape / Plin', formatMoney(r.yape)),
+            card('Descuentos', formatMoney(r.descuentos)),
+            card('Reembolsos', String(r.cantidadReembolsos), formatMoney(r.reembolsos))
+        ].join('');
     }
 
     // --- HISTORIAL ---
@@ -80,50 +105,62 @@ export function setupHistory({ onStockChanged } = {}) {
             + (detalle.length ? `<span class="refund-by">${escapeHtml(detalle.join(' · '))}</span>` : '');
     }
 
+    function renderVentas(dia) {
+        ventasList.innerHTML = '';
+        if (ventasCargadas.length === 0) {
+            const vacio = dia === toDateInputValue() ? 'Todavía no hay ventas hoy.' : 'No hubo ventas ese día.';
+            ventasList.innerHTML = `<tr><td colspan="8" class="table-message">${vacio}</td></tr>`;
+            return;
+        }
+        const now = Date.now();
+        for (const venta of ventasCargadas) {
+            const fecha = new Date(venta.fecha);
+            const productos = resumenProductos(venta.detalles);
+            const reembolsada = venta.estado === 'reembolsada';
+            const tachado = reembolsada ? ' is-struck' : '';
+            const accion = puedeReembolsar(venta, state.perfil, now)
+                ? `<button type="button" class="secondary-btn btn-refund" data-id="${escapeHtml(venta.id)}">Reembolsar</button>`
+                : '<span class="muted">—</span>';
+            const row = document.createElement('tr');
+            if (reembolsada) row.className = 'is-refunded-row';
+            row.innerHTML = `
+                <td class="date-cell"><strong>${escapeHtml(fecha.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }))}</strong></td>
+                <td class="nowrap">${escapeHtml(venta.metodo_pago || 'Efectivo')}</td>
+                <td class="products-cell">${escapeHtml(productos)}</td>
+                <td class="money-cell${tachado}"><strong>${escapeHtml(formatMoney(venta.total))}</strong></td>
+                <td class="money-cell discount-cell${tachado}">${escapeHtml(formatMoney(venta.descuento))}</td>
+                <td>${escapeHtml(nombreCorto(venta.creado_por_email) || '—')}</td>
+                <td>${estadoHtml(venta)}</td>
+                <td>${accion}</td>
+            `;
+            ventasList.appendChild(row);
+        }
+    }
+
     async function loadHistory() {
         if (!ventasList || !state.currentLocal) return;
+        const dia = diaElegido();
+        const range = dayRange(dia);
+        const carga = ++cargaActual;
+        aplicarModo(dia);
         ventasList.innerHTML = '<tr><td colspan="8" class="table-message">Cargando...</td></tr>';
-        aplicarModo();
-        loadCierre();
+        if (cierreResumen) cierreResumen.innerHTML = '<p class="muted">Calculando…</p>';
         try {
-            let query = supabase.from('ventas').select(COLUMNAS_HISTORIAL).eq('local', state.currentLocal);
-            if (soloHoy()) query = query.gte('fecha', dayRange(toDateInputValue()).start.toISOString());
-            const { data, error } = await query
-                .order('fecha', { ascending: false }).order('id', { ascending: false })
-                .limit(LIMITE_HISTORIAL);
-            if (error) throw error;
-            ventasCargadas = data || [];
-            ventasList.innerHTML = '';
-            if (ventasCargadas.length === 0) {
-                const vacio = soloHoy() ? 'Todavía no hay ventas hoy.' : 'No hay ventas registradas.';
-                ventasList.innerHTML = `<tr><td colspan="8" class="table-message">${vacio}</td></tr>`;
-                return;
-            }
-            const now = Date.now();
-            for (const venta of ventasCargadas) {
-                const fecha = new Date(venta.fecha);
-                const productos = resumenProductos(venta.detalles);
-                const reembolsada = venta.estado === 'reembolsada';
-                const tachado = reembolsada ? ' is-struck' : '';
-                const accion = puedeReembolsar(venta, state.perfil, now)
-                    ? `<button type="button" class="secondary-btn btn-refund" data-id="${escapeHtml(venta.id)}">Reembolsar</button>`
-                    : '<span class="muted">—</span>';
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td class="date-cell">${escapeHtml(fecha.toLocaleDateString('es-PE'))}<small>${escapeHtml(fecha.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }))}</small></td>
-                    <td class="nowrap">${escapeHtml(venta.metodo_pago || 'Efectivo')}</td>
-                    <td><div class="products-cell" title="${escapeHtml(productos)}">${escapeHtml(productos)}</div></td>
-                    <td class="money-cell${tachado}"><strong>${escapeHtml(formatMoney(venta.total))}</strong></td>
-                    <td class="money-cell discount-cell${tachado}">${escapeHtml(formatMoney(venta.descuento))}</td>
-                    <td>${escapeHtml(nombreCorto(venta.creado_por_email) || '—')}</td>
-                    <td>${estadoHtml(venta)}</td>
-                    <td>${accion}</td>
-                `;
-                ventasList.appendChild(row);
-            }
+            const ventas = await fetchAll(() => supabase.from('ventas').select(COLUMNAS_HISTORIAL)
+                .eq('local', state.currentLocal)
+                .gte('fecha', range.start.toISOString())
+                .lt('fecha', range.end.toISOString())
+                .order('fecha', { ascending: false }).order('id', { ascending: false }));
+            if (carga !== cargaActual) return; // ya se pidió otro día
+            ventasCargadas = ventas;
+            renderCierre(ventas);
+            renderVentas(dia);
         } catch (error) {
+            if (carga !== cargaActual) return;
             console.error(error);
-            ventasList.innerHTML = `<tr><td colspan="8" class="table-message is-error">No se pudo cargar el historial: ${escapeHtml(describeError(error))}</td></tr>`;
+            const mensaje = escapeHtml(describeError(error));
+            ventasList.innerHTML = `<tr><td colspan="8" class="table-message is-error">No se pudo cargar el historial: ${mensaje}</td></tr>`;
+            if (cierreResumen) cierreResumen.innerHTML = `<p class="table-message is-error">No se pudo calcular el cierre: ${mensaje}</p>`;
         }
     }
 
@@ -170,5 +207,5 @@ export function setupHistory({ onStockChanged } = {}) {
         }
     }
 
-    return { loadHistory, loadCierre, refundSale };
+    return { loadHistory, loadCierre: loadHistory, refundSale };
 }

@@ -356,24 +356,33 @@
                 <div class="dashboard-header">
                     <div>
                         <h1>Historial de ventas 🧾</h1>
-                        <p class="muted" id="historySubtitle">Cierre de caja y últimas 100 ventas del local</p>
+                        <p class="muted" id="historySubtitle">Cierre de caja y todas las ventas de hoy</p>
                     </div>
                     <button type="button" id="refreshHistoryBtn" class="secondary-btn refresh-btn"><svg class="icon" aria-hidden="true"><use href="#icon-refresh"></use></svg> Actualizar</button>
+                </div>
+
+                <div class="history-daybar">
+                    <h2 id="historyDayLabel" class="history-day">Hoy</h2>
+                    <div class="history-day-controls hidden" id="cierreFechaWrap">
+                        <button type="button" id="prevDayBtn" class="secondary-btn">◀ Día anterior</button>
+                        <input type="date" id="cierreFecha" class="styled-input" aria-label="Elegir día">
+                        <button type="button" id="nextDayBtn" class="secondary-btn">Día siguiente ▶</button>
+                        <button type="button" id="todayBtn" class="secondary-btn">Hoy</button>
+                    </div>
                 </div>
 
                 <section class="cash-close" aria-labelledby="cierreTitle">
                     <div class="cash-close-heading">
                         <h2 id="cierreTitle" class="section-title">Cierre de caja</h2>
-                        <label class="cash-close-date" id="cierreFechaWrap">Día <input type="date" id="cierreFecha" class="styled-input"></label>
                     </div>
                     <div class="cash-grid" id="cierreResumen"></div>
                 </section>
 
-                <div class="table-container">
+                <div class="table-container history-table-container">
                     <table class="data-table history-table">
                         <thead>
                             <tr>
-                                <th>Fecha</th>
+                                <th>Hora</th>
                                 <th>Método</th>
                                 <th>Productos</th>
                                 <th>Total pagado</th>
