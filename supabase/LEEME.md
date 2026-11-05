@@ -2,7 +2,7 @@
 
 Esta carpeta guarda la seguridad de Kalo **dentro de la base de datos**. La app (lo que corre en el navegador) puede ser leída y modificada por cualquiera, así que las reglas importantes viven aquí:
 
-- Cada cajero ve y modifica **solo su local**; el admin, todos. De las ventas, la vendedora solo ve **las de hoy** (su cierre de caja del día). Estadísticas (mes, margen, más vendidos y Excel) es solo para admins.
+- Cada cajero ve y modifica **solo su local**; el admin, todos. De las ventas, la vendedora solo ve **las de hoy** una por una; de días anteriores solo ve el **cierre de caja** (totales) de su local. Estadísticas (mes, margen, más vendidos y Excel) es solo para admins.
 - Nadie sin sesión puede leer ni tocar productos o ventas.
 - Las ventas y reembolsos se hacen con funciones que validan todo y se ejecutan completas o no se ejecutan: `registrar_venta`, `reembolsar_venta` y `crear_combo`.
 - Reembolsos: el admin siempre; el cajero solo de su local y hasta 15 minutos después de cobrar. Queda quién, cuándo y por qué.
@@ -13,6 +13,7 @@ Esta carpeta guarda la seguridad de Kalo **dentro de la base de datos**. La app 
 | `02_fase_b_cierre.sql` | Cierra la escritura directa de ventas (solo por las funciones) | Después de publicar la app nueva |
 | `03_fase_c_2fa_admins.sql` | Exige verificación en dos pasos a los admins | Cuando ambos admins la activaron |
 | `04_imagenes_storage.sql` | Crea el bucket de Storage `imagenes` para que las vendedoras suban y borren fotos de productos desde Inventario | Antes de publicar la versión con "Subir imagen" |
+| `05_cierres_anteriores.sql` | Función `cierre_de_caja`: la vendedora ve el cierre (solo totales) de días anteriores de su local | Antes de publicar la versión con cierres anteriores |
 | `usuarios.sql` | Ver, agregar o quitar cuentas | Cuando cambie el personal |
 | `diagnostico.sql` | Muestra estructura, políticas y cuentas (solo lectura) | Si algo falla |
 

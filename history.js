@@ -21,13 +21,13 @@ export function setupHistory({ onStockChanged } = {}) {
     let refundInProgress = false;
     let cargaActual = 0;
 
-    // Las vendedoras solo ven lo del día: su cierre de caja y las ventas de hoy.
-    // (La base de datos tampoco les entrega ventas de otros días.) El admin puede elegir el día.
+    // Las vendedoras ven las ventas una por una solo de hoy (la base de datos tampoco les
+    // entrega otras), pero pueden ver el cierre de caja de días anteriores de su local
+    // (función cierre_de_caja: solo totales). El admin ve todo de cualquier día.
     const soloHoy = () => !state.perfil?.esAdmin;
 
     function diaElegido() {
         const hoy = toDateInputValue();
-        if (soloHoy()) return hoy;
         const valor = cierreFecha?.value || '';
         // No hay ventas en el futuro: un día posterior a hoy vuelve a hoy.
         return parseLocalDate(valor) && valor <= hoy ? valor : hoy;
@@ -60,7 +60,7 @@ export function setupHistory({ onStockChanged } = {}) {
     function aplicarModo(dia) {
         const hoy = soloHoy();
         const esHoy = dia === toDateInputValue();
-        cierreFechaWrap?.classList.toggle('hidden', hoy);
+        cierreFechaWrap?.classList.remove('hidden');
         if (cierreFecha) {
             cierreFecha.value = dia;
             cierreFecha.max = toDateInputValue();
@@ -70,15 +70,15 @@ export function setupHistory({ onStockChanged } = {}) {
         if (historyDayLabel) historyDayLabel.textContent = nombreDelDia(dia);
         if (historySubtitle) {
             historySubtitle.textContent = hoy
-                ? 'Cierre de caja y todas las ventas de hoy'
+                ? 'Cierre de caja de cualquier día y ventas de hoy'
                 : 'Cierre de caja y todas las ventas del día elegido';
         }
     }
 
     // --- CIERRE DE CAJA ---
-    function renderCierre(ventas) {
+    // r: resumen de resumirVentas, o el que devuelve cierre_de_caja en Supabase
+    function renderCierre(r) {
         if (!cierreResumen) return;
-        const r = resumirVentas(ventas);
         const card = (titulo, valor, detalle = '') => `
             <div class="cash-card">
                 <span class="cash-card-title">${escapeHtml(titulo)}</span>
@@ -146,6 +146,10 @@ export function setupHistory({ onStockChanged } = {}) {
         ventasList.innerHTML = '<tr><td colspan="8" class="table-message">Cargando...</td></tr>';
         if (cierreResumen) cierreResumen.innerHTML = '<p class="muted">Calculando…</p>';
         try {
+            if (soloHoy() && dia !== toDateInputValue()) {
+                await cargarCierreAnterior(dia, carga);
+                return;
+            }
             const ventas = await fetchAll(() => supabase.from('ventas').select(COLUMNAS_HISTORIAL)
                 .eq('local', state.currentLocal)
                 .gte('fecha', range.start.toISOString())
@@ -153,7 +157,7 @@ export function setupHistory({ onStockChanged } = {}) {
                 .order('fecha', { ascending: false }).order('id', { ascending: false }));
             if (carga !== cargaActual) return; // ya se pidió otro día
             ventasCargadas = ventas;
-            renderCierre(ventas);
+            renderCierre(resumirVentas(ventas));
             renderVentas(dia);
         } catch (error) {
             if (carga !== cargaActual) return;
@@ -162,6 +166,25 @@ export function setupHistory({ onStockChanged } = {}) {
             ventasList.innerHTML = `<tr><td colspan="8" class="table-message is-error">No se pudo cargar el historial: ${mensaje}</td></tr>`;
             if (cierreResumen) cierreResumen.innerHTML = `<p class="table-message is-error">No se pudo calcular el cierre: ${mensaje}</p>`;
         }
+    }
+
+    // Vendedora en un día anterior: solo el cierre (totales); el detalle de ventas es del día.
+    async function cargarCierreAnterior(dia, carga) {
+        ventasCargadas = [];
+        const { data, error } = await supabase.rpc('cierre_de_caja', { p_local: state.currentLocal, p_dia: dia });
+        if (carga !== cargaActual) return;
+        if (error) throw error;
+        const r = data || {};
+        renderCierre({
+            cantidad: Number(r.cantidad) || 0,
+            ventas: Number(r.ventas) || 0,
+            efectivo: Number(r.efectivo) || 0,
+            yape: Number(r.yape) || 0,
+            descuentos: Number(r.descuentos) || 0,
+            cantidadReembolsos: Number(r.cantidad_reembolsos) || 0,
+            reembolsos: Number(r.reembolsos) || 0
+        });
+        ventasList.innerHTML = '<tr><td colspan="8" class="table-message">El detalle de cada venta se ve solo el mismo día. Arriba tienes el cierre de caja de ese día.</td></tr>';
     }
 
     refreshHistoryBtn?.addEventListener('click', () => loadHistory());

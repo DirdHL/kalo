@@ -48,24 +48,51 @@ const cierreQueries = ventasQueries;
 const diaDe = iso => utils().toDateInputValue(new Date(iso));
 const filtro = (call, op) => call.filters.find(([o, key]) => o === op && key === 'fecha')?.[2];
 
-test('la vendedora ve todas las ventas de hoy y no puede elegir otro día', async () => {
+test('la vendedora entra en hoy y ve todas las ventas del día', async () => {
     const t = setupHistory({ ventas: [venta(1), venta(2, { fecha: haceDias(1) }), venta(3, { fecha: haceDias(5) })] });
     await t.history.loadHistory();
     const q = historyQuery(t);
     assert.equal(filtro(q, 'gte'), inicioDelDia().toISOString(), 'pide solo ventas desde hoy');
     assert.equal(q.limit, null, 'sin tope de 100: todas las de hoy');
     assert.equal(t.ids.ventasList.children.length, 1);
-    assert.equal(t.ids.cierreFechaWrap.classList.contains('hidden'), true, 'sin selector de día');
-    assert.equal(t.ids.historySubtitle.textContent, 'Cierre de caja y todas las ventas de hoy');
+    assert.equal(t.ids.cierreFechaWrap.classList.contains('hidden'), false, 'puede moverse de día');
+    assert.equal(t.ids.historySubtitle.textContent, 'Cierre de caja de cualquier día y ventas de hoy');
     assert.match(t.ids.historyDayLabel.textContent, /^Hoy, /);
-
-    t.ids.cierreFecha.value = diaDe(haceDias(1));
-    await t.history.loadHistory();
-    assert.equal(filtro(historyQuery(t), 'gte'), inicioDelDia().toISOString(), 'aunque cambie la fecha, sigue siendo hoy');
+    assert.equal(t.supabase.rpcCalls.length, 0, 'hoy no usa la función de cierres');
 
     const vacio = setupHistory({ ventas: [venta(9, { fecha: haceDias(2) })] });
     await vacio.history.loadHistory();
     assert.match(rendered(vacio.ids.ventasList), /Todavía no hay ventas hoy/);
+});
+
+test('la vendedora ve el cierre de un día anterior (solo totales, sin el detalle de ventas)', async () => {
+    const cierre = { cantidad: 7, ventas: 85.5, efectivo: 60.5, yape: 25, descuentos: 2, cantidad_reembolsos: 1, reembolsos: 4 };
+    const t = setupHistory({ ventas: [venta(1), venta(2, { fecha: haceDias(1) })], rpc: { cierre_de_caja: () => cierre } });
+    await t.history.loadHistory();
+    const consultasHoy = ventasQueries(t).length;
+
+    await t.ids.prevDayBtn.click();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    assert.deepEqual(plain(t.supabase.rpcCalls), [{ name: 'cierre_de_caja', params: { p_local: 'LAS BRISAS', p_dia: diaDe(haceDias(1)) } }]);
+    assert.equal(ventasQueries(t).length, consultasHoy, 'no pide la lista de ventas de ese día');
+    const html = t.ids.cierreResumen.innerHTML;
+    assert.match(html, /Ventas<\/span>\s*<strong class="cash-card-value">7<\/strong>\s*<span class="cash-card-detail">S\/ 85\.50 cobrados/);
+    assert.match(html, /Efectivo en caja<\/span>\s*<strong class="cash-card-value">S\/ 60\.50/);
+    assert.match(html, /Yape \/ Plin<\/span>\s*<strong class="cash-card-value">S\/ 25\.00/);
+    assert.match(html, /Reembolsos<\/span>\s*<strong class="cash-card-value">1<\/strong>/);
+    assert.match(rendered(t.ids.ventasList), /se ve solo el mismo día/);
+    assert.equal(refundButtons(t).length, 0);
+
+    await t.ids.todayBtn.click();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    assert.match(rendered(t.ids.ventasList), /data-id="1"/, 'al volver a hoy ve las ventas otra vez');
+});
+
+test('si la base todavía no tiene cierre_de_caja, la vendedora ve un aviso entendible', async () => {
+    const t = setupHistory({ ventas: [venta(1)] });
+    t.ids.cierreFecha.value = diaDe(haceDias(1));
+    await t.history.loadHistory();
+    assert.match(t.ids.cierreResumen.innerHTML, /todavía no tiene la actualización/);
 });
 
 test('muestra más de 100 ventas del día (antes se cortaba en 100)', async () => {
@@ -196,4 +223,13 @@ test('el cierre de caja suma efectivo y Yape del día sin reembolsos', async () 
     assert.deepEqual(plain(query.filters.map(f => f.slice(0, 2))), [['eq', 'local'], ['gte', 'fecha'], ['lt', 'fecha']]);
     assert.equal(t.ids.ventasList.children.length, 3, 'la tabla muestra las 3 ventas de hoy');
     assert.equal(query.columns.includes('costo_total'), false, 'no pide costos');
+});
+
+test('el SQL de cierres anteriores solo da totales de un día y no abre la tabla ventas', () => {
+    const sql = require('./helpers.cjs').read('supabase/05_cierres_anteriores.sql');
+    assert.match(sql, /create or replace function public\.cierre_de_caja\(p_local text, p_dia date\)/);
+    assert.match(sql, /security definer set search_path = ''/);
+    assert.match(sql, /not public\.kalo_puede_operar\(p_local\)/);
+    assert.match(sql, /revoke all on function public\.cierre_de_caja\(text, date\) from public, anon;/);
+    assert.doesNotMatch(sql, /create policy|alter policy|grant select/i, 'no cambia los permisos de la tabla ventas');
 });
