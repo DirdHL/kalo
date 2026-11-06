@@ -24,7 +24,7 @@
   },
   "homepage": "https://github.com/DirdHL/kalo#readme",
   "dependencies": {
-    "@supabase/supabase-js": "^2.117.2",
+    "@supabase/supabase-js": "^2.118.0",
     "chart.js": "4.6.1",
     "exceljs": "4.4.0"
   },
