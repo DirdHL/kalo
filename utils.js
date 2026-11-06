@@ -193,3 +193,16 @@ export function nombreCorto(email) {
     const text = String(email ?? '');
     return text.includes('@') ? text.slice(0, text.indexOf('@')) : text;
 }
+
+// Descarga un Excel generado en el navegador (no sale a ningún servidor).
+const TIPO_XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+export function descargarArchivo(contenido, nombre, tipo = TIPO_XLSX) {
+    const url = URL.createObjectURL(new Blob([contenido], { type: tipo }));
+    const enlace = document.createElement('a');
+    enlace.href = url;
+    enlace.download = nombre;
+    document.body.appendChild(enlace);
+    enlace.click();
+    enlace.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+}

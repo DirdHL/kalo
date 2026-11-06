@@ -384,7 +384,7 @@ export function nombreArchivoReporte(m) {
 // ---------------------------------------------------------------------------
 // Libro de Excel (ExcelJS)
 // ---------------------------------------------------------------------------
-const COLOR = {
+export const COLOR = {
     verde: 'FF233E3A', teal: 'FF06615B', tealClaro: 'FFD8E8E4', ambar: 'FFF2B65F', ambarClaro: 'FFFDF1DC',
     crema: 'FFF9F4E9', cebra: 'FFF4F7F3', gris: 'FF5B6B64', grisClaro: 'FF9AA59F', borde: 'FFC9D3C9',
     rojo: 'FFB42318', rojoClaro: 'FFFDECEC', verdeOk: 'FF087F66', verdeOkClaro: 'FFE6F4EF', blanco: 'FFFFFFFF', texto: 'FF182C29'

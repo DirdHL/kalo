@@ -3,7 +3,7 @@ import { state } from "./state.js";
 import { customAlert } from "./ui.js";
 import { localPorId } from "./constants.js";
 import { NOMBRES_MESES, rangoPeriodo, calcularReporte, construirExcel, graficosReporte, nombreArchivoReporte } from "./reporte.js";
-import { escapeHtml, formatMoney, describeError, fetchAll, resumirVentas, ventasPorDia, monthRange, toMonthInputValue, toDateInputValue, roundMoney } from "./utils.js";
+import { escapeHtml, formatMoney, describeError, fetchAll, resumirVentas, ventasPorDia, monthRange, toMonthInputValue, toDateInputValue, roundMoney, descargarArchivo } from "./utils.js";
 
 const TOP_PRODUCTOS = 10;
 const MES_VALIDO = /^\d{4}-(0[1-9]|1[0-2])$/;
@@ -19,19 +19,6 @@ const COLOR_TEXTO = '#455b52';
 // Las librerías pesadas se cargan solo al abrir Estadísticas o al exportar.
 const cargarChart = () => import('chart.js/auto');
 const cargarExcel = () => import('exceljs');
-
-const TIPO_XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-
-function descargarArchivo(contenido, nombre) {
-    const url = URL.createObjectURL(new Blob([contenido], { type: TIPO_XLSX }));
-    const enlace = document.createElement('a');
-    enlace.href = url;
-    enlace.download = nombre;
-    document.body.appendChild(enlace);
-    enlace.click();
-    enlace.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 5000);
-}
 
 export function setupStats({ loadChart = cargarChart, loadExcel = cargarExcel, descargar = descargarArchivo, ahora = () => new Date() } = {}) {
     const statsView = document.getElementById('statsView');

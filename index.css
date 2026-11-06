@@ -343,6 +343,7 @@ body:has(.modal-overlay:not(.hidden)) { overflow: hidden; }
 .header-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .header-tools .primary-btn { width: auto; padding: 10px 18px; }
 .header-tools #invSearch { width: 280px; }
+.header-tools .export-btn { flex: 0 0 auto; min-height: 44px; }
 .combo-create-btn { background: #e8f3f8; color: #246b87; }
 .combo-create-btn:hover { background: #d6eaf2; }
 #invCategoryFilters { margin-bottom: 10px; }
@@ -534,7 +535,7 @@ body:has(.modal-overlay:not(.hidden)) { overflow: hidden; }
     .local-action { margin-top: 4px; padding: 0; border: 0; }
     .form-grid > .span-2 { grid-column: 1 / -1; }
     .header-tools #invSearch { width: 100%; }
-    .header-tools .primary-btn { flex: 1 1 auto; }
+    .header-tools .primary-btn, .header-tools .export-btn { flex: 1 1 auto; }
     .mfa-btn { padding: 8px 10px; font-size: 14px; }
     .chart-card { padding: 12px; }
     .chart-box { height: 260px; }

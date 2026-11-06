@@ -3,7 +3,11 @@ import { state } from "./state.js";
 import { AVAILABLE_IMAGES, resolveImage, CATEGORIA_COMBOS, PREFIJO_NUBE, urlImagenNube, etiquetaImagen } from "./constants.js";
 import { listarImagenesNube, subirImagenNube, borrarImagenNube, nombreArchivoImagen } from "./imagenes.js";
 import { customAlert, customConfirm } from "./ui.js";
-import { escapeHtml, formatMoney, describeError, fetchAll, estadoVencimiento, parseLocalDate } from "./utils.js";
+import { escapeHtml, formatMoney, describeError, fetchAll, estadoVencimiento, parseLocalDate, descargarArchivo } from "./utils.js";
+import { filasInventario, construirExcelInventario, nombreArchivoInventario } from "./inventario-excel.js";
+
+// ExcelJS es pesado: se carga solo al descargar.
+const cargarExcel = () => import('exceljs');
 
 let editingProductId = null;
 let selectedImageName = '';
@@ -12,7 +16,7 @@ let comboSelectedImage = '';
 
 const COLOR_VENCIMIENTO = { vencido: '#b42318', 'por-vencer': '#9a5908' };
 
-export function setupInventory({ onProductsLoaded } = {}) {
+export function setupInventory({ onProductsLoaded, loadExcel = cargarExcel, descargar = descargarArchivo, ahora = () => new Date() } = {}) {
     // Modal de producto
     const productModal = document.getElementById('productModal');
     const productModalTitle = document.getElementById('productModalTitle');
@@ -72,6 +76,7 @@ export function setupInventory({ onProductsLoaded } = {}) {
     const prevPageBtn = document.getElementById('prevPageBtn');
     const nextPageBtn = document.getElementById('nextPageBtn');
     const paginationInfo = document.getElementById('paginationInfo');
+    const exportInvBtn = document.getElementById('exportInvBtn');
 
     const isCombo = product => state.combos.has(String(product?.id));
     const productById = id => state.globalProducts.find(p => String(p.id) === String(id));
@@ -597,9 +602,10 @@ export function setupInventory({ onProductsLoaded } = {}) {
     saveComboBtn?.addEventListener('click', guardarCombo);
 
     // --- CARGA DE PRODUCTOS ---
+    // Devuelve true si quedaron cargados los productos del local actual.
     async function loadProducts() {
         const local = state.currentLocal;
-        if (!local) return;
+        if (!local) return false;
         try {
             const [rows, comboRows] = await Promise.all([
                 fetchAll(() => supabase.from('productos').select('*')
@@ -607,7 +613,7 @@ export function setupInventory({ onProductsLoaded } = {}) {
                 fetchAll(() => supabase.from('combo_items').select('combo_id, producto_id, cantidad')
                     .order('combo_id').order('producto_id'))
             ]);
-            if (local !== state.currentLocal) return; // se cambió de local mientras cargaba
+            if (local !== state.currentLocal) return false; // se cambió de local mientras cargaba
 
             const products = rows.map(p => ({ ...p, nombre: p.nombre ? p.nombre.replace(/_/g, ' ') : p.nombre }));
             const ids = new Set(products.map(p => String(p.id)));
@@ -624,12 +630,60 @@ export function setupInventory({ onProductsLoaded } = {}) {
             filterInventoryProducts();
             checkAlerts();
             if (typeof onProductsLoaded === 'function') onProductsLoaded(products);
+            return true;
         } catch (error) {
             if (productList) {
                 productList.innerHTML = `<tr><td colspan="8" class="table-message is-error">Error al cargar: ${escapeHtml(describeError(error))}</td></tr>`;
             }
+            return false;
         }
     }
+
+    // --- EXCEL DEL INVENTARIO (solo producto y cantidad, del local actual) ---
+    let exportando = false;
+    const exportLabel = exportInvBtn?.querySelector?.('.export-label');
+
+    async function descargarInventario() {
+        const local = state.currentLocal;
+        if (exportando || !local) return;
+        exportando = true;
+        if (exportInvBtn) exportInvBtn.disabled = true;
+        if (exportLabel) exportLabel.textContent = 'Preparando…';
+        try {
+            // Se vuelve a leer para que la cantidad sea la de este momento.
+            if (!await loadProducts()) {
+                await customAlert('No se pudo leer el inventario. Revisa el internet e inténtalo otra vez.', 'Sin conexión', '⚠️');
+                return;
+            }
+            const filas = filasInventario(state.globalProducts, isCombo);
+            if (filas.length === 0) {
+                await customAlert('Este local todavía no tiene productos registrados.', 'Sin productos', 'ℹ️');
+                return;
+            }
+            let ExcelJS;
+            try {
+                const modulo = await loadExcel();
+                ExcelJS = modulo.default || modulo;
+            } catch (error) {
+                console.error('Error al cargar ExcelJS:', error);
+                await customAlert('No se pudo preparar el Excel. Revisa el internet e inténtalo otra vez.', 'Error', '⚠️');
+                return;
+            }
+            const momento = ahora();
+            const libro = construirExcelInventario(ExcelJS, { local, filas, ahora: momento });
+            const contenido = await libro.xlsx.writeBuffer();
+            await descargar(contenido, nombreArchivoInventario(local, momento));
+        } catch (error) {
+            console.error('Error al descargar el inventario:', error);
+            await customAlert('No se pudo generar el Excel: ' + describeError(error), 'Error', '⚠️');
+        } finally {
+            exportando = false;
+            if (exportInvBtn) exportInvBtn.disabled = false;
+            if (exportLabel) exportLabel.textContent = 'Descargar Excel';
+        }
+    }
+
+    exportInvBtn?.addEventListener('click', descargarInventario);
 
     function clear() {
         if (productList) productList.innerHTML = '';
@@ -837,6 +891,7 @@ export function setupInventory({ onProductsLoaded } = {}) {
         renderInventoryTable,
         checkAlerts,
         abrirModalEdicion,
+        descargarInventario,
         clear
     };
 }

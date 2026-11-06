@@ -1,6 +1,11 @@
+process.env.TZ = 'America/Lima';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { loadModule, utils, element, rendered, fakeDocument, elements, fakeSupabase, plain } = require('./helpers.cjs');
+const ExcelJS = require('exceljs');
+const { loadModule, utils, constants, element, rendered, fakeDocument, elements, fakeSupabase, plain } = require('./helpers.cjs');
+
+const { exports: reporte } = loadModule('reporte.js', { ...utils(), ...constants(), Date });
+const { exports: inventarioExcel } = loadModule('inventario-excel.js', { ...utils(), ...constants(), COLOR: reporte.COLOR, Date });
 
 const INV_IDS = ['productModal', 'productModalTitle', 'openModalBtn', 'closeModalBtn', 'productStatusMsg', 'addProductBtn',
     'comboEditNote', 'productCode', 'productName', 'categoria', 'previewImg', 'precioCompra', 'precioVenta', 'ganancia',
@@ -9,16 +14,16 @@ const INV_IDS = ['productModal', 'productModalTitle', 'openModalBtn', 'closeModa
     'comboPreviewImg', 'openComboImagePickerBtn', 'comboProductList', 'saveComboBtn', 'comboStatusMsg', 'lotesList',
     'loteQtyInput', 'loteExpInput', 'addLoteBtn', 'productList', 'invSearch', 'prevPageBtn', 'nextPageBtn',
     'paginationInfo', 'alertsBadge', 'alertsList', 'comboRealSalePrice', 'comboRealCost', 'comboNetProfit',
-    'imageUploadFile', 'imageUploadName', 'imageUploadPreview', 'imageUploadBtn', 'imageUploadMsg'];
+    'imageUploadFile', 'imageUploadName', 'imageUploadPreview', 'imageUploadBtn', 'imageUploadMsg', 'exportInvBtn'];
 const XSS = '<img src=x onerror=alert(1)>';
 
 const row = (id, overrides = {}) => ({ id, nombre: `Producto ${id}`, categoria: 'Bebidas', codigo: null, precio_compra: 1, precio_venta: 2, stock: 5, alerta_stock: null, lotes: null, local: 'LAS BRISAS', activo: true, ...overrides });
 
-function setupInventory({ products = [], comboItems = [], confirm = () => true, rpc = {}, nube = {} } = {}) {
+function setupInventory({ products = [], comboItems = [], confirm = () => true, rpc = {}, nube = {}, fail = {}, opciones = {} } = {}) {
     const ids = elements(INV_IDS);
     ids.productName.value = 'Agua';
     ids.categoria.value = 'Bebidas';
-    const supabase = fakeSupabase({ tables: { productos: products, combo_items: comboItems }, rpc });
+    const supabase = fakeSupabase({ tables: { productos: products, combo_items: comboItems }, rpc, fail });
     const state = { globalProducts: [], combos: new Map(), invFilteredProducts: [], invCurrentPage: 1, invItemsPerPage: 999999, currentLocal: 'LAS BRISAS' };
     const alerts = [];
     const loaded = [];
@@ -35,9 +40,10 @@ function setupInventory({ products = [], comboItems = [], confirm = () => true, 
         listarImagenesNube: async () => [], subirImagenNube: async () => { throw new Error('sin stub'); },
         borrarImagenNube: async () => {},
         ...nube,
+        ...inventarioExcel,
         ...utils()
     });
-    const inv = exports.setupInventory({ onProductsLoaded: products => loaded.push(products) });
+    const inv = exports.setupInventory({ onProductsLoaded: products => loaded.push(products), ...opciones });
     return { ids, state, supabase, inv, alerts, loaded, document, save: () => ids.addProductBtn.click(), saveCombo: () => ids.saveComboBtn.click() };
 }
 
@@ -248,4 +254,47 @@ test('si no cargan las imágenes subidas, avisa y deja usar las de la app', asyn
     await flush();
     assert.match(rendered(t.ids.imageGrid), /No se pudieron cargar/);
     assert.equal(gridCells(t).length, 1);
+});
+
+test('descargar Excel: solo producto y cantidad del local, con el stock recién leído', async () => {
+    const archivos = [];
+    const t = setupInventory({
+        products: [row(1, { nombre: 'Agua_Cielo', stock: 3 }), row(2, { nombre: 'Chicle', stock: 0 }), row(3, { nombre: 'Galleta', local: 'LOS PINOS' }),
+            row(4, { nombre: 'Borrado', activo: false }), row(9, { nombre: 'Combo Lonchera', categoria: 'Combos', stock: null })],
+        comboItems: [{ combo_id: 9, producto_id: 1, cantidad: 2 }],
+        opciones: { loadExcel: async () => ExcelJS, descargar: async (contenido, nombre) => { archivos.push({ contenido, nombre }); }, ahora: () => new Date(2026, 10, 6, 15, 30) }
+    });
+    await t.inv.loadProducts();
+    t.supabase.db.productos[0].stock = 7; // se vendió/recibió algo después de abrir el inventario
+    await t.ids.exportInvBtn.click();
+
+    assert.equal(t.alerts.length, 0, t.alerts.join(' | '));
+    assert.equal(archivos.length, 1);
+    assert.equal(archivos[0].nombre, 'Kalo_Inventario_Las-Brisas_2026-11-06.xlsx');
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(archivos[0].contenido);
+    const ws = wb.getWorksheet('Inventario');
+    assert.equal(ws.getCell('A1').value, 'Inventario · Las Brisas');
+    const filas = [];
+    for (let r = 5; r <= ws.rowCount; r++) filas.push([ws.getCell(r, 1).value, ws.getCell(r, 2).value]);
+    assert.deepEqual(filas, [['Agua Cielo', 7], ['Chicle', 0]], 'sin combos, sin otros locales, sin productos borrados');
+    assert.equal(t.ids.exportInvBtn.disabled, false);
+});
+
+test('descargar Excel avisa si no se pudo leer el inventario o si no hay productos', async () => {
+    const descargas = [];
+    const opciones = { loadExcel: async () => ExcelJS, descargar: async () => { descargas.push(1); } };
+    const sinRed = setupInventory({ products: [row(1)], fail: { productos: () => ({ data: null, error: { message: 'Failed to fetch' } }) }, opciones });
+    await sinRed.inv.descargarInventario();
+    assert.match(sinRed.alerts[0], /No se pudo leer el inventario/);
+
+    const vacio = setupInventory({ products: [row(9, { categoria: 'Combos', stock: null })], opciones });
+    await vacio.inv.descargarInventario();
+    assert.match(vacio.alerts[0], /no tiene productos/);
+
+    const sinExcel = setupInventory({ products: [row(1)], opciones: { ...opciones, loadExcel: async () => { throw new Error('chunk'); } } });
+    await sinExcel.inv.descargarInventario();
+    assert.match(sinExcel.alerts[0], /No se pudo preparar el Excel/);
+    assert.equal(descargas.length, 0);
+    assert.equal(sinExcel.ids.exportInvBtn.disabled, false);
 });
