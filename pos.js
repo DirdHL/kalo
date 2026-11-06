@@ -33,6 +33,8 @@ export function setupPOS({ onSaleCompleted, onPricesChanged } = {}) {
     let posCurrentCategory = 'Todos';
     let activeDiscountPercent = null;
     let isProcessingSale = false;
+    let totalTicket = 0;
+    let splitAncla = null; // 'efectivo' | 'yape': el cuadro que escribió la vendedora (se respeta si cambia el total)
 
     const productsById = () => new Map(state.globalProducts.map(product => [String(product.id), product]));
     // Igual que la base de datos: cada precio se redondea a céntimos antes de multiplicar.
@@ -224,7 +226,9 @@ export function setupPOS({ onSaleCompleted, onPricesChanged } = {}) {
         if (discountSummaryAmount) {
             discountSummaryAmount.textContent = Number.isFinite(discount) && discount > 0 ? `- ${formatMoney(discount)}` : 'Opcional';
         }
-        cartTotalValue.textContent = formatMoney(Math.max(0, roundMoney(subtotal - roundMoney(discount))));
+        const total = Math.max(0, roundMoney(subtotal - roundMoney(discount)));
+        cartTotalValue.textContent = formatMoney(total);
+        ajustarPagoDividido(total);
         if (mobileCartTotal) mobileCartTotal.textContent = cartTotalValue.textContent;
         if (cartItemCount) {
             const count = state.cart.reduce((sum, item) => sum + item.qty, 0);
@@ -239,7 +243,59 @@ export function setupPOS({ onSaleCompleted, onPricesChanged } = {}) {
         if (paymentMethod) paymentMethod.value = 'Efectivo';
         if (splitEfectivo) splitEfectivo.value = '';
         if (splitYape) splitYape.value = '';
+        splitAncla = null;
         if (splitPaymentSection) splitPaymentSection.classList.add('hidden');
+    }
+
+    // --- PAGO DIVIDIDO (Efectivo + Yape/Plin) ---
+    // Al elegirlo se reparte mitad y mitad. Si escriben en un cuadro, el otro se completa
+    // para que los dos sumen siempre el total (total 4, efectivo 3 → Yape/Plin 1).
+    const montoEscrito = input => {
+        const valor = Number(input?.value);
+        return input && String(input.value).trim() !== '' && Number.isFinite(valor) && valor > 0 ? roundMoney(valor) : 0;
+    };
+    const campoDe = nombre => (nombre === 'yape' ? splitYape : splitEfectivo);
+    const otroCampo = nombre => (nombre === 'yape' ? splitEfectivo : splitYape);
+
+    function completarPago(nombre, total = totalTicket) {
+        const otro = otroCampo(nombre);
+        if (otro) otro.value = Math.max(0, roundMoney(total - montoEscrito(campoDe(nombre)))).toFixed(2);
+    }
+
+    function repartirMitad(total = totalTicket) {
+        if (!splitEfectivo || !splitYape) return;
+        const mitad = roundMoney(total / 2);
+        splitEfectivo.value = mitad.toFixed(2);
+        splitYape.value = roundMoney(total - mitad).toFixed(2);
+    }
+
+    function ajustarPagoDividido(total) {
+        totalTicket = total;
+        if (paymentMethod?.value !== 'Ambos') return;
+        if (!splitAncla) {
+            repartirMitad(total);
+            return;
+        }
+        const campo = campoDe(splitAncla);
+        if (campo && montoEscrito(campo) > total) campo.value = total.toFixed(2);
+        completarPago(splitAncla, total);
+    }
+
+    for (const nombre of ['efectivo', 'yape']) {
+        const campo = campoDe(nombre);
+        // Mientras escriben solo se toca el otro cuadro (no se les mueve lo que están escribiendo).
+        campo?.addEventListener('input', () => {
+            splitAncla = nombre;
+            completarPago(nombre);
+        });
+        // Al salir del cuadro: no puede pasar del total y queda con dos decimales.
+        campo?.addEventListener('change', () => {
+            const valor = Number(campo.value);
+            if (String(campo.value).trim() !== '' && Number.isFinite(valor) && valor >= 0) {
+                campo.value = Math.min(roundMoney(valor), totalTicket).toFixed(2);
+            }
+            completarPago(nombre);
+        });
     }
 
     function clearCart() {
@@ -291,10 +347,8 @@ export function setupPOS({ onSaleCompleted, onPricesChanged } = {}) {
     paymentMethod?.addEventListener('change', event => {
         const split = event.target.value === 'Ambos';
         splitPaymentSection?.classList.toggle('hidden', !split);
-        if (split) {
-            if (splitEfectivo) splitEfectivo.value = '';
-            if (splitYape) splitYape.value = '';
-        }
+        splitAncla = null;
+        if (split) repartirMitad();
     });
 
     // --- BOLETA ---

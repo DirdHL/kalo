@@ -104,6 +104,67 @@ test('cobrar valida descuento y pago dividido antes de llamar a la base', async 
     assert.match(empty.alerts[0], /vacío/);
 });
 
+test('efectivo + Yape/Plin: se reparte mitad y mitad y el otro cuadro completa el total', async () => {
+    const agua = product(1, { precio_venta: 4 });
+    const t = setupPos({ products: [agua], cart: [{ ...agua, qty: 1 }] });
+    const escribir = async (campo, valor, evento = 'input') => { t.ids[campo].value = valor; await t.ids[campo].dispatch(evento); };
+
+    t.ids.paymentMethod.value = 'Ambos';
+    await t.ids.paymentMethod.dispatch('change');
+    assert.equal(t.ids.splitPaymentSection.classList.contains('hidden'), false);
+    assert.deepEqual([t.ids.splitEfectivo.value, t.ids.splitYape.value], ['2.00', '2.00'], 'mitad y mitad');
+
+    await escribir('splitEfectivo', '3');
+    assert.equal(t.ids.splitYape.value, '1.00', 'total 4, efectivo 3 → Yape 1');
+    assert.equal(t.ids.splitEfectivo.value, '3', 'no se toca lo que están escribiendo');
+    await escribir('splitYape', '0.5');
+    assert.equal(t.ids.splitEfectivo.value, '3.50');
+    await escribir('splitEfectivo', '');
+    assert.equal(t.ids.splitYape.value, '4.00', 'si borran un cuadro, el otro lleva todo');
+
+    await escribir('splitEfectivo', '3.5');
+    await t.pos.checkout();
+    assert.equal(t.alerts.length, 0, t.alerts.join(' | '));
+    const params = t.supabase.rpcCalls[0].params;
+    assert.deepEqual([params.p_metodo, params.p_efectivo, params.p_yape, params.p_total_esperado], ['Ambos', 3.5, 0.5, 4]);
+});
+
+test('pago dividido: si cambia el total se respeta lo escrito, sin pasarse del total', async () => {
+    const agua = product(1, { precio_venta: 4 });
+    const t = setupPos({ products: [agua], cart: [{ ...agua, qty: 1 }] });
+    t.ids.paymentMethod.value = 'Ambos';
+    await t.ids.paymentMethod.dispatch('change');
+    t.ids.splitEfectivo.value = '3';
+    await t.ids.splitEfectivo.dispatch('input');
+
+    t.pos.addToCart(agua);
+    assert.deepEqual([t.ids.splitEfectivo.value, t.ids.splitYape.value], ['3', '5.00'], 'total 8: el efectivo escrito se queda');
+    t.ids.cartDiscount.value = '6';
+    await t.ids.cartDiscount.dispatch('input');
+    assert.deepEqual([t.ids.splitEfectivo.value, t.ids.splitYape.value], ['2.00', '0.00'], 'total 2: el efectivo no puede pasar del total');
+
+    t.ids.splitYape.value = '10';
+    await t.ids.splitYape.dispatch('input');
+    assert.equal(t.ids.splitEfectivo.value, '0.00');
+    await t.ids.splitYape.dispatch('change');
+    assert.equal(t.ids.splitYape.value, '2.00', 'al salir del cuadro se ajusta al total');
+
+    // Volver a elegir el pago dividido reparte de nuevo; con céntimos impares igual suma el total.
+    const galleta = product(2, { precio_venta: 4.25 });
+    const u = setupPos({ products: [galleta], cart: [{ ...galleta, qty: 1 }] });
+    u.ids.paymentMethod.value = 'Ambos';
+    await u.ids.paymentMethod.dispatch('change');
+    const [ef, yp] = [Number(u.ids.splitEfectivo.value), Number(u.ids.splitYape.value)];
+    assert.equal(Math.round((ef + yp) * 100), 425);
+    assert.ok(Math.abs(ef - yp) <= 0.011);
+    u.ids.paymentMethod.value = 'Efectivo';
+    await u.ids.paymentMethod.dispatch('change');
+    u.pos.addToCart(galleta);
+    u.ids.paymentMethod.value = 'Ambos';
+    await u.ids.paymentMethod.dispatch('change');
+    assert.deepEqual([u.ids.splitEfectivo.value, u.ids.splitYape.value], ['4.25', '4.25']);
+});
+
 test('una venta usa registrar_venta con el total esperado y muestra la boleta que devuelve la base', async () => {
     let completed = 0;
     const products = [product(1), product(2, { precio_venta: 3.333 })];
