@@ -2,7 +2,7 @@ import { supabase } from "./supabase.js";
 import { state } from "./state.js";
 import { AVAILABLE_IMAGES, resolveImage, CATEGORIA_COMBOS, PREFIJO_NUBE, urlImagenNube, etiquetaImagen } from "./constants.js";
 import { listarImagenesNube, subirImagenNube, borrarImagenNube, nombreArchivoImagen } from "./imagenes.js";
-import { customAlert, customConfirm } from "./ui.js";
+import { customAlert, customConfirm, showToast } from "./ui.js";
 import { escapeHtml, formatMoney, describeError, fetchAll, estadoVencimiento, parseLocalDate, descargarArchivo } from "./utils.js";
 import { filasInventario, construirExcelInventario, nombreArchivoInventario } from "./inventario-excel.js";
 
@@ -10,6 +10,7 @@ import { filasInventario, construirExcelInventario, nombreArchivoInventario } fr
 const cargarExcel = () => import('exceljs');
 
 let editingProductId = null;
+let stockAlAbrir = '';  // lo que decía "Stock total" al abrir Editar: si no lo tocan, no se pisa el stock
 let selectedImageName = '';
 let currentLotes = [];
 let comboSelectedImage = '';
@@ -35,6 +36,9 @@ export function setupInventory({ onProductsLoaded, loadExcel = cargarExcel, desc
     const gananciaInput = document.getElementById('ganancia');
     const stockInput = document.getElementById('stock');
     const alertaStockInput = document.getElementById('alertaStock');
+    const stockAddGroup = document.getElementById('stockAddGroup');
+    const stockLlegaronInput = document.getElementById('stockLlegaron');
+    const stockLlegaronHint = document.getElementById('stockLlegaronHint');
 
     // Selector de imagen
     const imagePickerModal = document.getElementById('imagePickerModal');
@@ -329,14 +333,54 @@ export function setupInventory({ onProductsLoaded, loadExcel = cargarExcel, desc
     precioVentaInput?.addEventListener('input', calcularGanancia);
 
     function setComboMode(enabled) {
-        for (const input of [precioCompraInput, stockInput, alertaStockInput, ...loteFields]) {
+        for (const input of [precioCompraInput, stockInput, alertaStockInput, stockLlegaronInput, ...loteFields]) {
             if (input) input.disabled = enabled;
         }
         comboEditNote?.classList.toggle('hidden', !enabled);
     }
 
+    // --- MERCADERÍA QUE LLEGÓ: se suma al stock ---
+    const MAX_LLEGADA = 100000;
+    const cantidadLlegada = texto => {
+        const valor = Number(String(texto ?? '').trim());
+        return String(texto ?? '').trim() !== '' && Number.isSafeInteger(valor) && valor > 0 && valor <= MAX_LLEGADA ? valor : null;
+    };
+
+    // Suma en la base sin pisar ventas hechas mientras tanto: solo guarda si el stock
+    // sigue siendo el que se leyó; si cambió, lo vuelve a leer y lo intenta otra vez.
+    async function sumarAlStock(prod, cantidad) {
+        for (let intento = 0; intento < 4; intento++) {
+            const lectura = await supabase.from('productos').select('id, stock')
+                .eq('id', prod.id).eq('local', state.currentLocal).eq('activo', true);
+            if (lectura.error) throw lectura.error;
+            const fila = lectura.data?.[0];
+            if (!fila) throw new Error('No se encontró el producto en este local. Actualiza la pantalla.');
+            const antes = fila.stock == null ? null : Number(fila.stock);
+            const nuevo = (antes ?? 0) + cantidad;
+            let cambio = supabase.from('productos').update({ stock: nuevo }).eq('id', prod.id).eq('local', state.currentLocal);
+            cambio = antes === null ? cambio.is('stock', null) : cambio.eq('stock', antes);
+            const { data, error } = await cambio.select('id');
+            if (error) throw error;
+            if (data && data.length === 1) return { antes: antes ?? 0, nuevo };
+        }
+        throw new Error('El stock cambió mientras se guardaba. Inténtalo otra vez.');
+    }
+
+    function mostrarLlegada() {
+        if (!stockLlegaronHint) return;
+        const cantidad = cantidadLlegada(stockLlegaronInput?.value);
+        const base = Number(stockInput?.value) || 0;
+        stockLlegaronHint.textContent = cantidad ? `Quedará en ${base + cantidad} (${base} + ${cantidad})` : '';
+    }
+    stockLlegaronInput?.addEventListener('input', mostrarLlegada);
+    stockInput?.addEventListener('input', mostrarLlegada);
+
     function limpiarFormulario() {
         editingProductId = null;
+        stockAlAbrir = '';
+        if (stockLlegaronInput) stockLlegaronInput.value = '';
+        if (stockLlegaronHint) stockLlegaronHint.textContent = '';
+        stockAddGroup?.classList.add('hidden');
         if (productModalTitle) productModalTitle.textContent = 'Registrar producto';
         if (addProductBtn) addProductBtn.textContent = 'Guardar producto';
         for (const input of [productCodeInput, productNameInput, precioCompraInput, precioVentaInput, gananciaInput, stockInput, alertaStockInput, loteQtyInput, loteExpInput]) {
@@ -365,9 +409,11 @@ export function setupInventory({ onProductsLoaded, loadExcel = cargarExcel, desc
         if (precioCompraInput) precioCompraInput.value = prod.precio_compra ?? '';
         if (precioVentaInput) precioVentaInput.value = prod.precio_venta ?? '';
         if (stockInput) stockInput.value = prod.stock ?? '';
+        stockAlAbrir = stockInput ? String(stockInput.value).trim() : '';
         if (alertaStockInput) alertaStockInput.value = prod.alerta_stock ?? '';
         currentLotes = Array.isArray(prod.lotes) ? prod.lotes.map(lote => ({ ...lote })) : [];
         setComboMode(isCombo(prod));
+        stockAddGroup?.classList.toggle('hidden', isCombo(prod));
         renderLotes();
         selectedImageName = prod.imagen || '';
         if (previewImg) previewImg.src = resolveImage(selectedImageName);
@@ -442,6 +488,13 @@ export function setupInventory({ onProductsLoaded, loadExcel = cargarExcel, desc
             setProductStatus('El nombre es demasiado largo (máximo 120 caracteres).');
             return;
         }
+        // Mercadería que llegó (solo al editar): se suma después de guardar lo demás.
+        const llegadaTexto = editing && !comboEnEdicion && stockLlegaronInput ? String(stockLlegaronInput.value).trim() : '';
+        const llegada = llegadaTexto ? cantidadLlegada(llegadaTexto) : null;
+        if (llegadaTexto && !llegada) {
+            setProductStatus(`Lo que llegó debe ser un número entero entre 1 y ${MAX_LLEGADA.toLocaleString('es-PE')}.`);
+            return;
+        }
 
         const payload = {
             codigo: productCode || null,
@@ -453,10 +506,13 @@ export function setupInventory({ onProductsLoaded, loadExcel = cargarExcel, desc
         if (!comboEnEdicion) {
             Object.assign(payload, {
                 precio_compra: pCompra,
-                stock,
                 alerta_stock: alerta,
                 lotes: currentLotes.length > 0 ? currentLotes : null
             });
+            // Al editar, el stock solo se escribe si lo cambiaron a mano: así no se pisan
+            // las ventas que se hicieron mientras el formulario estaba abierto.
+            const stockTocado = !editing || (stockInput ? String(stockInput.value).trim() : '') !== stockAlAbrir;
+            if (stockTocado) payload.stock = stock;
         }
 
         try {
@@ -473,7 +529,19 @@ export function setupInventory({ onProductsLoaded, loadExcel = cargarExcel, desc
                 result = await supabase.from('productos').insert([{ ...payload, local: state.currentLocal }]);
             }
             if (result.error) throw result.error;
-            setProductStatus(editing ? '¡Producto actualizado!' : '¡Producto guardado!', true);
+            let mensaje = editing ? '¡Producto actualizado!' : '¡Producto guardado!';
+            if (llegada) {
+                try {
+                    const suma = await sumarAlStock(editing, llegada);
+                    mensaje = `¡Producto actualizado! Stock: ${suma.antes} + ${llegada} = ${suma.nuevo}`;
+                    if (stockLlegaronInput) stockLlegaronInput.value = '';
+                } catch (error) {
+                    setProductStatus('Se guardaron los demás cambios, pero no se pudo sumar lo que llegó: ' + describeError(error));
+                    await loadProducts();
+                    return;
+                }
+            }
+            setProductStatus(mensaje, true);
             await loadProducts();
             setTimeout(() => {
                 productModal?.classList.add('hidden');
@@ -721,7 +789,17 @@ export function setupInventory({ onProductsLoaded, loadExcel = cargarExcel, desc
             const codigo = combo
                 ? `<span class="combo-badge" title="${escapeHtml(describirCombo(prod))}">Combo</span>`
                 : `<code>${escapeHtml(prod.codigo || '')}</code>`;
-            const stock = combo ? '<span class="muted" title="Se descuenta de sus componentes">—</span>' : escapeHtml(prod.stock ?? '');
+            const nombre = escapeHtml(prod.nombre);
+            const id = escapeHtml(prod.id);
+            // Al lado del stock, un cuadrito para sumar lo que llegó (Enter o "Sumar").
+            const stock = combo ? '<span class="muted" title="Se descuenta de sus componentes">—</span>' : `
+                <div class="stock-cell">
+                    <span class="stock-value">${escapeHtml(prod.stock ?? '—')}${stockWarning}</span>
+                    <span class="stock-add">
+                        <input type="number" class="stock-add-input" data-prodid="${id}" min="1" step="1" inputmode="numeric" placeholder="+0" aria-label="Unidades que llegaron de ${nombre}">
+                        <button type="button" class="stock-add-btn" data-prodid="${id}" title="Sumar al stock" aria-label="Sumar al stock de ${nombre}">Sumar</button>
+                    </span>
+                </div>`;
             row.innerHTML = `
                 <td><img src="${escapeHtml(resolveImage(prod.imagen))}" class="inventory-thumb" alt=""></td>
                 <td>${codigo}</td>
@@ -729,7 +807,7 @@ export function setupInventory({ onProductsLoaded, loadExcel = cargarExcel, desc
                 <td>${escapeHtml(prod.categoria || '')}</td>
                 <td>${prod.precio_compra ? escapeHtml(formatMoney(prod.precio_compra)) : ''}</td>
                 <td><strong class="price-cell">${prod.precio_venta ? escapeHtml(formatMoney(prod.precio_venta)) : ''}</strong></td>
-                <td>${stock}${stockWarning}</td>
+                <td>${stock}</td>
                 <td class="row-actions">
                     <button type="button" class="edit-btn" data-prodid="${escapeHtml(prod.id)}" title="Editar" aria-label="Editar ${escapeHtml(prod.nombre)}">✏️</button>
                     <button type="button" class="delete-btn" data-prodid="${escapeHtml(prod.id)}" title="Eliminar" aria-label="Eliminar ${escapeHtml(prod.nombre)}">🗑️</button>
@@ -767,7 +845,54 @@ export function setupInventory({ onProductsLoaded, loadExcel = cargarExcel, desc
         }
     }
 
+    // --- SUMAR AL STOCK DESDE LA TABLA ---
+    const sumandoAhora = new Set();
+
+    async function sumarDesdeTabla(prodId, input, button) {
+        const prod = productById(prodId);
+        if (!prod || isCombo(prod) || sumandoAhora.has(String(prod.id))) return;
+        const cantidad = cantidadLlegada(input?.value);
+        if (!cantidad) {
+            await customAlert(`Escribe cuántas unidades llegaron de "${prod.nombre}" (un número entero entre 1 y ${MAX_LLEGADA.toLocaleString('es-PE')}).`, 'Cantidad inválida', '⚠️');
+            input?.focus?.();
+            return;
+        }
+        sumandoAhora.add(String(prod.id));
+        if (input) input.disabled = true;
+        if (button) {
+            button.disabled = true;
+            button.textContent = '...';
+        }
+        try {
+            const { antes, nuevo } = await sumarAlStock(prod, cantidad);
+            showToast(`${prod.nombre}: ${antes} + ${cantidad} = ${nuevo} unidades.`, 'success');
+            await loadProducts();
+        } catch (error) {
+            if (input) input.disabled = false;
+            if (button) {
+                button.disabled = false;
+                button.textContent = 'Sumar';
+            }
+            await customAlert('No se pudo sumar al stock: ' + describeError(error), 'Error', '⚠️');
+        } finally {
+            sumandoAhora.delete(String(prod.id));
+        }
+    }
+
+    productList?.addEventListener('keydown', event => {
+        const input = event.target;
+        if (event.key !== 'Enter' || !input?.classList?.contains('stock-add-input')) return;
+        event.preventDefault?.();
+        const button = input.closest?.('.stock-add')?.querySelector?.('.stock-add-btn') || null;
+        return sumarDesdeTabla(input.getAttribute('data-prodid'), input, button);
+    });
+
     productList?.addEventListener('click', event => {
+        const addBtn = event.target.closest?.('.stock-add-btn');
+        if (addBtn) {
+            const input = addBtn.closest?.('.stock-add')?.querySelector?.('.stock-add-input') || null;
+            return sumarDesdeTabla(addBtn.getAttribute('data-prodid'), input, addBtn);
+        }
         const editBtn = event.target.closest?.('.edit-btn');
         if (editBtn) {
             const prod = productById(editBtn.getAttribute('data-prodid'));

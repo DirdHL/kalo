@@ -542,6 +542,14 @@
                     <label for="alertaStock">Alerta de inventario bajo</label>
                     <input type="number" id="alertaStock" placeholder="Ej. 2" min="0" step="1" class="styled-input">
                 </div>
+                <!-- Mercadería que llegó: se suma al stock (solo al editar un producto). -->
+                <div class="input-group span-2 stock-arrival hidden" id="stockAddGroup">
+                    <label for="stockLlegaron">¿Llegó mercadería? Escribe cuántas unidades llegaron y se suman al stock</label>
+                    <div class="stock-arrival-row">
+                        <input type="number" id="stockLlegaron" placeholder="Ej. 20" min="1" step="1" inputmode="numeric" class="styled-input">
+                        <span id="stockLlegaronHint" class="stock-arrival-hint" aria-live="polite"></span>
+                    </div>
+                </div>
             </div>
 
             <p id="productStatusMsg" class="form-status" role="status"></p>

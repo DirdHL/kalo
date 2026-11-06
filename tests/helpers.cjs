@@ -120,6 +120,7 @@ function fakeSupabase({ tables = {}, rpc = {}, fail = {} } = {}) {
             if (op === 'gte') return row[key] >= value;
             if (op === 'lt') return row[key] < value;
             if (op === 'in') return value.map(String).includes(String(row[key]));
+            if (op === 'is') return value === null ? row[key] == null : row[key] === value;
             return true;
         });
         if (q.op === 'insert') {
@@ -152,6 +153,7 @@ function fakeSupabase({ tables = {}, rpc = {}, fail = {} } = {}) {
             gte(key, value) { q.filters.push(['gte', key, value]); return api; },
             lt(key, value) { q.filters.push(['lt', key, value]); return api; },
             in(key, value) { q.filters.push(['in', key, value]); return api; },
+            is(key, value) { q.filters.push(['is', key, value]); return api; },
             order(key, options) { q.orders.push([key, options?.ascending !== false]); return api; },
             limit(count) { q.limit = count; return api; },
             range(start, end) { q.range = [start, end]; return api; },

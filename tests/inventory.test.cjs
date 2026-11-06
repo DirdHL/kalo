@@ -14,7 +14,8 @@ const INV_IDS = ['productModal', 'productModalTitle', 'openModalBtn', 'closeModa
     'comboPreviewImg', 'openComboImagePickerBtn', 'comboProductList', 'saveComboBtn', 'comboStatusMsg', 'lotesList',
     'loteQtyInput', 'loteExpInput', 'addLoteBtn', 'productList', 'invSearch', 'prevPageBtn', 'nextPageBtn',
     'paginationInfo', 'alertsBadge', 'alertsList', 'comboRealSalePrice', 'comboRealCost', 'comboNetProfit',
-    'imageUploadFile', 'imageUploadName', 'imageUploadPreview', 'imageUploadBtn', 'imageUploadMsg', 'exportInvBtn'];
+    'imageUploadFile', 'imageUploadName', 'imageUploadPreview', 'imageUploadBtn', 'imageUploadMsg', 'exportInvBtn',
+    'stockAddGroup', 'stockLlegaron', 'stockLlegaronHint'];
 const XSS = '<img src=x onerror=alert(1)>';
 
 const row = (id, overrides = {}) => ({ id, nombre: `Producto ${id}`, categoria: 'Bebidas', codigo: null, precio_compra: 1, precio_venta: 2, stock: 5, alerta_stock: null, lotes: null, local: 'LAS BRISAS', activo: true, ...overrides });
@@ -26,6 +27,7 @@ function setupInventory({ products = [], comboItems = [], confirm = () => true, 
     const supabase = fakeSupabase({ tables: { productos: products, combo_items: comboItems }, rpc, fail });
     const state = { globalProducts: [], combos: new Map(), invFilteredProducts: [], invCurrentPage: 1, invItemsPerPage: 999999, currentLocal: 'LAS BRISAS' };
     const alerts = [];
+    const toasts = [];
     const loaded = [];
     const document = fakeDocument(ids);
     document.createElement = tag => element(tag, { querySelector: () => element() });
@@ -33,6 +35,7 @@ function setupInventory({ products = [], comboItems = [], confirm = () => true, 
         document, state, supabase,
         customAlert: async message => { alerts.push(message); },
         customConfirm: async () => confirm(),
+        showToast: (message, type) => toasts.push({ message, type }),
         AVAILABLE_IMAGES: ['AGUA-LOA-3L.svg'], resolveImage: () => './kalo-logo.png', CATEGORIA_COMBOS: 'Combos',
         PREFIJO_NUBE: 'sb:', urlImagenNube: name => `https://x.supabase.co/img/${name}`,
         etiquetaImagen: name => name.replace(/\.[^.]+$/, '').replace(/-/g, ' '),
@@ -44,7 +47,7 @@ function setupInventory({ products = [], comboItems = [], confirm = () => true, 
         ...utils()
     });
     const inv = exports.setupInventory({ onProductsLoaded: products => loaded.push(products), ...opciones });
-    return { ids, state, supabase, inv, alerts, loaded, document, save: () => ids.addProductBtn.click(), saveCombo: () => ids.saveComboBtn.click() };
+    return { ids, state, supabase, inv, alerts, toasts, loaded, document, save: () => ids.addProductBtn.click(), saveCombo: () => ids.saveComboBtn.click() };
 }
 
 const updates = t => t.supabase.calls.filter(call => call.op === 'update');
@@ -297,4 +300,118 @@ test('descargar Excel avisa si no se pudo leer el inventario o si no hay product
     assert.match(sinExcel.alerts[0], /No se pudo preparar el Excel/);
     assert.equal(descargas.length, 0);
     assert.equal(sinExcel.ids.exportInvBtn.disabled, false);
+});
+
+// Simula el cuadrito "Sumar" de una fila de la tabla.
+function sumarEnTabla(t, id, valor, { tecla = false } = {}) {
+    const input = element('input');
+    input.value = valor;
+    input.attributes['data-prodid'] = String(id);
+    input.classList.add('stock-add-input');
+    const boton = element('button');
+    boton.attributes['data-prodid'] = String(id);
+    const caja = { querySelector: sel => (sel === '.stock-add-input' ? input : sel === '.stock-add-btn' ? boton : null) };
+    boton.closest = sel => (sel === '.stock-add' ? caja : null);
+    input.closest = sel => (sel === '.stock-add' ? caja : null);
+    if (tecla) return t.ids.productList.dispatch('keydown', { key: 'Enter', target: input });
+    return t.ids.productList.dispatch('click', { target: { closest: sel => (sel === '.stock-add-btn' ? boton : null) } });
+}
+
+test('desde la tabla: tengo 15, llegan 20 y el stock queda en 35', async () => {
+    const t = setupInventory({ products: [row(1, { nombre: 'Agua', stock: 15 }), row(2, { stock: 3 })] });
+    await t.inv.loadProducts();
+    assert.match(t.ids.productList.children[1].innerHTML, /class="stock-add-input" data-prodid="1"/, 'cada fila tiene su cuadrito');
+    await sumarEnTabla(t, 1, '20');
+    assert.equal(t.supabase.db.productos[0].stock, 35);
+    assert.equal(t.supabase.db.productos[1].stock, 3, 'los demás no cambian');
+    assert.equal(t.toasts[0].message, 'Agua: 15 + 20 = 35 unidades.');
+    assert.equal(t.state.globalProducts.find(p => p.id === 1).stock, 35, 'la tabla se vuelve a cargar');
+    const cambio = updates(t)[0];
+    assert.deepEqual(plain(cambio.payload), { stock: 35 });
+    assert.deepEqual(plain(cambio.filters), [['eq', 'id', 1], ['eq', 'local', 'LAS BRISAS'], ['eq', 'stock', 15]], 'solo si el stock sigue en 15');
+
+    await sumarEnTabla(t, 1, '5', { tecla: true });
+    assert.equal(t.supabase.db.productos[0].stock, 40, 'Enter también suma');
+});
+
+test('si se vende justo mientras se suma, no se pierde la venta', async () => {
+    let vendido = false;
+    const t = setupInventory({
+        products: [row(1, { stock: 15 })],
+        fail: { productos: (q, db) => { if (q.op === 'update' && !vendido) { vendido = true; db.productos[0].stock = 14; } } }
+    });
+    await t.inv.loadProducts();
+    await sumarEnTabla(t, 1, '20');
+    assert.equal(t.supabase.db.productos[0].stock, 34, '15 - 1 vendido + 20');
+    assert.equal(updates(t).length, 2, 'lo vuelve a intentar con el stock nuevo');
+    assert.equal(t.alerts.length, 0);
+});
+
+test('sumar a un producto sin stock registrado, y cantidades inválidas', async () => {
+    const t = setupInventory({ products: [row(1, { stock: null }), row(9, { categoria: 'Combos', stock: null })], comboItems: [{ combo_id: 9, producto_id: 1, cantidad: 1 }] });
+    await t.inv.loadProducts();
+    await sumarEnTabla(t, 1, '12');
+    assert.equal(t.supabase.db.productos[0].stock, 12);
+    assert.deepEqual(plain(updates(t)[0].filters.at(-1)), ['is', 'stock', null]);
+    assert.doesNotMatch(t.ids.productList.children[0].innerHTML, /stock-add-input/, 'un combo no tiene cuadrito (su stock es el de sus productos)');
+
+    for (const malo of ['', '0', '-3', '1.5', 'abc', '100001']) {
+        const u = setupInventory({ products: [row(1, { stock: 15 })] });
+        await u.inv.loadProducts();
+        await sumarEnTabla(u, 1, malo);
+        assert.equal(updates(u).length, 0, `"${malo}" no se suma`);
+        assert.match(u.alerts[0], /cuántas unidades llegaron/);
+    }
+});
+
+test('al editar: "¿llegó mercadería?" suma al stock y muestra cuánto quedará', async () => {
+    const t = setupInventory({ products: [row(1, { nombre: 'Agua', stock: 15 })] });
+    await t.inv.loadProducts();
+    t.inv.abrirModalEdicion(t.state.globalProducts[0]);
+    assert.equal(t.ids.stockAddGroup.classList.contains('hidden'), false);
+    t.ids.stockLlegaron.value = '20';
+    await t.ids.stockLlegaron.dispatch('input');
+    assert.equal(t.ids.stockLlegaronHint.textContent, 'Quedará en 35 (15 + 20)');
+    await t.save();
+    assert.equal(t.supabase.db.productos[0].stock, 35);
+    assert.equal(updates(t)[0].payload.stock, undefined, 'el formulario no pisa el stock: se suma aparte');
+    assert.match(t.ids.productStatusMsg.textContent, /Stock: 15 \+ 20 = 35/);
+});
+
+test('al editar sin tocar el stock, no se pisan las ventas hechas mientras estaba abierto', async () => {
+    const t = setupInventory({ products: [row(1, { stock: 15 })] });
+    await t.inv.loadProducts();
+    t.inv.abrirModalEdicion(t.state.globalProducts[0]);
+    t.supabase.db.productos[0].stock = 12; // se vendieron 3 en otra caja
+    t.ids.productName.value = 'Agua grande';
+    await t.save();
+    assert.equal(t.supabase.db.productos[0].stock, 12);
+    assert.equal(t.supabase.db.productos[0].nombre, 'Agua grande');
+
+    // Si cambian el stock a mano y además llegó mercadería: lo escrito + lo que llegó.
+    const u = setupInventory({ products: [row(1, { stock: 15 })] });
+    await u.inv.loadProducts();
+    u.inv.abrirModalEdicion(u.state.globalProducts[0]);
+    u.ids.stock.value = '50';
+    u.ids.stockLlegaron.value = '5';
+    await u.save();
+    assert.equal(u.supabase.db.productos[0].stock, 55);
+
+    const malo = setupInventory({ products: [row(1, { stock: 15 })] });
+    await malo.inv.loadProducts();
+    malo.inv.abrirModalEdicion(malo.state.globalProducts[0]);
+    malo.ids.stockLlegaron.value = '2.5';
+    await malo.save();
+    assert.equal(updates(malo).length, 0);
+    assert.match(malo.ids.productStatusMsg.textContent, /entero entre 1 y/);
+});
+
+test('el campo de mercadería no aparece al crear un producto ni en un combo', async () => {
+    const t = setupInventory({ products: [row(1), row(9, { categoria: 'Combos', stock: null })], comboItems: [{ combo_id: 9, producto_id: 1, cantidad: 1 }] });
+    await t.inv.loadProducts();
+    await t.ids.openModalBtn.click();
+    assert.equal(t.ids.stockAddGroup.classList.contains('hidden'), true, 'al crear, el stock inicial va en "Stock total"');
+    t.inv.abrirModalEdicion(t.state.globalProducts.find(p => p.id === 9));
+    assert.equal(t.ids.stockAddGroup.classList.contains('hidden'), true);
+    assert.equal(t.ids.stockLlegaron.disabled, true);
 });
