@@ -2,7 +2,7 @@ process.env.TZ = 'America/Lima';
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const ExcelJS = require('exceljs');
-const { loadModule, utils, constants, element, rendered, fakeDocument, elements, fakeSupabase, plain } = require('./helpers.cjs');
+const { loadModule, utils, constants, categorias, element, rendered, fakeDocument, elements, fakeSupabase, plain } = require('./helpers.cjs');
 
 const { exports: reporte } = loadModule('reporte.js', { ...utils(), ...constants(), Date });
 const { exports: inventarioExcel } = loadModule('inventario-excel.js', { ...utils(), ...constants(), COLOR: reporte.COLOR, Date });
@@ -15,7 +15,7 @@ const INV_IDS = ['productModal', 'productModalTitle', 'openModalBtn', 'closeModa
     'loteQtyInput', 'loteExpInput', 'addLoteBtn', 'productList', 'invSearch', 'prevPageBtn', 'nextPageBtn',
     'paginationInfo', 'alertsBadge', 'alertsList', 'comboRealSalePrice', 'comboRealCost', 'comboNetProfit',
     'imageUploadFile', 'imageUploadName', 'imageUploadPreview', 'imageUploadBtn', 'imageUploadMsg', 'exportInvBtn',
-    'stockAddGroup', 'stockLlegaron', 'stockLlegaronHint'];
+    'stockAddGroup', 'stockLlegaron', 'stockLlegaronHint', 'invCategoryFilters'];
 const XSS = '<img src=x onerror=alert(1)>';
 
 const row = (id, overrides = {}) => ({ id, nombre: `Producto ${id}`, categoria: 'Bebidas', codigo: null, precio_compra: 1, precio_venta: 2, stock: 5, alerta_stock: null, lotes: null, local: 'LAS BRISAS', activo: true, ...overrides });
@@ -44,6 +44,9 @@ function setupInventory({ products = [], comboItems = [], confirm = () => true, 
         borrarImagenNube: async () => {},
         ...nube,
         ...inventarioExcel,
+        ...categorias(),
+        customPrompt: async () => null,
+        ...nube,
         ...utils()
     });
     const inv = exports.setupInventory({ onProductsLoaded: products => loaded.push(products), ...opciones });
@@ -414,4 +417,62 @@ test('el campo de mercadería no aparece al crear un producto ni en un combo', a
     t.inv.abrirModalEdicion(t.state.globalProducts.find(p => p.id === 9));
     assert.equal(t.ids.stockAddGroup.classList.contains('hidden'), true);
     assert.equal(t.ids.stockLlegaron.disabled, true);
+});
+
+test('crear una categoría nueva desde el formulario y verla en los filtros', async () => {
+    let respuesta = '  golosinas ';
+    const t = setupInventory({ products: [row(1, { categoria: 'Bebidas' })], nube: { customPrompt: async () => respuesta } });
+    await t.inv.loadProducts();
+    await t.ids.openModalBtn.click();
+    assert.match(t.ids.categoria.innerHTML, /value="__nueva__">➕ Nueva categoría…/);
+
+    t.ids.categoria.value = '__nueva__';
+    await t.ids.categoria.dispatch('change');
+    assert.equal(t.ids.categoria.value, 'Golosinas', 'se limpia y empieza con mayúscula');
+    assert.match(t.ids.categoria.innerHTML, /value="Golosinas">🏷️ Golosinas/);
+    t.ids.productName.value = 'Chupetín';
+    await t.save();
+    const guardado = t.supabase.db.productos.find(p => p.nombre === 'Chupetín');
+    assert.equal(guardado.categoria, 'Golosinas');
+    guardado.activo = true; // en la base real "activo" vale true por defecto
+    await t.inv.loadProducts();
+    assert.match(t.ids.invCategoryFilters.innerHTML, /data-cat="Golosinas"[^>]*>🏷️ Golosinas</, 'ya aparece en los filtros');
+
+    await t.ids.invCategoryFilters.dispatch('click', { target: { closest: sel => (sel === '.inv-filter-btn' ? { getAttribute: () => 'Golosinas' } : null) } });
+    assert.deepEqual(plain(t.state.invFilteredProducts.map(p => p.nombre)), ['Chupetín']);
+
+    // Escribir una que ya existe (con otras mayúsculas o sin tilde) elige la existente.
+    respuesta = 'lacteos';
+    t.ids.categoria.value = '__nueva__';
+    await t.ids.categoria.dispatch('change');
+    assert.equal(t.ids.categoria.value, 'Lácteos');
+});
+
+test('nombres de categoría no válidos o cancelar vuelven a la que estaba', async () => {
+    for (const malo of ['x', 'Todos', 'combos', '!!!', 'a'.repeat(31)]) {
+        const t = setupInventory({ products: [row(1)], nube: { customPrompt: async () => malo } });
+        await t.inv.loadProducts();
+        t.inv.abrirModalEdicion(t.state.globalProducts[0]);
+        t.ids.categoria.value = '__nueva__';
+        await t.ids.categoria.dispatch('change');
+        assert.equal(t.ids.categoria.value, 'Bebidas', `"${malo}"`);
+        assert.match(t.alerts[0], /Escribe un nombre de 2 a 30 letras/);
+    }
+    const cancela = setupInventory({ products: [row(1, { categoria: 'Snacks' })], nube: { customPrompt: async () => null } });
+    await cancela.inv.loadProducts();
+    cancela.inv.abrirModalEdicion(cancela.state.globalProducts[0]);
+    cancela.ids.categoria.value = '__nueva__';
+    await cancela.ids.categoria.dispatch('change');
+    assert.equal(cancela.ids.categoria.value, 'Snacks');
+    assert.equal(cancela.alerts.length, 0);
+});
+
+test('una categoría con HTML se muestra como texto en filtros y selector', async () => {
+    const t = setupInventory({ products: [row(1, { categoria: XSS })] });
+    await t.inv.loadProducts();
+    t.inv.abrirModalEdicion(t.state.globalProducts[0]);
+    for (const html of [t.ids.invCategoryFilters.innerHTML, t.ids.categoria.innerHTML]) {
+        assert.equal(html.includes('<img src=x'), false);
+        assert.match(html, /&lt;img src=x onerror=alert\(1\)&gt;/);
+    }
 });

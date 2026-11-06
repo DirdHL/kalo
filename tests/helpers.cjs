@@ -42,6 +42,11 @@ function constants() {
     return loadModule('constants.js').exports;
 }
 
+// Módulo de categorías (usa escapeHtml de utils y CATEGORIA_COMBOS de constants).
+function categorias() {
+    return loadModule('categorias.js', { ...utils(), CATEGORIA_COMBOS: 'Combos' }).exports;
+}
+
 // Elemento HTML falso con lo mínimo que usa Kalo.
 function element(tag = 'div', props = {}) {
     const classes = new Set();
@@ -180,4 +185,4 @@ function fakeSupabase({ tables = {}, rpc = {}, fail = {} } = {}) {
 // Copia "normal" de datos creados dentro de la sandbox (para comparar con deepEqual).
 const plain = value => JSON.parse(JSON.stringify(value));
 
-module.exports = { ROOT, read, loadModule, utils, constants, element, rendered, fakeDocument, elements, fakeSupabase, plain };
+module.exports = { ROOT, read, loadModule, utils, constants, categorias, element, rendered, fakeDocument, elements, fakeSupabase, plain };

@@ -1,9 +1,9 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { loadModule, utils, constants, element, rendered, fakeDocument, elements, fakeSupabase, plain } = require('./helpers.cjs');
+const { loadModule, utils, constants, categorias, element, rendered, fakeDocument, elements, fakeSupabase, plain } = require('./helpers.cjs');
 
 const POS_IDS = ['posGrid', 'posSearch', 'cartItems', 'cartTotalValue', 'cartItemCount', 'mobileCartTotal', 'catalogCount',
-    'paymentMethod', 'splitPaymentSection', 'splitEfectivo', 'splitYape', 'cobrarBtn', 'pnpBtn', 'pnpDetail', 'paymentField',
+    'posCategoryFilters', 'paymentMethod', 'splitPaymentSection', 'splitEfectivo', 'splitYape', 'cobrarBtn', 'pnpBtn', 'pnpDetail', 'paymentField',
     'posPrevPageBtn', 'posNextPageBtn', 'posPaginationInfo', 'receiptModal', 'receiptLocalName', 'receiptSaleNumber',
     'receiptDate', 'receiptItems', 'receiptSubtotal', 'receiptDiscountRow', 'receiptDiscount', 'receiptTotal',
     'receiptPaymentMethod', 'closeReceiptBtn', 'printReceiptBtn', 'saleSuccessTotal', 'saleSuccessDetail'];
@@ -17,7 +17,6 @@ function setupPos({ products = [product()], cart = [], combos = new Map(), rpc, 
     ids.splitPaymentSection.classList.add('hidden');
     ids.receiptModal.classList.add('hidden');
     ids.cobrarBtn.innerHTML = 'Cobrar <svg class="icon"></svg>';
-    const categoryButton = element('button', { attributes: { 'data-cat': 'Snacks' } });
     const state = { cart: cart.map(item => ({ ...item })), globalProducts: products.map(p => ({ ...p })), combos, currentLocal: 'LAS BRISAS' };
     const alerts = [];
     const toasts = [];
@@ -40,7 +39,7 @@ function setupPos({ products = [product()], cart = [], combos = new Map(), rpc, 
     };
     const supabase = fakeSupabase({ rpc: { registrar_venta: rpc || servidor } });
     const { exports } = loadModule('pos.js', {
-        document: fakeDocument(ids, { '.cat-filter-btn': [categoryButton] }),
+        document: fakeDocument(ids),
         window: { addEventListener() {}, removeEventListener() {}, print() { prints.push(1); } },
         state, supabase,
         setTimeout(callback) { const id = timers.size + 1; timers.set(id, callback); return id; },
@@ -49,10 +48,14 @@ function setupPos({ products = [product()], cart = [], combos = new Map(), rpc, 
         showToast: (message, type) => toasts.push({ message, type }),
         resolveImage: () => './kalo-logo.png',
         localPorId: constants().localPorId,
+        ...categorias(),
         ...utils()
     });
     const pos = exports.setupPOS({ onSaleCompleted, onPricesChanged });
-    return { ids, state, supabase, pos, alerts, toasts, timers, prints, categoryButton };
+    const elegirCategoria = cat => ids.posCategoryFilters.dispatch('click', {
+        target: { closest: sel => (sel === '.cat-filter-btn' ? { getAttribute: () => cat } : null) }
+    });
+    return { ids, state, supabase, pos, alerts, toasts, timers, prints, elegirCategoria };
 }
 
 const clickQty = (t, index, delta) => t.ids.cartItems.dispatch('click', {
@@ -323,7 +326,7 @@ test('la recarga de productos conserva filtros y ajusta la página', async () =>
     t.pos.renderPosGrid([products[0]]);
     assert.equal(t.ids.posPaginationInfo.textContent, 'Página 1 de 1');
     assert.equal(t.ids.posGrid.children.length, 1);
-    await t.categoryButton.dispatch('click');
+    await t.elegirCategoria('Snacks');
     t.pos.renderPosGrid([...products, product(99, { categoria: 'Snacks' })]);
     assert.equal(t.ids.posGrid.children.length, 1);
     assert.match(t.ids.posGrid.children[0].innerHTML, /Producto 99/);
@@ -343,4 +346,24 @@ test('un nombre con HTML no se ejecuta en el catálogo, el ticket ni la boleta',
     const row = t.ids.receiptItems.children[0];
     assert.equal(row.children[0].textContent, `1x ${XSS}`, 'la boleta usa textContent');
     assert.equal(t.ids.receiptItems.innerHTML, '');
+});
+
+test('los filtros de la caja muestran las categorías nuevas que usan los productos del local', async () => {
+    const products = [product(1, { categoria: 'Bebidas' }), product(2, { categoria: 'Golosinas' }), product(3, { categoria: 'golosinas ' }), product(4, { categoria: 'Panadería' })];
+    const t = setupPos({ products });
+    t.pos.onProductsLoaded(products);
+    const html = t.ids.posCategoryFilters.innerHTML;
+    for (const texto of ['🥤 Bebidas', '📦 Otros', '🏷️ Golosinas', '🏷️ Panadería', '🍔 Combos']) assert.ok(html.includes(texto), texto);
+    assert.equal(html.match(/Golosinas/gi).length, 2, 'una sola vez (data-cat y texto), aunque esté escrita distinto');
+    assert.ok(html.indexOf('Otros') < html.indexOf('Golosinas') && html.indexOf('Panadería') < html.indexOf('Combos'), 'las de siempre, luego las nuevas, Combos al final');
+
+    await t.elegirCategoria('Golosinas');
+    assert.equal(t.ids.posGrid.children.length, 2, '"Golosinas" y "golosinas " son la misma');
+    assert.match(t.ids.posCategoryFilters.innerHTML, /class="cat-filter-btn active" data-cat="Golosinas"/);
+
+    // Si ya ningún producto usa esa categoría, el filtro vuelve a "Todos".
+    t.state.globalProducts = [products[0]]; // el inventario actualiza la lista antes de avisar a la caja
+    t.pos.onProductsLoaded([products[0]]);
+    assert.doesNotMatch(t.ids.posCategoryFilters.innerHTML, /Golosinas/);
+    assert.equal(t.ids.posGrid.children.length, 1);
 });

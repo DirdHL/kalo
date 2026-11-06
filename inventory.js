@@ -2,7 +2,8 @@ import { supabase } from "./supabase.js";
 import { state } from "./state.js";
 import { AVAILABLE_IMAGES, resolveImage, CATEGORIA_COMBOS, PREFIJO_NUBE, urlImagenNube, etiquetaImagen } from "./constants.js";
 import { listarImagenesNube, subirImagenNube, borrarImagenNube, nombreArchivoImagen } from "./imagenes.js";
-import { customAlert, customConfirm, showToast } from "./ui.js";
+import { customAlert, customConfirm, customPrompt, showToast } from "./ui.js";
+import { listaCategorias, mismaCategoria, categoriaVigente, htmlFiltrosCategoria, normalizarCategoria, MAX_LARGO_CATEGORIA } from "./categorias.js";
 import { escapeHtml, formatMoney, describeError, fetchAll, estadoVencimiento, parseLocalDate, descargarArchivo } from "./utils.js";
 import { filasInventario, construirExcelInventario, nombreArchivoInventario } from "./inventario-excel.js";
 
@@ -80,6 +81,10 @@ export function setupInventory({ onProductsLoaded, loadExcel = cargarExcel, desc
     const prevPageBtn = document.getElementById('prevPageBtn');
     const nextPageBtn = document.getElementById('nextPageBtn');
     const paginationInfo = document.getElementById('paginationInfo');
+    const invCategoryFilters = document.getElementById('invCategoryFilters');
+    let invCategoria = 'Todos';
+    let categoriasCreadas = [];   // creadas en esta sesión y aún sin producto guardado
+    let categoriaPrevia = 'Bebidas';
     const exportInvBtn = document.getElementById('exportInvBtn');
 
     const isCombo = product => state.combos.has(String(product?.id));
@@ -386,7 +391,7 @@ export function setupInventory({ onProductsLoaded, loadExcel = cargarExcel, desc
         for (const input of [productCodeInput, productNameInput, precioCompraInput, precioVentaInput, gananciaInput, stockInput, alertaStockInput, loteQtyInput, loteExpInput]) {
             if (input) input.value = '';
         }
-        if (categoriaInput) categoriaInput.value = 'Bebidas';
+        renderSelectCategorias('Bebidas');
         if (productStatusMsg) {
             productStatusMsg.textContent = '';
             productStatusMsg.style.color = '';
@@ -405,7 +410,7 @@ export function setupInventory({ onProductsLoaded, loadExcel = cargarExcel, desc
         if (addProductBtn) addProductBtn.textContent = 'Actualizar producto';
         if (productCodeInput) productCodeInput.value = prod.codigo || '';
         if (productNameInput) productNameInput.value = prod.nombre || '';
-        if (categoriaInput) categoriaInput.value = prod.categoria || 'Bebidas';
+        renderSelectCategorias(prod.categoria || 'Bebidas');
         if (precioCompraInput) precioCompraInput.value = prod.precio_compra ?? '';
         if (precioVentaInput) precioVentaInput.value = prod.precio_venta ?? '';
         if (stockInput) stockInput.value = prod.stock ?? '';
@@ -499,7 +504,7 @@ export function setupInventory({ onProductsLoaded, loadExcel = cargarExcel, desc
         const payload = {
             codigo: productCode || null,
             nombre: productName,
-            categoria: categoriaInput ? categoriaInput.value : 'Bebidas',
+            categoria: categoriaInput && categoriaInput.value && categoriaInput.value !== OPCION_NUEVA ? categoriaInput.value : 'Bebidas',
             imagen: selectedImageName || null,
             precio_venta: pVenta
         };
@@ -695,6 +700,7 @@ export function setupInventory({ onProductsLoaded, loadExcel = cargarExcel, desc
 
             state.globalProducts = products;
             state.combos = combos;
+            renderFiltrosInventario();
             filterInventoryProducts();
             checkAlerts();
             if (typeof onProductsLoaded === 'function') onProductsLoaded(products);
@@ -909,10 +915,8 @@ export function setupInventory({ onProductsLoaded, loadExcel = cargarExcel, desc
 
     function filterInventoryProducts() {
         const term = invSearch ? invSearch.value.toLowerCase() : '';
-        const activeBtn = document.querySelector('.inv-filter-btn.active');
-        const activeCat = activeBtn ? activeBtn.getAttribute('data-cat') : 'Todos';
         let filtered = state.globalProducts;
-        if (activeCat && activeCat !== 'Todos') filtered = filtered.filter(p => p.categoria === activeCat);
+        if (invCategoria !== 'Todos') filtered = filtered.filter(p => mismaCategoria(p.categoria, invCategoria));
         if (term) {
             filtered = filtered.filter(p =>
                 (p.nombre || '').toLowerCase().includes(term) ||
@@ -926,13 +930,63 @@ export function setupInventory({ onProductsLoaded, loadExcel = cargarExcel, desc
 
     invSearch?.addEventListener('input', filterInventoryProducts);
 
-    const invCatBtns = document.querySelectorAll('.inv-filter-btn');
-    invCatBtns.forEach(btn => {
-        btn.addEventListener('click', event => {
-            invCatBtns.forEach(b => b.classList.remove('active'));
-            event.target.classList.add('active');
-            filterInventoryProducts();
-        });
+    // --- CATEGORÍAS ---
+    // Filtros: las de siempre + las que usan los productos de este local.
+    function renderFiltrosInventario() {
+        if (!invCategoryFilters) return;
+        const categorias = listaCategorias(state.globalProducts);
+        invCategoria = categoriaVigente(invCategoria, categorias);
+        invCategoryFilters.innerHTML = htmlFiltrosCategoria(categorias, 'inv-filter-btn', invCategoria);
+    }
+
+    invCategoryFilters?.addEventListener('click', event => {
+        const boton = event.target.closest?.('.inv-filter-btn');
+        if (!boton) return;
+        invCategoria = boton.getAttribute('data-cat') || 'Todos';
+        renderFiltrosInventario();
+        filterInventoryProducts();
+    });
+
+    // Selector del formulario: las categorías + "Combos" + "Nueva categoría…".
+    const OPCION_NUEVA = '__nueva__';
+    function renderSelectCategorias(valor) {
+        if (!categoriaInput) return;
+        const categorias = listaCategorias(state.globalProducts, [...categoriasCreadas, valor]);
+        const opcion = (v, texto) => `<option value="${escapeHtml(v)}">${escapeHtml(texto)}</option>`;
+        categoriaInput.innerHTML = [
+            ...categorias.map(c => opcion(c.nombre, `${c.icono} ${c.nombre}`)),
+            opcion(CATEGORIA_COMBOS, `🍔 ${CATEGORIA_COMBOS}`),
+            opcion(OPCION_NUEVA, '➕ Nueva categoría…')
+        ].join('');
+        const elegida = [...categorias.map(c => c.nombre), CATEGORIA_COMBOS].find(nombre => mismaCategoria(nombre, valor));
+        categoriaInput.value = elegida || 'Bebidas';
+        categoriaPrevia = categoriaInput.value;
+    }
+
+    async function crearCategoria() {
+        const texto = await customPrompt(
+            `Escribe el nombre de la nueva categoría (ej. Golosinas, Panadería). Máximo ${MAX_LARGO_CATEGORIA} letras.`,
+            'Nueva categoría', '🏷️', 'Ej. Golosinas');
+        if (texto === null) {
+            renderSelectCategorias(categoriaPrevia);
+            return;
+        }
+        const nombre = normalizarCategoria(texto);
+        if (!nombre) {
+            await customAlert(`Escribe un nombre de 2 a ${MAX_LARGO_CATEGORIA} letras (no puede ser "Todos" ni "Combos").`, 'Nombre no válido', '⚠️');
+            renderSelectCategorias(categoriaPrevia);
+            return;
+        }
+        // Si ya existe (aunque esté escrita distinto), se usa esa.
+        const existente = listaCategorias(state.globalProducts, categoriasCreadas).find(c => mismaCategoria(c.nombre, nombre));
+        if (!existente) categoriasCreadas = [...categoriasCreadas, nombre];
+        renderSelectCategorias(existente ? existente.nombre : nombre);
+    }
+
+    categoriaInput?.addEventListener('change', () => {
+        if (categoriaInput.value === OPCION_NUEVA) return crearCategoria();
+        categoriaPrevia = categoriaInput.value;
+        return undefined;
     });
 
     prevPageBtn?.addEventListener('click', () => {

@@ -179,15 +179,9 @@
                         <svg class="icon" aria-hidden="true"><use href="#icon-search"></use></svg>
                         <input type="search" id="posSearch" class="pos-search" placeholder="Buscar producto o escanear código" aria-label="Buscar producto por nombre o código" autocomplete="off">
                     </label>
+                    <!-- Los botones se arman en categorias.js (las de siempre + las que crean las vendedoras). -->
                     <div class="category-filters" id="posCategoryFilters" aria-label="Categorías de productos">
                         <button type="button" class="cat-filter-btn active" data-cat="Todos">Todos</button>
-                        <button type="button" class="cat-filter-btn" data-cat="Bebidas">🥤 Bebidas</button>
-                        <button type="button" class="cat-filter-btn" data-cat="Snacks">🍿 Snacks</button>
-                        <button type="button" class="cat-filter-btn" data-cat="Lácteos">🥛 Lácteos</button>
-                        <button type="button" class="cat-filter-btn" data-cat="Limpieza">🧼 Limpieza</button>
-                        <button type="button" class="cat-filter-btn" data-cat="Dulces">🍬 Dulces</button>
-                        <button type="button" class="cat-filter-btn" data-cat="Abarrotes">🥫 Abarrotes</button>
-                        <button type="button" class="cat-filter-btn combo-filter" data-cat="Combos">🍔 Combos</button>
                     </div>
                     <div class="pos-grid" id="posGrid" aria-label="Productos disponibles"></div>
                     <div class="catalog-pagination">
@@ -249,15 +243,8 @@
                     </div>
                 </div>
 
-                <div class="category-filters" id="invCategoryFilters">
+                <div class="category-filters" id="invCategoryFilters" aria-label="Filtrar por categoría">
                     <button type="button" class="inv-filter-btn active" data-cat="Todos">Todos</button>
-                    <button type="button" class="inv-filter-btn" data-cat="Bebidas">🥤 Bebidas</button>
-                    <button type="button" class="inv-filter-btn" data-cat="Snacks">🍿 Snacks</button>
-                    <button type="button" class="inv-filter-btn" data-cat="Lácteos">🥛 Lácteos</button>
-                    <button type="button" class="inv-filter-btn" data-cat="Limpieza">🧼 Limpieza</button>
-                    <button type="button" class="inv-filter-btn" data-cat="Dulces">🍬 Dulces</button>
-                    <button type="button" class="inv-filter-btn" data-cat="Abarrotes">🥫 Abarrotes</button>
-                    <button type="button" class="inv-filter-btn combo-filter" data-cat="Combos">🍔 Combos</button>
                 </div>
                 <div class="table-container">
                     <table class="data-table">

@@ -3,6 +3,7 @@ import { state } from "./state.js";
 import { customAlert, showToast } from "./ui.js";
 import { resolveImage, localPorId } from "./constants.js";
 import { escapeHtml, roundMoney, formatMoney, describeError, faltanteDeStock, esVentaPNP } from "./utils.js";
+import { listaCategorias, mismaCategoria, categoriaVigente, htmlFiltrosCategoria } from "./categorias.js";
 
 export function setupPOS({ onSaleCompleted, onPricesChanged } = {}) {
     const posGrid = document.getElementById('posGrid');
@@ -21,7 +22,7 @@ export function setupPOS({ onSaleCompleted, onPricesChanged } = {}) {
     const pnpBtn = document.getElementById('pnpBtn');
     const pnpDetail = document.getElementById('pnpDetail');
     const paymentField = document.getElementById('paymentField');
-    const catBtns = document.querySelectorAll('.cat-filter-btn');
+    const posCategoryFilters = document.getElementById('posCategoryFilters');
 
     const posPrevPageBtn = document.getElementById('posPrevPageBtn');
     const posNextPageBtn = document.getElementById('posNextPageBtn');
@@ -47,7 +48,7 @@ export function setupPOS({ onSaleCompleted, onPricesChanged } = {}) {
         if (resetPage) posCurrentPage = 1;
         const term = posSearch ? posSearch.value.toLowerCase().trim() : '';
         posFilteredProducts = (productsToRender || state.globalProducts).filter(product =>
-            (posCurrentCategory === 'Todos' || product.categoria === posCurrentCategory) &&
+            (posCurrentCategory === 'Todos' || mismaCategoria(product.categoria, posCurrentCategory)) &&
             ((product.nombre || '').toLowerCase().includes(term) || (product.codigo || '').toLowerCase().includes(term))
         );
 
@@ -133,13 +134,20 @@ export function setupPOS({ onSaleCompleted, onPricesChanged } = {}) {
         });
     }
 
-    catBtns.forEach(btn => {
-        btn.addEventListener('click', event => {
-            catBtns.forEach(b => b.classList.remove('active'));
-            event.target.classList.add('active');
-            posCurrentCategory = event.target.getAttribute('data-cat');
-            filterPosProducts();
-        });
+    // Filtros de categoría: las de siempre + las que crearon las vendedoras en este local.
+    function renderCategorias() {
+        if (!posCategoryFilters) return;
+        const categorias = listaCategorias(state.globalProducts);
+        posCurrentCategory = categoriaVigente(posCurrentCategory, categorias);
+        posCategoryFilters.innerHTML = htmlFiltrosCategoria(categorias, 'cat-filter-btn', posCurrentCategory);
+    }
+
+    posCategoryFilters?.addEventListener('click', event => {
+        const boton = event.target.closest?.('.cat-filter-btn');
+        if (!boton) return;
+        posCurrentCategory = boton.getAttribute('data-cat') || 'Todos';
+        renderCategorias();
+        filterPosProducts();
     });
 
     // --- TICKET ---
@@ -312,6 +320,7 @@ export function setupPOS({ onSaleCompleted, onPricesChanged } = {}) {
             return true;
         });
         if (quitados.length) showToast(`Se quitó del ticket porque ya no está disponible: ${quitados.join(', ')}.`, 'warning', 6000);
+        renderCategorias();
         renderPosGrid(products);
         renderCart();
     }
