@@ -2,7 +2,7 @@ import { supabase } from "./supabase.js";
 import { state } from "./state.js";
 import { customAlert, showToast } from "./ui.js";
 import { resolveImage, localPorId } from "./constants.js";
-import { escapeHtml, roundMoney, formatMoney, describeError, faltanteDeStock } from "./utils.js";
+import { escapeHtml, roundMoney, formatMoney, describeError, faltanteDeStock, esVentaPNP } from "./utils.js";
 
 export function setupPOS({ onSaleCompleted, onPricesChanged } = {}) {
     const posGrid = document.getElementById('posGrid');
@@ -18,9 +18,9 @@ export function setupPOS({ onSaleCompleted, onPricesChanged } = {}) {
     const splitYape = document.getElementById('splitYape');
     const cobrarBtn = document.getElementById('cobrarBtn');
     const cobrarHtml = cobrarBtn ? cobrarBtn.innerHTML : 'Cobrar';
-    const cartDiscount = document.getElementById('cartDiscount');
-    const discountSummaryAmount = document.getElementById('discountSummaryAmount');
-    const discountBtns = document.querySelectorAll('.discount-btn');
+    const pnpBtn = document.getElementById('pnpBtn');
+    const pnpDetail = document.getElementById('pnpDetail');
+    const paymentField = document.getElementById('paymentField');
     const catBtns = document.querySelectorAll('.cat-filter-btn');
 
     const posPrevPageBtn = document.getElementById('posPrevPageBtn');
@@ -31,7 +31,7 @@ export function setupPOS({ onSaleCompleted, onPricesChanged } = {}) {
     const posItemsPerPage = 25;
     let posFilteredProducts = [];
     let posCurrentCategory = 'Todos';
-    let activeDiscountPercent = null;
+    let pnpActivo = false; // PNP (policía): el único descuento, 100% del ticket
     let isProcessingSale = false;
     let totalTicket = 0;
     let splitAncla = null; // 'efectivo' | 'yape': el cuadro que escribió la vendedora (se respeta si cambia el total)
@@ -218,15 +218,10 @@ export function setupPOS({ onSaleCompleted, onPricesChanged } = {}) {
             cartItemsContainer.appendChild(row);
         });
 
+        if (state.cart.length === 0) pnpActivo = false;
         const subtotal = cartSubtotal(state.cart);
-        if (activeDiscountPercent !== null && cartDiscount) {
-            cartDiscount.value = roundMoney(subtotal * activeDiscountPercent / 100).toFixed(2);
-        }
-        const discount = Number(cartDiscount ? cartDiscount.value : 0) || 0;
-        if (discountSummaryAmount) {
-            discountSummaryAmount.textContent = Number.isFinite(discount) && discount > 0 ? `- ${formatMoney(discount)}` : 'Opcional';
-        }
-        const total = Math.max(0, roundMoney(subtotal - roundMoney(discount)));
+        const total = roundMoney(subtotal - descuentoDe(subtotal));
+        mostrarPNP(subtotal);
         cartTotalValue.textContent = formatMoney(total);
         ajustarPagoDividido(total);
         if (mobileCartTotal) mobileCartTotal.textContent = cartTotalValue.textContent;
@@ -237,9 +232,8 @@ export function setupPOS({ onSaleCompleted, onPricesChanged } = {}) {
     }
 
     function resetPaymentControls() {
-        activeDiscountPercent = null;
-        if (cartDiscount) cartDiscount.value = '';
-        discountBtns.forEach(b => b.classList.remove('active-discount'));
+        pnpActivo = false;
+        mostrarPNP(0);
         if (paymentMethod) paymentMethod.value = 'Efectivo';
         if (splitEfectivo) splitEfectivo.value = '';
         if (splitYape) splitYape.value = '';
@@ -322,26 +316,29 @@ export function setupPOS({ onSaleCompleted, onPricesChanged } = {}) {
         renderCart();
     }
 
-    cartDiscount?.addEventListener('input', () => {
-        activeDiscountPercent = null;
-        discountBtns.forEach(b => b.classList.remove('active-discount'));
-        renderCart();
-    });
+    // --- DESCUENTO PNP ---
+    // Con PNP activo el ticket queda en S/ 0.00 y no se pide método de pago.
+    const descuentoDe = subtotal => (pnpActivo ? subtotal : 0);
 
-    discountBtns.forEach(btn => {
-        btn.addEventListener('click', event => {
-            const isAlreadyActive = event.target.classList.contains('active-discount');
-            discountBtns.forEach(b => b.classList.remove('active-discount'));
-            if (isAlreadyActive || cartSubtotal(state.cart) <= 0) {
-                activeDiscountPercent = null;
-                if (cartDiscount) cartDiscount.value = '';
-                renderCart();
-                return;
-            }
-            event.target.classList.add('active-discount');
-            activeDiscountPercent = parseInt(event.target.getAttribute('data-percent'), 10);
-            renderCart();
-        });
+    function mostrarPNP(subtotal) {
+        if (pnpBtn) {
+            pnpBtn.classList.toggle('is-active', pnpActivo);
+            pnpBtn.setAttribute('aria-pressed', String(pnpActivo));
+        }
+        if (pnpDetail) pnpDetail.textContent = pnpActivo ? `- ${formatMoney(subtotal)} · toca para quitar` : '100% de descuento';
+        paymentField?.classList.toggle('hidden', pnpActivo);
+        if (pnpActivo) splitPaymentSection?.classList.add('hidden');
+        else splitPaymentSection?.classList.toggle('hidden', paymentMethod?.value !== 'Ambos');
+    }
+
+    pnpBtn?.addEventListener('click', () => {
+        if (isProcessingSale) return;
+        if (!pnpActivo && state.cart.length === 0) {
+            showToast('Primero agrega los productos al ticket.', 'warning');
+            return;
+        }
+        pnpActivo = !pnpActivo;
+        renderCart();
     });
 
     paymentMethod?.addEventListener('change', event => {
@@ -389,16 +386,19 @@ export function setupPOS({ onSaleCompleted, onPricesChanged } = {}) {
         if (discountRow) discountRow.classList.toggle('hidden', descuento <= 0);
         setText('receiptDiscount', `- ${formatMoney(descuento)}`);
         setText('receiptTotal', formatMoney(venta.total));
-        setText('receiptPaymentMethod', venta.metodo_pago === 'Ambos'
-            ? `${formatMoney(venta.efectivo)} Efvo | ${formatMoney(venta.yape)} Yape`
-            : `Pago: ${venta.metodo_pago === 'Yape' ? 'Yape / Plin' : venta.metodo_pago}`);
+        const pnp = esVentaPNP(venta);
+        setText('receiptPaymentMethod', pnp ? 'PNP: 100% de descuento'
+            : venta.metodo_pago === 'Ambos'
+                ? `${formatMoney(venta.efectivo)} Efvo | ${formatMoney(venta.yape)} Yape`
+                : `Pago: ${venta.metodo_pago === 'Yape' ? 'Yape / Plin' : venta.metodo_pago}`);
 
         // Aviso de venta exitosa. La boleta ya no se imprime sola (no todos los locales tienen
         // impresora): solo si la vendedora toca "Imprimir boleta".
         const pago = venta.metodo_pago === 'Ambos' ? 'Efectivo + Yape'
             : venta.metodo_pago === 'Yape' ? 'Yape / Plin' : (venta.metodo_pago || 'Efectivo');
         setText('saleSuccessTotal', formatMoney(venta.total));
-        setText('saleSuccessDetail', `Cobrado con ${pago}${numero ? ` · Venta N° ${numero.length > 12 ? numero.slice(0, 8).toUpperCase() : numero}` : ''}`);
+        const textoPago = pnp ? 'Venta PNP (100% de descuento)' : `Cobrado con ${pago}`;
+        setText('saleSuccessDetail', `${textoPago}${numero ? ` · Venta N° ${numero.length > 12 ? numero.slice(0, 8).toUpperCase() : numero}` : ''}`);
 
         receiptModal.classList.remove('hidden');
         const closeBtn = document.getElementById('closeReceiptBtn');
@@ -432,13 +432,10 @@ export function setupPOS({ onSaleCompleted, onPricesChanged } = {}) {
             return;
         }
         const subtotal = cartSubtotal(saleItems);
-        const discount = Number(cartDiscount ? cartDiscount.value : 0);
-        if (!Number.isFinite(discount) || discount < 0 || roundMoney(discount) > subtotal) {
-            await customAlert('El descuento debe estar entre cero y el subtotal del ticket.', 'Descuento inválido', '⚠️');
-            return;
-        }
-        const total = roundMoney(subtotal - roundMoney(discount));
-        const metodo = paymentMethod ? paymentMethod.value : 'Efectivo';
+        const discount = descuentoDe(subtotal);
+        const total = roundMoney(subtotal - discount);
+        // Venta PNP: no entra dinero, se registra como efectivo S/ 0.00.
+        const metodo = pnpActivo ? 'Efectivo' : (paymentMethod ? paymentMethod.value : 'Efectivo');
         if (!['Efectivo', 'Yape', 'Ambos'].includes(metodo)) {
             await customAlert('Selecciona un método de pago válido.', 'Pago inválido', '⚠️');
             return;

@@ -1,9 +1,11 @@
 import { supabase } from "./supabase.js";
 import { state } from "./state.js";
 import { customAlert, customConfirm, customPrompt, showToast } from "./ui.js";
-import { escapeHtml, formatMoney, describeError, fetchAll, resumirVentas, puedeReembolsar, resumenProductos, nombreCorto, dayRange, toDateInputValue, parseLocalDate, REEMBOLSO_CAJERO_MINUTOS } from "./utils.js";
+import { escapeHtml, formatMoney, roundMoney, describeError, fetchAll, resumirVentas, montosDeVenta, esVentaPNP, puedeReembolsar, resumenProductos, nombreCorto, dayRange, toDateInputValue, parseLocalDate, REEMBOLSO_CAJERO_MINUTOS } from "./utils.js";
 
 // Una sola consulta por día: la tabla y el cierre de caja salen de las mismas ventas.
+const COLUMNAS_TABLA = 10;
+const NOMBRE_METODO = { Efectivo: 'Efectivo', Yape: 'Yape / Plin', Ambos: 'Efectivo + Yape / Plin' };
 const COLUMNAS_HISTORIAL = 'id, fecha, local, total, descuento, efectivo, yape, metodo_pago, estado, detalles, creado_por_email, reembolsado_por_email, reembolsado_en, motivo_reembolso';
 
 export function setupHistory({ onStockChanged } = {}) {
@@ -79,16 +81,17 @@ export function setupHistory({ onStockChanged } = {}) {
     // r: resumen de resumirVentas, o el que devuelve cierre_de_caja en Supabase
     function renderCierre(r) {
         if (!cierreResumen) return;
-        const card = (titulo, valor, detalle = '') => `
-            <div class="cash-card">
+        const card = (titulo, valor, detalle = '', clase = '') => `
+            <div class="cash-card${clase ? ` ${clase}` : ''}">
                 <span class="cash-card-title">${escapeHtml(titulo)}</span>
                 <strong class="cash-card-value">${escapeHtml(valor)}</strong>
                 ${detalle ? `<span class="cash-card-detail">${escapeHtml(detalle)}</span>` : ''}
             </div>`;
         cierreResumen.innerHTML = [
             card('Ventas', String(r.cantidad), `${formatMoney(r.ventas)} cobrados`),
-            card('Efectivo en caja', formatMoney(r.efectivo), 'Debe coincidir con el conteo'),
-            card('Yape / Plin', formatMoney(r.yape)),
+            card('Efectivo en caja', formatMoney(r.efectivo), 'Debe coincidir con el conteo', 'is-efectivo'),
+            card('Yape / Plin', formatMoney(r.yape), '', 'is-yape'),
+            card('Efectivo + Yape / Plin', formatMoney(roundMoney(r.efectivo + r.yape)), 'Todo lo cobrado del día', 'is-total'),
             card('Descuentos', formatMoney(r.descuentos)),
             card('Reembolsos', String(r.cantidadReembolsos), formatMoney(r.reembolsos))
         ].join('');
@@ -109,10 +112,14 @@ export function setupHistory({ onStockChanged } = {}) {
         ventasList.innerHTML = '';
         if (ventasCargadas.length === 0) {
             const vacio = dia === toDateInputValue() ? 'Todavía no hay ventas hoy.' : 'No hubo ventas ese día.';
-            ventasList.innerHTML = `<tr><td colspan="8" class="table-message">${vacio}</td></tr>`;
+            ventasList.innerHTML = `<tr><td colspan="${COLUMNAS_TABLA}" class="table-message">${vacio}</td></tr>`;
             return;
         }
         const now = Date.now();
+        // Yape/Plin y efectivo de cada venta; en 0 se ve "—" para que se lea rápido.
+        const monto = (valor, clase, tachado) => (valor > 0
+            ? `<td class="money-cell ${clase}${tachado}"><strong>${escapeHtml(formatMoney(valor))}</strong></td>`
+            : `<td class="money-cell ${clase} is-empty"><span class="muted">—</span></td>`);
         for (const venta of ventasCargadas) {
             const fecha = new Date(venta.fecha);
             const productos = resumenProductos(venta.detalles);
@@ -121,14 +128,20 @@ export function setupHistory({ onStockChanged } = {}) {
             const accion = puedeReembolsar(venta, state.perfil, now)
                 ? `<button type="button" class="secondary-btn btn-refund" data-id="${escapeHtml(venta.id)}">Reembolsar</button>`
                 : '<span class="muted">—</span>';
+            const { efectivo, yape } = montosDeVenta(venta);
+            const metodo = esVentaPNP(venta)
+                ? '<span class="pnp-pill">PNP</span>'
+                : escapeHtml(NOMBRE_METODO[venta.metodo_pago] || venta.metodo_pago || 'Efectivo');
             const row = document.createElement('tr');
             if (reembolsada) row.className = 'is-refunded-row';
             row.innerHTML = `
                 <td class="date-cell"><strong>${escapeHtml(fecha.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }))}</strong></td>
-                <td class="nowrap">${escapeHtml(venta.metodo_pago || 'Efectivo')}</td>
+                <td class="method-cell">${metodo}</td>
                 <td class="products-cell">${escapeHtml(productos)}</td>
-                <td class="money-cell${tachado}"><strong>${escapeHtml(formatMoney(venta.total))}</strong></td>
-                <td class="money-cell discount-cell${tachado}">${escapeHtml(formatMoney(venta.descuento))}</td>
+                ${monto(yape, 'yape-cell', tachado)}
+                ${monto(efectivo, 'cash-cell', tachado)}
+                <td class="money-cell total-cell${tachado}"><strong>${escapeHtml(formatMoney(venta.total))}</strong></td>
+                ${monto(Number(venta.descuento) || 0, 'discount-cell', tachado)}
                 <td>${escapeHtml(nombreCorto(venta.creado_por_email) || '—')}</td>
                 <td>${estadoHtml(venta)}</td>
                 <td>${accion}</td>
@@ -143,7 +156,7 @@ export function setupHistory({ onStockChanged } = {}) {
         const range = dayRange(dia);
         const carga = ++cargaActual;
         aplicarModo(dia);
-        ventasList.innerHTML = '<tr><td colspan="8" class="table-message">Cargando...</td></tr>';
+        ventasList.innerHTML = `<tr><td colspan="${COLUMNAS_TABLA}" class="table-message">Cargando...</td></tr>`;
         if (cierreResumen) cierreResumen.innerHTML = '<p class="muted">Calculando…</p>';
         try {
             if (soloHoy() && dia !== toDateInputValue()) {
@@ -163,7 +176,7 @@ export function setupHistory({ onStockChanged } = {}) {
             if (carga !== cargaActual) return;
             console.error(error);
             const mensaje = escapeHtml(describeError(error));
-            ventasList.innerHTML = `<tr><td colspan="8" class="table-message is-error">No se pudo cargar el historial: ${mensaje}</td></tr>`;
+            ventasList.innerHTML = `<tr><td colspan="${COLUMNAS_TABLA}" class="table-message is-error">No se pudo cargar el historial: ${mensaje}</td></tr>`;
             if (cierreResumen) cierreResumen.innerHTML = `<p class="table-message is-error">No se pudo calcular el cierre: ${mensaje}</p>`;
         }
     }
@@ -184,7 +197,7 @@ export function setupHistory({ onStockChanged } = {}) {
             cantidadReembolsos: Number(r.cantidad_reembolsos) || 0,
             reembolsos: Number(r.reembolsos) || 0
         });
-        ventasList.innerHTML = '<tr><td colspan="8" class="table-message">El detalle de cada venta se ve solo el mismo día. Arriba tienes el cierre de caja de ese día.</td></tr>';
+        ventasList.innerHTML = `<tr><td colspan="${COLUMNAS_TABLA}" class="table-message">El detalle de cada venta se ve solo el mismo día. Arriba tienes el cierre de caja de ese día.</td></tr>`;
     }
 
     refreshHistoryBtn?.addEventListener('click', () => loadHistory());

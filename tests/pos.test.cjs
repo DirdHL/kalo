@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const { loadModule, utils, constants, element, rendered, fakeDocument, elements, fakeSupabase, plain } = require('./helpers.cjs');
 
 const POS_IDS = ['posGrid', 'posSearch', 'cartItems', 'cartTotalValue', 'cartItemCount', 'mobileCartTotal', 'catalogCount',
-    'paymentMethod', 'splitPaymentSection', 'splitEfectivo', 'splitYape', 'cobrarBtn', 'cartDiscount', 'discountSummaryAmount',
+    'paymentMethod', 'splitPaymentSection', 'splitEfectivo', 'splitYape', 'cobrarBtn', 'pnpBtn', 'pnpDetail', 'paymentField',
     'posPrevPageBtn', 'posNextPageBtn', 'posPaginationInfo', 'receiptModal', 'receiptLocalName', 'receiptSaleNumber',
     'receiptDate', 'receiptItems', 'receiptSubtotal', 'receiptDiscountRow', 'receiptDiscount', 'receiptTotal',
     'receiptPaymentMethod', 'closeReceiptBtn', 'printReceiptBtn', 'saleSuccessTotal', 'saleSuccessDetail'];
@@ -17,7 +17,6 @@ function setupPos({ products = [product()], cart = [], combos = new Map(), rpc, 
     ids.splitPaymentSection.classList.add('hidden');
     ids.receiptModal.classList.add('hidden');
     ids.cobrarBtn.innerHTML = 'Cobrar <svg class="icon"></svg>';
-    const discountButton = element('button', { attributes: { 'data-percent': '10' } });
     const categoryButton = element('button', { attributes: { 'data-cat': 'Snacks' } });
     const state = { cart: cart.map(item => ({ ...item })), globalProducts: products.map(p => ({ ...p })), combos, currentLocal: 'LAS BRISAS' };
     const alerts = [];
@@ -41,7 +40,7 @@ function setupPos({ products = [product()], cart = [], combos = new Map(), rpc, 
     };
     const supabase = fakeSupabase({ rpc: { registrar_venta: rpc || servidor } });
     const { exports } = loadModule('pos.js', {
-        document: fakeDocument(ids, { '.discount-btn': [discountButton], '.cat-filter-btn': [categoryButton] }),
+        document: fakeDocument(ids, { '.cat-filter-btn': [categoryButton] }),
         window: { addEventListener() {}, removeEventListener() {}, print() { prints.push(1); } },
         state, supabase,
         setTimeout(callback) { const id = timers.size + 1; timers.set(id, callback); return id; },
@@ -53,36 +52,57 @@ function setupPos({ products = [product()], cart = [], combos = new Map(), rpc, 
         ...utils()
     });
     const pos = exports.setupPOS({ onSaleCompleted, onPricesChanged });
-    return { ids, state, supabase, pos, alerts, toasts, timers, prints, discountButton, categoryButton };
+    return { ids, state, supabase, pos, alerts, toasts, timers, prints, categoryButton };
 }
 
 const clickQty = (t, index, delta) => t.ids.cartItems.dispatch('click', {
     target: { closest: () => ({ dataset: { index: String(index), qtyDelta: String(delta) } }) }
 });
 
-test('los descuentos porcentuales siguen la cantidad y el manual queda fijo', async () => {
+test('el botón PNP deja el ticket en S/ 0.00, sigue la cantidad y se quita al tocarlo otra vez', async () => {
     const t = setupPos({ cart: [{ ...product(), qty: 1 }] });
-    await t.discountButton.dispatch('click');
-    assert.equal(t.ids.cartDiscount.value, '1.00');
-    assert.equal(t.ids.cartTotalValue.textContent, 'S/ 9.00');
+    await t.ids.pnpBtn.click();
+    assert.equal(t.ids.cartTotalValue.textContent, 'S/ 0.00');
+    assert.equal(t.ids.pnpBtn.classList.contains('is-active'), true);
+    assert.equal(t.ids.pnpBtn.getAttribute('aria-pressed'), 'true');
+    assert.equal(t.ids.pnpDetail.textContent, '- S/ 10.00 · toca para quitar');
+    assert.equal(t.ids.paymentField.classList.contains('hidden'), true, 'sin método de pago: no se cobra nada');
     t.pos.addToCart(product());
-    assert.equal(t.ids.cartDiscount.value, '2.00');
-    assert.equal(t.ids.cartTotalValue.textContent, 'S/ 18.00');
-    t.ids.cartDiscount.value = '3';
-    await t.ids.cartDiscount.dispatch('input');
-    t.pos.addToCart(product());
-    assert.equal(t.ids.cartDiscount.value, '3');
-    assert.equal(t.ids.cartTotalValue.textContent, 'S/ 27.00');
+    assert.equal(t.ids.cartTotalValue.textContent, 'S/ 0.00');
+    assert.equal(t.ids.pnpDetail.textContent, '- S/ 20.00 · toca para quitar');
+
+    await t.ids.pnpBtn.click();
+    assert.equal(t.ids.cartTotalValue.textContent, 'S/ 20.00');
+    assert.equal(t.ids.pnpBtn.classList.contains('is-active'), false);
+    assert.equal(t.ids.pnpDetail.textContent, '100% de descuento');
+    assert.equal(t.ids.paymentField.classList.contains('hidden'), false);
+
+    const vacio = setupPos();
+    await vacio.ids.pnpBtn.click();
+    assert.equal(vacio.ids.pnpBtn.classList.contains('is-active'), false, 'con el ticket vacío no se activa');
+    assert.match(vacio.toasts[0].message, /agrega los productos/);
 });
 
-test('cobrar valida descuento y pago dividido antes de llamar a la base', async () => {
-    for (const discount of ['-1', '11', 'Infinity', 'abc']) {
-        const t = setupPos({ cart: [{ ...product(), qty: 1 }] });
-        t.ids.cartDiscount.value = discount;
-        await t.pos.checkout();
-        assert.equal(t.supabase.rpcCalls.length, 0, `descuento ${discount}`);
-        assert.equal(t.state.cart.length, 1);
-    }
+test('una venta PNP se registra con 100% de descuento, en efectivo S/ 0.00', async () => {
+    const t = setupPos({ cart: [{ ...product(), qty: 2 }] });
+    t.ids.paymentMethod.value = 'Ambos';
+    await t.ids.paymentMethod.dispatch('change');
+    await t.ids.pnpBtn.click();
+    assert.equal(t.ids.splitPaymentSection.classList.contains('hidden'), true);
+    await t.pos.checkout();
+
+    assert.equal(t.alerts.length, 0, t.alerts.join(' | '));
+    assert.deepEqual(plain(t.supabase.rpcCalls[0].params), {
+        p_local: 'LAS BRISAS', p_items: [{ id: 1, cantidad: 2 }],
+        p_descuento: 20, p_metodo: 'Efectivo', p_efectivo: null, p_yape: null, p_total_esperado: 0
+    });
+    assert.equal(t.ids.receiptPaymentMethod.textContent, 'PNP: 100% de descuento');
+    assert.equal(t.ids.saleSuccessDetail.textContent, 'Venta PNP (100% de descuento) · Venta N° 77');
+    assert.equal(t.ids.pnpBtn.classList.contains('is-active'), false, 'la siguiente venta empieza sin PNP');
+    assert.equal(t.ids.paymentField.classList.contains('hidden'), false);
+});
+
+test('cobrar valida el pago dividido antes de llamar a la base', async () => {
     const negative = setupPos({ cart: [{ ...product(), qty: 1 }] });
     negative.ids.paymentMethod.value = 'Ambos';
     negative.ids.splitEfectivo.value = '-5';
@@ -139,15 +159,16 @@ test('pago dividido: si cambia el total se respeta lo escrito, sin pasarse del t
 
     t.pos.addToCart(agua);
     assert.deepEqual([t.ids.splitEfectivo.value, t.ids.splitYape.value], ['3', '5.00'], 'total 8: el efectivo escrito se queda');
-    t.ids.cartDiscount.value = '6';
-    await t.ids.cartDiscount.dispatch('input');
-    assert.deepEqual([t.ids.splitEfectivo.value, t.ids.splitYape.value], ['2.00', '0.00'], 'total 2: el efectivo no puede pasar del total');
+    t.ids.splitEfectivo.value = '6';
+    await t.ids.splitEfectivo.dispatch('input');
+    await clickQty(t, 0, -1);
+    assert.deepEqual([t.ids.splitEfectivo.value, t.ids.splitYape.value], ['4.00', '0.00'], 'total 4: el efectivo no puede pasar del total');
 
     t.ids.splitYape.value = '10';
     await t.ids.splitYape.dispatch('input');
     assert.equal(t.ids.splitEfectivo.value, '0.00');
     await t.ids.splitYape.dispatch('change');
-    assert.equal(t.ids.splitYape.value, '2.00', 'al salir del cuadro se ajusta al total');
+    assert.equal(t.ids.splitYape.value, '4.00', 'al salir del cuadro se ajusta al total');
 
     // Volver a elegir el pago dividido reparte de nuevo; con céntimos impares igual suma el total.
     const galleta = product(2, { precio_venta: 4.25 });
@@ -169,10 +190,9 @@ test('una venta usa registrar_venta con el total esperado y muestra la boleta qu
     let completed = 0;
     const products = [product(1), product(2, { precio_venta: 3.333 })];
     const t = setupPos({ products, cart: [{ ...products[0], qty: 2 }, { ...products[1], qty: 3 }], onSaleCompleted: async () => { completed++; } });
-    t.ids.cartDiscount.value = '1';
     t.ids.paymentMethod.value = 'Ambos';
     t.ids.splitEfectivo.value = '20';
-    t.ids.splitYape.value = '8.99';
+    t.ids.splitYape.value = '9.99';
     await t.pos.checkout();
 
     assert.equal(t.supabase.rpcCalls.length, 1);
@@ -180,7 +200,7 @@ test('una venta usa registrar_venta con el total esperado y muestra la boleta qu
         name: 'registrar_venta',
         params: {
             p_local: 'LAS BRISAS', p_items: [{ id: 1, cantidad: 2 }, { id: 2, cantidad: 3 }],
-            p_descuento: 1, p_metodo: 'Ambos', p_efectivo: 20, p_yape: 8.99, p_total_esperado: 28.99
+            p_descuento: 0, p_metodo: 'Ambos', p_efectivo: 20, p_yape: 9.99, p_total_esperado: 29.99
         }
     });
     assert.equal(t.state.cart.length, 0);
@@ -188,14 +208,14 @@ test('una venta usa registrar_venta con el total esperado y muestra la boleta qu
     assert.equal(t.ids.receiptModal.classList.contains('hidden'), false);
     assert.equal(t.ids.receiptSaleNumber.textContent, 'Venta N° 77');
     assert.equal(t.ids.receiptLocalName.textContent, 'Local: Las Brisas');
-    assert.equal(t.ids.receiptPaymentMethod.textContent, 'S/ 20.00 Efvo | S/ 8.99 Yape');
+    assert.equal(t.ids.receiptPaymentMethod.textContent, 'S/ 20.00 Efvo | S/ 9.99 Yape');
     assert.equal(t.ids.receiptItems.children.length, 2);
     assert.equal(t.ids.cobrarBtn.innerHTML, 'Cobrar <svg class="icon"></svg>', 'el botón recupera su ícono');
     assert.equal(t.ids.cobrarBtn.disabled, false);
     assert.equal(completed, 1);
 
     // Aviso de venta exitosa, sin imprimir solo.
-    assert.equal(t.ids.saleSuccessTotal.textContent, 'S/ 28.99');
+    assert.equal(t.ids.saleSuccessTotal.textContent, 'S/ 29.99');
     assert.equal(t.ids.saleSuccessDetail.textContent, 'Cobrado con Efectivo + Yape · Venta N° 77');
     assert.equal(t.prints.length, 0, 'la boleta no se imprime automáticamente');
     assert.equal(t.timers.size, 0);

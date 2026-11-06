@@ -126,6 +126,21 @@ export function faltanteDeStock(cart, combos, productsById) {
 }
 
 // Totales de un conjunto de ventas. Las reembolsadas se cuentan aparte.
+// Cuánto de una venta entró en efectivo y cuánto por Yape/Plin.
+// Las ventas antiguas no guardaban el reparto: se toma el total según el método.
+export function montosDeVenta(venta) {
+    const total = Number(venta?.total) || 0;
+    if (venta?.efectivo == null && venta?.yape == null) {
+        return venta?.metodo_pago === 'Yape' ? { efectivo: 0, yape: total } : { efectivo: total, yape: 0 };
+    }
+    return { efectivo: Number(venta.efectivo) || 0, yape: Number(venta.yape) || 0 };
+}
+
+// Descuento de la PNP (policía): es el único descuento y cubre todo el ticket (total S/ 0.00).
+export function esVentaPNP(venta) {
+    return (Number(venta?.descuento) || 0) > 0 && roundMoney(Number(venta?.total) || 0) === 0;
+}
+
 export function resumirVentas(ventas) {
     const resumen = { cantidad: 0, ventas: 0, descuentos: 0, costo: 0, efectivo: 0, yape: 0, reembolsos: 0, cantidadReembolsos: 0 };
     for (const venta of ventas) {
@@ -139,13 +154,9 @@ export function resumirVentas(ventas) {
         resumen.ventas += total;
         resumen.descuentos += Number(venta.descuento) || 0;
         resumen.costo += Number(venta.costo_total) || 0;
-        if (venta.efectivo == null && venta.yape == null) {
-            if (venta.metodo_pago === 'Yape') resumen.yape += total;
-            else resumen.efectivo += total;
-        } else {
-            resumen.efectivo += Number(venta.efectivo) || 0;
-            resumen.yape += Number(venta.yape) || 0;
-        }
+        const montos = montosDeVenta(venta);
+        resumen.efectivo += montos.efectivo;
+        resumen.yape += montos.yape;
     }
     for (const key of ['ventas', 'descuentos', 'costo', 'efectivo', 'yape', 'reembolsos']) resumen[key] = roundMoney(resumen[key]);
     resumen.margen = roundMoney(resumen.ventas - resumen.costo);

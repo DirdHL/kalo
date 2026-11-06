@@ -203,23 +203,12 @@
                     </div>
                     <div class="cart-items" id="cartItems"></div>
                     <div class="cart-controls">
-                        <details class="discount-settings">
-                            <summary>Aplicar descuento <span id="discountSummaryAmount">Opcional</span></summary>
-                            <div class="discount-content">
-                                <span class="control-label">Descuento rápido</span>
-                                <div class="discount-options" aria-label="Descuentos porcentuales">
-                                    <button type="button" class="discount-btn secondary-btn" data-percent="25">25%</button>
-                                    <button type="button" class="discount-btn secondary-btn" data-percent="50">50%</button>
-                                    <button type="button" class="discount-btn secondary-btn" data-percent="75">75%</button>
-                                    <button type="button" class="discount-btn secondary-btn" data-percent="100">100%</button>
-                                </div>
-                                <div class="discount-field">
-                                    <label for="cartDiscount">Descuento en soles</label>
-                                    <input type="number" id="cartDiscount" class="styled-input" placeholder="0.00" step="0.01" min="0" inputmode="decimal">
-                                </div>
-                            </div>
-                        </details>
-                        <div class="payment-field">
+                        <!-- El único descuento: la PNP (policía) no paga nada (100%). -->
+                        <button type="button" id="pnpBtn" class="pnp-btn" aria-pressed="false">
+                            <span class="pnp-btn-title">PNP</span>
+                            <span class="pnp-btn-detail" id="pnpDetail">100% de descuento</span>
+                        </button>
+                        <div class="payment-field" id="paymentField">
                             <label class="control-label" for="paymentMethod">Método de pago</label>
                             <select id="paymentMethod" class="styled-input">
                                 <option value="Efectivo">Efectivo</option>
@@ -436,15 +425,17 @@
                                 <th>Hora</th>
                                 <th>Método</th>
                                 <th>Productos</th>
-                                <th>Total pagado</th>
+                                <th class="yape-col">Yape / Plin</th>
+                                <th class="cash-col">Efectivo</th>
+                                <th class="total-col">Total pagado</th>
                                 <th>Descuento</th>
                                 <th>Atendió</th>
                                 <th>Estado</th>
-                                <th>Acciones</th>
+                                <th>Reembolso</th>
                             </tr>
                         </thead>
                         <tbody id="ventasList">
-                            <tr><td colspan="8" class="table-message">No hay ventas para mostrar.</td></tr>
+                            <tr><td colspan="10" class="table-message">No hay ventas para mostrar.</td></tr>
                         </tbody>
                     </table>
                 </div>

@@ -218,11 +218,36 @@ test('el cierre de caja suma efectivo y Yape del día sin reembolsos', async () 
     assert.match(html, /Efectivo en caja<\/span>\s*<strong class="cash-card-value">S\/ 12\.00/);
     assert.match(html, /Yape \/ Plin<\/span>\s*<strong class="cash-card-value">S\/ 4\.00/);
     assert.match(html, /Reembolsos<\/span>\s*<strong class="cash-card-value">1<\/strong>\s*<span class="cash-card-detail">S\/ 8\.00/);
+    assert.match(html, /is-total">\s*<span class="cash-card-title">Efectivo \+ Yape \/ Plin<\/span>\s*<strong class="cash-card-value">S\/ 16\.00/, 'la suma de efectivo y Yape/Plin');
     assert.equal(html.includes('Margen'), false, 'el cierre no muestra márgenes');
     const query = cierreQueries(t)[0];
     assert.deepEqual(plain(query.filters.map(f => f.slice(0, 2))), [['eq', 'local'], ['gte', 'fecha'], ['lt', 'fecha']]);
     assert.equal(t.ids.ventasList.children.length, 3, 'la tabla muestra las 3 ventas de hoy');
     assert.equal(query.columns.includes('costo_total'), false, 'no pide costos');
+});
+
+test('cada venta muestra Yape/Plin, efectivo y total pagado en columnas aparte (y PNP en amarillo)', async () => {
+    const t = setupHistory({ ventas: [
+        venta(1, { total: 10, efectivo: 10, yape: 0, fecha: hoyHace(40) }),
+        venta(2, { total: 6, efectivo: 2, yape: 4, metodo_pago: 'Ambos', descuento: 0, fecha: hoyHace(30) }),
+        venta(3, { total: 5, efectivo: null, yape: null, metodo_pago: 'Yape', fecha: hoyHace(20) }),
+        venta(4, { total: 0, subtotal: 12, efectivo: 0, yape: 0, descuento: 12, metodo_pago: 'Efectivo', fecha: hoyHace(10) })
+    ] });
+    await t.history.loadHistory();
+    const celdas = row => [...row.innerHTML.matchAll(/<td class="([^"]*)"[^>]*>([\s\S]*?)<\/td>|<td>([\s\S]*?)<\/td>/g)]
+        .map(m => ({ clase: m[1] || '', texto: (m[2] ?? m[3]).replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim() }));
+    const filas = t.ids.ventasList.children.map(celdas);
+    assert.equal(filas[0].length, 10, 'hora, método, productos, Yape/Plin, efectivo, total, descuento, atendió, estado, reembolso');
+    const columnas = fila => fila.slice(1, 7).filter((_, i) => i !== 1).map(c => c.texto);
+    // Más reciente primero
+    assert.deepEqual(columnas(filas[0]), ['PNP', '—', '—', 'S/ 0.00', 'S/ 12.00']);
+    assert.deepEqual(columnas(filas[1]), ['Yape / Plin', 'S/ 5.00', '—', 'S/ 5.00', '—'], 'venta antigua sin reparto guardado');
+    assert.deepEqual(columnas(filas[2]), ['Efectivo + Yape / Plin', 'S/ 4.00', 'S/ 2.00', 'S/ 6.00', '—']);
+    assert.deepEqual(columnas(filas[3]), ['Efectivo', '—', 'S/ 10.00', 'S/ 10.00', '—']);
+    assert.match(filas[3][3].clase, /yape-cell/);
+    assert.match(filas[3][4].clase, /cash-cell/);
+    assert.match(filas[3][5].clase, /total-cell/);
+    assert.match(t.ids.ventasList.children[0].innerHTML, /class="pnp-pill">PNP</);
 });
 
 test('el SQL de cierres anteriores solo da totales de un día y no abre la tabla ventas', () => {

@@ -118,17 +118,13 @@ h2 { font-size: 20px; }
 .qty-btn:hover { background: var(--soft-teal); border-color: #a9d3d4; }
 .cart-controls { min-height: 0; max-height: 44vh; overflow-y: auto; padding: 12px 16px; border-top: 1px solid var(--card-border); scrollbar-width: auto; }
 .control-label { display: block; margin-bottom: 7px; color: var(--text-secondary); font-size: 14px; font-weight: 600; }
-.discount-settings { margin-bottom: 12px; border-bottom: 1px solid var(--card-border); }
-.discount-settings summary { min-height: 42px; padding: 3px 0 10px; color: var(--text-secondary); font-size: 16px; cursor: pointer; }
-.discount-settings summary::marker { color: var(--primary); font-size: 14px; }
-.discount-settings summary span { float: right; margin-top: 2px; color: var(--primary); font-size: 14px; font-weight: 500; }
-.discount-content { padding-top: 6px; }
-.discount-options { display: flex; align-items: center; gap: 5px; margin-bottom: 9px; }
-.discount-options .discount-btn { flex: 1; min-width: 0; min-height: 40px; padding: 5px; font-size: 16px; }
-.active-discount { background: var(--soft-teal) !important; color: var(--primary) !important; border-color: #7e9d89 !important; }
-.discount-field { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 11px; }
-.discount-field label { color: var(--text-secondary); font-size: 16px; }
-.discount-field .styled-input { width: 92px; min-height: 40px; padding: 6px 9px; font-size: 16px; text-align: right; }
+/* Botón PNP (policía): el único descuento, 100% del ticket. */
+.pnp-btn { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; min-height: 48px; margin-bottom: 12px; padding: 8px 14px; border: 2px solid #d9a400; border-radius: 10px; background: #ffd84d; color: #2e2400; text-align: left; }
+.pnp-btn:hover { background: #ffcf26; }
+.pnp-btn-title { font-size: 20px; font-weight: 800; letter-spacing: .06em; }
+.pnp-btn-detail { font-size: 14px; font-weight: 600; }
+.pnp-btn.is-active { border-color: #2e2400; background: #f5b800; box-shadow: inset 0 0 0 2px #2e2400; }
+.pnp-btn.is-active .pnp-btn-title::before { content: "✓ "; }
 .payment-field select { min-height: 44px; padding: 8px 10px; font-size: 16px; font-weight: 500; background: var(--card-bg); }
 .split-payment { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; padding: 10px; background: #e0e8d8; border: 1px solid #a5bcab; border-radius: 8px; }
 .split-payment label { display: block; min-width: 0; color: var(--text-secondary); font-size: 14px; }
@@ -287,7 +283,6 @@ body:has(.modal-overlay:not(.hidden)) { overflow: hidden; }
     .qty-btn { width: 40px; height: 40px; }
     .cart-item-title { font-size: 16px; }
     .cart-item-price { font-size: 14px; }
-    .discount-btn { min-height: 42px; font-size: 14px; }
     .glass-card:not(.top-nav):not(.login-card) { padding: 15px; }
     #dashboardCard, #statsView, #historyView, #alertsView { min-height: 380px; }
     .dashboard-header { gap: 12px !important; }
@@ -406,6 +401,13 @@ body:has(.modal-overlay:not(.hidden)) { overflow: hidden; }
 .cash-card-title { color: var(--text-secondary); font-size: 13px; font-weight: 600; }
 .cash-card-value { font-size: 22px; font-variant-numeric: tabular-nums; }
 .cash-card-detail { color: var(--text-secondary); font-size: 12px; }
+/* Mismos colores que las columnas del historial: Yape/Plin morado, efectivo verde, total azul. */
+.cash-card.is-efectivo { border-top: 4px solid #147556; }
+.cash-card.is-efectivo .cash-card-value { color: #147556; }
+.cash-card.is-yape { border-top: 4px solid #742f96; }
+.cash-card.is-yape .cash-card-value { color: #742f96; }
+.cash-card.is-total { border: 1px solid #9fbbe0; border-top: 4px solid #1f4f8f; background: #eef3fa; }
+.cash-card.is-total .cash-card-value { color: #1f4f8f; }
 
 .history-table { font-size: 16px !important; }
 /* Historial: la tabla no se encoge en un cuadro con scroll propio; crece con las ventas y baja toda la página. */
@@ -423,6 +425,15 @@ body:has(.modal-overlay:not(.hidden)) { overflow: hidden; }
 .products-cell { max-width: 190px; overflow: hidden; color: var(--text-secondary); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
 .money-cell { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .discount-cell { color: #b42318; }
+.history-table th.yape-col { background: #eadcf2; color: #5b2277; }
+.history-table th.cash-col { background: #d3ebdf; color: #0f5c43; }
+.history-table th.total-col { background: #d8e5f5; color: #173f75; }
+.history-table .yape-cell { color: #742f96; }
+.history-table .cash-cell { color: #147556; }
+.history-table .total-cell { color: #1f4f8f; }
+.history-table .money-cell.is-empty { text-align: center; }
+.history-table .method-cell { min-width: 96px; max-width: 140px; line-height: 1.35; }
+.pnp-pill { display: inline-block; padding: 3px 10px; border: 1px solid #d9a400; border-radius: 5px; background: #ffd84d; color: #2e2400; font-size: 14px; font-weight: 800; letter-spacing: .05em; }
 .is-struck { text-decoration: line-through; opacity: .5; }
 .status-pill { display: inline-block; padding: 3px 8px; border-radius: 5px; font-size: 13px; line-height: 1.4; }
 .status-pill.is-ok { background: #e9f6f1; color: #147556; }
