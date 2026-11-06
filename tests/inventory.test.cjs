@@ -476,3 +476,43 @@ test('una categoría con HTML se muestra como texto en filtros y selector', asyn
         assert.match(html, /&lt;img src=x onerror=alert\(1\)&gt;/);
     }
 });
+
+const clickBorrarCategoria = (t, nombre) => t.ids.invCategoryFilters.dispatch('click', {
+    target: { closest: sel => (sel === '.cat-delete-btn' ? { getAttribute: () => nombre } : null) }
+});
+
+test('eliminar una categoría creada: sus productos pasan a "Otros" y no se borran', async () => {
+    const t = setupInventory({ products: [
+        row(1, { nombre: 'Chupetín', categoria: 'Golosinas' }), row(2, { nombre: 'Caramelo', categoria: 'golosinas ' }),
+        row(3, { nombre: 'Agua', categoria: 'Bebidas' }), row(4, { nombre: 'Gomita', categoria: 'Golosinas', local: 'LOS PINOS' })
+    ] });
+    await t.inv.loadProducts();
+    const filtros = t.ids.invCategoryFilters.innerHTML;
+    assert.match(filtros, /<span class="cat-chip"><button[^>]*data-cat="Golosinas"[^>]*>🏷️ Golosinas<\/button><button type="button" class="cat-delete-btn" data-borrar-cat="Golosinas"/);
+    assert.doesNotMatch(filtros, /data-borrar-cat="Bebidas"|data-borrar-cat="Otros"|data-borrar-cat="Combos"/, 'las de siempre no se pueden eliminar');
+
+    await t.ids.invCategoryFilters.dispatch('click', { target: { closest: sel => (sel === '.inv-filter-btn' ? { getAttribute: () => 'Golosinas' } : null) } });
+    await clickBorrarCategoria(t, 'Golosinas');
+    const [cambio] = updates(t);
+    assert.deepEqual(plain(cambio.payload), { categoria: 'Otros' });
+    assert.deepEqual(plain(cambio.filters.slice(0, 2)), [['eq', 'local', 'LAS BRISAS'], ['eq', 'activo', true]]);
+    assert.deepEqual(plain(cambio.filters[2][2]).sort(), ['Golosinas', 'golosinas '], 'todas las formas en que está escrita');
+    assert.deepEqual(plain(t.supabase.db.productos.map(p => p.categoria)), ['Otros', 'Otros', 'Bebidas', 'Golosinas'], 'el otro local no cambia');
+    assert.equal(t.supabase.db.productos.every(p => p.activo), true, 'ningún producto se borra');
+    assert.doesNotMatch(t.ids.invCategoryFilters.innerHTML, /Golosinas/, 'ya no aparece en los filtros');
+    assert.equal(t.state.invFilteredProducts.length, 3, 'el filtro vuelve a "Todos"');
+    assert.match(t.toasts[0].message, /Se eliminó la categoría "Golosinas". 2 producto\(s\) pasaron a Otros/);
+});
+
+test('eliminar categoría: cancelar no cambia nada y las de siempre no se tocan', async () => {
+    const t = setupInventory({ products: [row(1, { categoria: 'Golosinas' })], confirm: () => false });
+    await t.inv.loadProducts();
+    await clickBorrarCategoria(t, 'Golosinas');
+    assert.equal(updates(t).length, 0);
+    assert.equal(t.supabase.db.productos[0].categoria, 'Golosinas');
+
+    const base = setupInventory({ products: [row(1, { categoria: 'Bebidas' })] });
+    await base.inv.loadProducts();
+    await clickBorrarCategoria(base, 'Bebidas');
+    assert.equal(updates(base).length, 0, 'aunque llegara el clic, una de siempre no se elimina');
+});

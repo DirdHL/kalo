@@ -3,7 +3,7 @@ import { state } from "./state.js";
 import { AVAILABLE_IMAGES, resolveImage, CATEGORIA_COMBOS, PREFIJO_NUBE, urlImagenNube, etiquetaImagen } from "./constants.js";
 import { listarImagenesNube, subirImagenNube, borrarImagenNube, nombreArchivoImagen } from "./imagenes.js";
 import { customAlert, customConfirm, customPrompt, showToast } from "./ui.js";
-import { listaCategorias, mismaCategoria, categoriaVigente, htmlFiltrosCategoria, normalizarCategoria, MAX_LARGO_CATEGORIA } from "./categorias.js";
+import { listaCategorias, mismaCategoria, categoriaVigente, htmlFiltrosCategoria, normalizarCategoria, esCategoriaBase, MAX_LARGO_CATEGORIA, CATEGORIA_POR_DEFECTO } from "./categorias.js";
 import { escapeHtml, formatMoney, describeError, fetchAll, estadoVencimiento, parseLocalDate, descargarArchivo } from "./utils.js";
 import { filasInventario, construirExcelInventario, nombreArchivoInventario } from "./inventario-excel.js";
 
@@ -936,15 +936,45 @@ export function setupInventory({ onProductsLoaded, loadExcel = cargarExcel, desc
         if (!invCategoryFilters) return;
         const categorias = listaCategorias(state.globalProducts);
         invCategoria = categoriaVigente(invCategoria, categorias);
-        invCategoryFilters.innerHTML = htmlFiltrosCategoria(categorias, 'inv-filter-btn', invCategoria);
+        invCategoryFilters.innerHTML = htmlFiltrosCategoria(categorias, 'inv-filter-btn', invCategoria, { borrar: true });
+    }
+
+    // Eliminar una categoría creada por las vendedoras: sus productos NO se borran, pasan a "Otros".
+    let eliminandoCategoria = false;
+    async function eliminarCategoria(nombre) {
+        if (!nombre || esCategoriaBase(nombre) || eliminandoCategoria) return;
+        const productos = state.globalProducts.filter(p => mismaCategoria(p.categoria, nombre));
+        const variantes = [...new Set(productos.map(p => p.categoria))];
+        const cuantos = productos.length === 1 ? 'Su producto no se borra: pasa' : `Sus ${productos.length} productos no se borran: pasan`;
+        const ok = await customConfirm(`¿Eliminar la categoría "${nombre}"?\n\n${cuantos} a "📦 ${CATEGORIA_POR_DEFECTO}".`, 'Eliminar categoría', '🗑️');
+        if (!ok) return;
+        eliminandoCategoria = true;
+        try {
+            if (variantes.length) {
+                const { error } = await supabase.from('productos').update({ categoria: CATEGORIA_POR_DEFECTO })
+                    .eq('local', state.currentLocal).eq('activo', true).in('categoria', variantes).select('id');
+                if (error) throw error;
+            }
+            categoriasCreadas = categoriasCreadas.filter(c => !mismaCategoria(c, nombre));
+            if (mismaCategoria(invCategoria, nombre)) invCategoria = 'Todos';
+            showToast(`Se eliminó la categoría "${nombre}". ${productos.length} producto(s) pasaron a ${CATEGORIA_POR_DEFECTO}.`, 'success');
+            await loadProducts();
+        } catch (error) {
+            await customAlert('No se pudo eliminar la categoría: ' + describeError(error), 'Error', '⚠️');
+        } finally {
+            eliminandoCategoria = false;
+        }
     }
 
     invCategoryFilters?.addEventListener('click', event => {
+        const borrar = event.target.closest?.('.cat-delete-btn');
+        if (borrar) return eliminarCategoria(borrar.getAttribute('data-borrar-cat'));
         const boton = event.target.closest?.('.inv-filter-btn');
         if (!boton) return;
         invCategoria = boton.getAttribute('data-cat') || 'Todos';
         renderFiltrosInventario();
         filterInventoryProducts();
+        return undefined;
     });
 
     // Selector del formulario: las categorías + "Combos" + "Nueva categoría…".

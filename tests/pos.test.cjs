@@ -356,6 +356,7 @@ test('los filtros de la caja muestran las categorías nuevas que usan los produc
     for (const texto of ['🥤 Bebidas', '📦 Otros', '🏷️ Golosinas', '🏷️ Panadería', '🍔 Combos']) assert.ok(html.includes(texto), texto);
     assert.equal(html.match(/Golosinas/gi).length, 2, 'una sola vez (data-cat y texto), aunque esté escrita distinto');
     assert.ok(html.indexOf('Otros') < html.indexOf('Golosinas') && html.indexOf('Panadería') < html.indexOf('Combos'), 'las de siempre, luego las nuevas, Combos al final');
+    assert.doesNotMatch(html, /cat-delete-btn/, 'en la caja no se eliminan categorías');
 
     await t.elegirCategoria('Golosinas');
     assert.equal(t.ids.posGrid.children.length, 2, '"Golosinas" y "golosinas " son la misma');
