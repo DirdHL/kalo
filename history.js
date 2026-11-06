@@ -92,7 +92,7 @@ export function setupHistory({ onStockChanged } = {}) {
             card('Efectivo en caja', formatMoney(r.efectivo), 'Debe coincidir con el conteo', 'is-efectivo'),
             card('Yape / Plin', formatMoney(r.yape), '', 'is-yape'),
             card('Efectivo + Yape / Plin', formatMoney(roundMoney(r.efectivo + r.yape)), 'Todo lo cobrado del día', 'is-total'),
-            card('Descuentos', formatMoney(r.descuentos)),
+            card('Descuentos', formatMoney(r.descuentos), '', 'is-descuento'),
             card('Reembolsos', String(r.cantidadReembolsos), formatMoney(r.reembolsos))
         ].join('');
     }

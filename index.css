@@ -408,6 +408,8 @@ body:has(.modal-overlay:not(.hidden)) { overflow: hidden; }
 .cash-card.is-yape .cash-card-value { color: #742f96; }
 .cash-card.is-total { border: 1px solid #9fbbe0; border-top: 4px solid #1f4f8f; background: #eef3fa; }
 .cash-card.is-total .cash-card-value { color: #1f4f8f; }
+.cash-card.is-descuento { border-top: 4px solid #e0b000; }
+.cash-card.is-descuento .cash-card-value { color: #6b5200; }
 
 .history-table { font-size: 16px !important; }
 /* Historial: la tabla no se encoge en un cuadro con scroll propio; crece con las ventas y baja toda la página. */
@@ -424,7 +426,9 @@ body:has(.modal-overlay:not(.hidden)) { overflow: hidden; }
 .history-day-controls .styled-input, .period-controls .styled-input { width: auto; min-height: 42px; padding: 6px 10px; }
 .products-cell { max-width: 190px; overflow: hidden; color: var(--text-secondary); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
 .money-cell { white-space: nowrap; font-variant-numeric: tabular-nums; }
-.discount-cell { color: #b42318; }
+/* Descuento (PNP) en amarillo, igual que el botón de la caja. */
+.history-table th.discount-col { background: #fbe9a6; color: #5c4700; }
+.history-table .discount-cell strong { display: inline-block; padding: 2px 8px; border: 1px solid #d9a400; border-radius: 5px; background: #ffd84d; color: #2e2400; }
 .history-table th.yape-col { background: #eadcf2; color: #5b2277; }
 .history-table th.cash-col { background: #d3ebdf; color: #0f5c43; }
 .history-table th.total-col { background: #d8e5f5; color: #173f75; }
